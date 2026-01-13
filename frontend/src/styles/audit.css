@@ -1,0 +1,75 @@
+/* ===============================
+🧾 Audit Dashboard Layout
+================================ */
+.audit-dashboard {
+  padding: 2rem;
+}
+
+.audit-dashboard .tool-section {
+  background-color: var(--card-bg);
+  padding: 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.audit-dashboard .tool-section h3 {
+  margin-bottom: 1rem;
+  font-size: 1.2rem;
+  color: var(--accent);
+}
+
+.audit-dashboard .audit-tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+/* ===============================
+📋 Compliance & Usage Stats
+================================ */
+.compliance-report ul,
+.system-usage-stats ul {
+  list-style: none;
+  padding: 0;
+  margin-top: 1rem;
+}
+
+.compliance-report li,
+.system-usage-stats li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ===============================
+📊 Registry Snapshot
+================================ */
+.registry-snapshot table {
+  width: 100%;
+  margin-top: 1rem;
+  border-collapse: collapse;
+}
+
+.registry-snapshot th,
+.registry-snapshot td {
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+/* ===============================
+📤 Audit Export Panel
+================================ */
+.audit-export-panel button {
+  background-color: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 1rem;
+}
+
+.audit-export-panel button:hover {
+  background-color: var(--accent-hover);
+}

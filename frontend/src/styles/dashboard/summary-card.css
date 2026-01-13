@@ -1,0 +1,16 @@
+/* ===============================
+📊 Summary Cards Layout
+================================ */
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+
+.card-icon {
+  font-size: 1.25rem;
+  margin-right: var(--space-xs);
+  display: inline-block;
+}
+

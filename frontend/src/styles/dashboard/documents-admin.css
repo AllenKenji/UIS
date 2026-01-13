@@ -1,0 +1,114 @@
+/* documents-admin.css */
+
+/* Page container */
+.documents-admin-page {
+  padding: 2rem;
+  background-color: #f9fafb;
+  font-family: "Segoe UI", Roboto, sans-serif;
+  color: #333;
+}
+
+/* Headings */
+.documents-admin-page h1 {
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+  color: #222;
+}
+
+.documents-admin-page h2 {
+  font-size: 1.4rem;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  color: #444;
+}
+
+/* Status messages */
+.status-message {
+  margin: 0.5rem 0;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  background-color: #fff3cd;
+  color: #856404;
+  font-size: 0.9rem;
+}
+
+/* Document table */
+.document-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  background-color: #fff;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.document-table th,
+.document-table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.document-table th {
+  background-color: #f3f4f6;
+  font-weight: 600;
+  color: #111827;
+}
+
+.document-table tr:hover {
+  background-color: #f9fafb;
+}
+
+/* Action links/buttons */
+.document-table a {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.document-table a:hover {
+  text-decoration: underline;
+}
+
+.document-table button {
+  background: none;
+  border: none;
+  color: #dc2626;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.document-table button:hover {
+  text-decoration: underline;
+}
+
+/* Audit table styling (shared look) */
+.audit-table {
+  margin-top: 1rem;
+  background-color: #fff;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.audit-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.audit-table th,
+.audit-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.audit-table th {
+  background-color: #f3f4f6;
+  font-weight: 600;
+  color: #111827;
+}
+
+.audit-table tr:hover {
+  background-color: #f9fafb;
+}

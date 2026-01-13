@@ -1,0 +1,40 @@
+.business-dashboard {
+  padding: 1rem;
+}
+
+.filters {
+  margin-bottom: 1rem;
+}
+
+.business-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.business-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 0 6px rgba(0,0,0,0.1);
+}
+
+.business-card h3 {
+  margin-top: 0;
+}
+
+.business-id {
+  font-size: 0.85rem;
+  color: #666;
+  margin-top: 0.5rem;
+}
+
+.qr-wrapper {
+  margin-top: 0.5rem;
+  text-align: center;
+}
+.business-card .qr-wrapper canvas {
+  border: 1px solid #ccc;
+  padding: 4px;
+  background: #fff;
+}

@@ -1,0 +1,71 @@
+.document-form {
+  background-color: var(--bg-color, #ffffff);
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+}
+
+.document-form h2 {
+  text-align: center;
+  margin-bottom: 1rem;
+  color: var(--text-color, #333);
+}
+
+.document-form form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.document-form label {
+  font-weight: bold;
+  color: var(--text-color, #444);
+}
+
+.document-form input,
+.document-form select,
+.document-form textarea {
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  background-color: var(--input-bg, #f9f9f9);
+  color: var(--text-color, #333);
+}
+
+.document-form textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.document-form button {
+  padding: 0.6rem 1rem;
+  background-color: #0077cc;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.document-form button:hover {
+  background-color: #005fa3;
+}
+
+.document-form p {
+  margin-top: 1rem;
+  text-align: center;
+  font-size: 0.95rem;
+}
+
+.document-form a {
+  color: #0077cc;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.document-form a:hover {
+  text-decoration: underline;
+}

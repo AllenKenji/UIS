@@ -1,0 +1,128 @@
+import logging
+import os
+import sys
+import argparse
+import firebase_admin
+from firebase_admin import auth, credentials
+from google.cloud import firestore
+
+# ✅ Import ROLE_PERMISSIONS from your core module
+from backend.app.core.roles import ROLE_PERMISSIONS
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s: %(message)s"
+)
+logger = logging.getLogger("uvicorn.error")
+
+
+def ensure_firebase_initialized():
+    """Initialize Firebase app if not already initialized."""
+    try:
+        firebase_admin.get_app()
+    except ValueError:
+        cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+        if not cred_path or not os.path.exists(cred_path):
+            logger.error("❌ Set GOOGLE_APPLICATION_CREDENTIALS to your service account JSON path")
+            sys.exit(2)
+        cred = credentials.Certificate(cred_path)
+        firebase_admin.initialize_app(cred)
+        logger.info("✅ Firebase initialized with %s", cred_path)
+
+
+def assign_role_claims(dry_run: bool = False,
+                       filter_role: str = None,
+                       filter_uid: str = None):
+    """Assign custom claims to users based on their role."""
+    ensure_firebase_initialized()
+    db = firestore.Client()
+
+    users_ref = db.collection("users")
+    docs = users_ref.stream()
+
+    updated, skipped, failed = 0, 0, 0
+    role_counts = {}
+
+    for doc in docs:
+        uid = doc.id
+        data = doc.to_dict()
+        role = (data.get("role") or "").strip().lower()
+
+        logger.debug("📄 Firestore doc for UID %s: %s", uid, data)
+
+        if not role:
+            logger.warning("⚠️ No role found for UID: %s", uid)
+            skipped += 1
+            continue
+
+        if filter_role and role != filter_role.lower():
+            logger.debug("⏭️ Skipped UID %s due to role filter (%s)", uid, filter_role)
+            skipped += 1
+            continue
+
+        if filter_uid and uid != filter_uid:
+            logger.debug("⏭️ Skipped UID %s due to UID filter (%s)", uid, filter_uid)
+            skipped += 1
+            continue
+
+        permissions = ROLE_PERMISSIONS.get(role)
+        if not permissions:
+            logger.warning("⚠️ Unknown role '%s' for UID: %s", role, uid)
+            skipped += 1
+            continue
+
+        role_counts[role] = role_counts.get(role, 0) + 1
+
+        try:
+            current_claims = auth.get_user(uid).custom_claims or {}
+            desired_claims = {"role": role, "permissions": permissions}
+
+            logger.debug("🔍 Current claims for UID %s: %s", uid, current_claims)
+            logger.debug("🔧 Desired claims for UID %s: %s", uid, desired_claims)
+
+            if (current_claims.get("role") == role and
+                    current_claims.get("permissions") == permissions):
+                logger.info("⏩ Claims already correct for UID: %s", uid)
+                skipped += 1
+                continue
+
+            if dry_run:
+                logger.info("🔍 Dry run: would set claims for UID: %s", uid)
+            else:
+                auth.set_custom_user_claims(uid, desired_claims)
+                logger.info("✅ Claims set for UID: %s (role=%s)", uid, role)
+
+            updated += 1
+
+        except Exception as e:
+            logger.error("❌ Failed to set claims for UID %s: %s", uid, str(e))
+            failed += 1
+
+    logger.info("📊 Roles processed: %s", role_counts)
+    logger.info("🔄 Sync complete: %s updated, %s skipped, %s failed.",
+                updated, skipped, failed)
+
+    if failed > 0:
+        sys.exit(1)
+    else:
+        sys.exit(0)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Sync Firebase custom claims with Firestore roles")
+    parser.add_argument("--dry-run", action="store_true", help="Preview changes without applying")
+    parser.add_argument("--filter-role", type=str, help="Only process users with this role")
+    parser.add_argument("--filter-uid", type=str, help="Only process this specific UID")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+
+    args = parser.parse_args()
+
+    if args.debug:
+        logger.setLevel(logging.DEBUG)
+
+    assign_role_claims(
+        dry_run=args.dry_run,
+        filter_role=args.filter_role,
+        filter_uid=args.filter_uid
+    )

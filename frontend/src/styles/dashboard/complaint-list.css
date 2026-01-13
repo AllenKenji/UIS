@@ -1,0 +1,51 @@
+/* ===============================
+📢 Complaint List
+================================ */
+.complaint-list {
+  margin-top: var(--space-md);
+  background: var(--gradient-card);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.complaint-list h3 {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-accent);
+  margin-bottom: var(--space-md);
+}
+
+/* Table */
+.complaint-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.complaint-table th,
+.complaint-table td {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.complaint-table th {
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.complaint-table tr:hover {
+  background: var(--color-table-row-hover);
+  color: var(--color-text-strong); /* ✅ ensures readability in light mode */
+}
+
+/* Issue badge */
+.issue-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  background: var(--color-warning);
+  color: #fff;
+}

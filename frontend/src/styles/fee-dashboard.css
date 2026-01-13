@@ -1,0 +1,84 @@
+/* Container */
+.fee-dashboard {
+  padding: 2rem;
+  font-family: "Segoe UI", Roboto, sans-serif;
+  color: #333;
+}
+
+/* Heading */
+.fee-dashboard h1 {
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+  color: #2c3e50;
+}
+
+/* Status messages */
+.fee-dashboard p {
+  margin: 0.5rem 0;
+}
+
+.fee-dashboard p.error {
+  color: #e74c3c;
+  font-weight: bold;
+}
+
+.fee-dashboard p.loading {
+  color: #2980b9;
+}
+
+/* Tables */
+.fee-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 2rem;
+  background: #fafafa;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.fee-table th,
+.fee-table td {
+  border: 1px solid #ddd;
+  padding: 0.75rem;
+  text-align: left;
+}
+
+.fee-table th {
+  background: #f0f0f0;
+  font-weight: 600;
+}
+
+.fee-table tr:nth-child(even) {
+  background: #f9f9f9;
+}
+
+/* Inputs */
+.fee-table input[type="number"] {
+  width: 100px;
+  padding: 0.25rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+/* Buttons */
+.fee-table button {
+  margin-right: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.fee-table button:first-of-type {
+  background: #27ae60;
+  color: #fff;
+}
+
+.fee-table button:last-of-type {
+  background: #e74c3c;
+  color: #fff;
+}
+
+.fee-table button:hover {
+  opacity: 0.9;
+}

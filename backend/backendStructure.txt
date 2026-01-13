@@ -1,0 +1,55 @@
+BIS/
+├── backend/       
+│   ├── app/
+│   │   ├── core/
+│   │   │   ├── auth.py
+│   │   │   ├── roles.py
+│   │   │   └── firebase.py
+│   │   ├── models/
+│   │   │   ├── __init__.py
+│   │   │   ├── account.py
+│   │   │   ├── business.py
+│   │   │   ├── complaint.py
+│   │   │   ├── document.py
+│   │   │   ├── incident.py
+│   │   │   ├── payment.py
+│   │   │   ├── resident.py
+│   │   │   └── settings.py
+│   │   ├── routes/
+│   │   │   ├── __init__.py
+│   │   │   ├── account_routes.py
+│   │   │   ├── audit_routes.py
+│   │   │   ├── business_routes.py
+│   │   │   ├── complaint_routes.py
+│   │   │   ├── dashboard.py
+│   │   │   ├── document_routes.py
+│   │   │   ├── incident_routes.py
+│   │   │   ├── payment_routes.py
+│   │   │   ├── paymongo_routes.py
+│   │   │   ├── resident_routes.py
+│   │   │   └── settings_routes.py
+│   │   ├── services/
+│   │   │   ├── __init__.py
+│   │   │   ├── account_services.py
+│   │   │   ├── business_services.py
+│   │   │   ├── complaint_services.py
+│   │   │   ├── document_services.py
+│   │   │   ├── incident_services.py
+│   │   │   ├── payment_services.py
+│   │   │   ├── paymongo_services.py
+│   │   │   ├── resident_services.py
+│   │   │   └── settings_services.py
+│   │   ├── utils/
+│   │   │   ├── __init__.py
+│   │   │   ├── barangay_documents.py
+│   │   │   ├── fee_calculator.py
+│   │   │   └── sanitize.py
+│   │   ├── __init__.py
+│   │   └── main.py
+│   ├── v/
+│   ├── venv/
+│   ├── __init__.py
+│   ├── assign_claims.py
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   └── serviceAccountKey.json

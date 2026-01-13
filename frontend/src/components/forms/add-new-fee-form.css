@@ -1,0 +1,59 @@
+.add-fee-form {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fafafa;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.add-fee-form h2 {
+  font-size: 1.4rem;
+  margin-bottom: 1rem;
+  color: #2c3e50;
+}
+
+/* Labels stack neatly above inputs */
+.add-fee-form label {
+  display: block;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+  color: #444;
+}
+
+.add-fee-form select,
+.add-fee-form input[type="text"],
+.add-fee-form input[type="number"] {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  margin-top: 0.25rem;
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease;
+}
+
+.add-fee-form select:focus,
+.add-fee-form input:focus {
+  outline: none;
+  border-color: #2980b9;
+}
+
+/* Save button */
+.add-fee-form button {
+  padding: 0.6rem 1.2rem;
+  background: #27ae60;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.add-fee-form button:hover {
+  background: #219150;
+}

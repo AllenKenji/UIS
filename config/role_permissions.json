@@ -1,0 +1,63 @@
+{
+  "admin": [
+    "viewDashboard",
+    "createAccounts",
+    "manageResidents",
+    "generateCertificates",
+    "viewFinancialRecords",
+    "manageFinancialRecords",
+    "youthRegistryAccess",
+    "auditBarangayData",
+    "viewDocuments",
+    "viewBusinesses",
+    "viewAllComplaints",
+    "viewIncidents",
+    "manageSettings",
+    "manageAnnouncements",
+    "manageEvents",
+    "viewUsers",
+    "manageUsers"
+  ],
+  "staff": [
+    "viewDashboard",
+    "manageBusinesses",
+    "manageComplaints",
+    "manageResidents",
+    "viewBusinesses",
+    "viewIncidents",
+    "viewAllComplaints"   
+  ],
+  "resident": [
+    "viewDashboard",
+    "fileComplaints",
+    "viewOwnComplaints",
+    "viewOwnDocuments",
+    "requestDocuments",
+    "viewOwnBusinesses",
+    "registerBusinesses",
+    "reportIncidents",
+    "viewOwnIncidents",
+    "submitFeedback"
+  ],
+  "secretary": [ 
+    "viewDashboard", 
+    "viewDocuments", 
+    "pendingRequests", 
+    "paymentQueue", 
+    "issuedDocuments", 
+    "rejectedRequests" 
+  ],
+  "treasurer": [
+    "viewDashboard",
+    "viewFinancialRecords",
+    "manageFinancialRecords"
+  ],
+  "sk": [
+    "viewDashboard",
+    "youthRegistryAccess"
+  ],
+  "dilg": [
+    "viewDashboard",
+    "auditBarangayData"
+  ]
+}

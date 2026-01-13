@@ -1,0 +1,142 @@
+/* Overlay */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5); /* slate-900/50 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+/* Container */
+.modal-container {
+  background: #ffffff;
+  border-radius: 8px;
+  max-width: 640px;
+  width: 100%;
+  padding: 1.5rem 1.75rem;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.2);
+  max-height: 90vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+/* Heading */
+.modal-container h2 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #111827; /* gray-900 */
+}
+
+/* Section with read-only info */
+.modal-section {
+  margin-bottom: 1.25rem;
+  padding: 0.75rem 0.9rem;
+  background: #f9fafb; /* gray-50 */
+  border-radius: 6px;
+  border: 1px solid #e5e7eb; /* gray-200 */
+  font-size: 0.9rem;
+}
+
+.modal-section p {
+  margin: 0.25rem 0;
+}
+
+.modal-section a {
+  color: #2563eb; /* blue-600 */
+  text-decoration: none;
+}
+
+.modal-section a:hover {
+  text-decoration: underline;
+}
+
+/* Form */
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.modal-form label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #374151; /* gray-700 */
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.modal-form select,
+.modal-form textarea {
+  width: 100%;
+  border-radius: 6px;
+  border: 1px solid #d1d5db; /* gray-300 */
+  padding: 0.45rem 0.55rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.modal-form select:focus,
+.modal-form textarea:focus {
+  outline: none;
+  border-color: #2563eb; /* blue-600 */
+  box-shadow: 0 0 0 1px #2563eb20;
+}
+
+.modal-form textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+/* Actions */
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.modal-actions button {
+  border-radius: 999px;
+  border: none;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.cancel-btn {
+  background: #f3f4f6; /* gray-100 */
+  color: #374151; /* gray-700 */
+}
+
+.cancel-btn:hover {
+  background: #e5e7eb; /* gray-200 */
+}
+
+.submit-btn {
+  background: #2563eb; /* blue-600 */
+  color: #ffffff;
+}
+
+.submit-btn:hover {
+  background: #1d4ed8; /* blue-700 */
+}
+
+.submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Small screens */
+@media (max-width: 640px) {
+  .modal-container {
+    max-width: 100%;
+    margin: 0 1rem;
+    padding: 1.25rem 1.25rem;
+  }
+}

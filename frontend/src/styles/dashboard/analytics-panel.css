@@ -1,0 +1,106 @@
+/* ===============================
+📊 Analytics Panel
+================================ */
+.analytics-panel {
+  background: var(--gradient-card);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--color-border);
+  margin-top: var(--space-lg);
+}
+
+/* Header with toggle */
+.analytics-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+}
+
+.analytics-header h3 {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+/* Toggle buttons */
+.trend-toggle {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.trend-toggle button {
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-card-muted);
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  color: var(--color-text-strong); /* ✅ ensures visibility in light mode */
+}
+
+.trend-toggle button:hover {
+  background: var(--color-table-row-hover);
+}
+
+.trend-toggle button.active {
+  background: var(--color-accent);
+  color: #fff; /* ✅ white text for contrast */
+  border-color: var(--color-accent);
+}
+
+/* Metrics grid */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-md);
+}
+
+/* Trend indicators inside cards */
+.trend-indicator {
+  margin-left: var(--space-xs);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.trend-indicator.up {
+  color: var(--color-success);
+}
+
+.trend-indicator.down {
+  color: var(--color-danger);
+}
+
+.trend-indicator.neutral {
+  color: var(--color-text-muted);
+}
+
+/* Chart container */
+.analytics-chart {
+  grid-column: 1 / -1; /* span full width */
+  margin-top: var(--space-lg);
+  background: var(--color-card-muted);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .analytics-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-sm);
+  }
+
+  .trend-toggle {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .analytics-chart {
+    margin-top: var(--space-md);
+  }
+}

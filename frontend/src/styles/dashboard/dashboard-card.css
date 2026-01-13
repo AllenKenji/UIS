@@ -1,0 +1,45 @@
+/* ===============================
+📊 Dashboard Card
+================================ */
+.dashboard-card {
+  background: var(--gradient-card);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  box-shadow: var(--shadow-card);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.dashboard-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-card-hover);
+}
+
+.dashboard-card h4 {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  margin-bottom: var(--space-xs);
+  color: var(--color-text-strong);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.dashboard-card p {
+  font-size: var(--font-size-lg);
+  font-weight: bold;
+  color: var(--color-text);
+}
+
+/* Icon spacing */
+.card-icon {
+  margin-right: var(--space-xs);
+}
+
+/* Variants */
+.dashboard-card.accent  { border-left: 6px solid var(--color-accent); }
+.dashboard-card.success { border-left: 6px solid var(--color-success); }
+.dashboard-card.info    { border-left: 6px solid var(--color-info); }
+.dashboard-card.warning { border-left: 6px solid var(--color-warning); }
+.dashboard-card.neutral { border-left: 6px solid var(--color-neutral); }
+.dashboard-card.danger  { border-left: 6px solid var(--color-danger); }
+.dashboard-card.youth    { border-left: 6px solid var(--color-youth); }

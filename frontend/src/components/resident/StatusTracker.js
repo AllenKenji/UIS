@@ -1,0 +1,22 @@
+import React from "react";
+import "../../styles/admin.css";
+
+const mockStatuses = [
+  { id: 1, type: "Document", name: "Barangay Clearance", status: "Ready for pickup" },
+  { id: 2, type: "Complaint", name: "Flooding", status: "Under review" },
+];
+
+const StatusTracker = () => (
+  <div className="status-tracker">
+    <h3>📍 Status Tracker</h3>
+    <ul>
+      {mockStatuses.map((item) => (
+        <li key={item.id}>
+          <strong>{item.name}</strong> ({item.type}) — {item.status}
+        </li>
+      ))}
+    </ul>
+  </div>
+);
+
+export default StatusTracker;

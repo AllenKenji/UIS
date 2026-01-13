@@ -1,0 +1,92 @@
+/* ===============================
+🧑‍💼 Admin Dashboard Styles
+================================ */
+.dashboard.admin-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: var(--space-lg);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+/* Header */
+.dashboard-header {
+  margin-bottom: var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--space-sm);
+}
+
+.dashboard-header h2 {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  color: var(--color-accent);
+  margin-bottom: var(--space-xs);
+}
+
+.dashboard-subtitle {
+  font-size: var(--font-size-md);
+  color: var(--color-text-strong);
+}
+
+/* Section stack */
+.section-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* DashboardSection wrapper */
+.dashboard-section {
+  background: var(--gradient-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-md);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.dashboard-section:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-card-hover);
+}
+
+.dashboard-section h3 {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  margin-bottom: var(--space-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+/* Accent borders */
+.dashboard-section.accent  { border-left: 6px solid var(--color-accent); }
+.dashboard-section.success { border-left: 6px solid var(--color-success); }
+.dashboard-section.danger  { border-left: 6px solid var(--color-danger); }
+
+/* Layout variants */
+.dashboard-section.grid-auto {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-md);
+}
+
+.dashboard-section.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-md);
+}
+
+.dashboard-section.flex-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+}
+
+/* Responsive adjustments */
+@media (max-width: var(--bp-md)) {
+  .dashboard-section.grid-2 {
+    grid-template-columns: 1fr;
+  }
+}

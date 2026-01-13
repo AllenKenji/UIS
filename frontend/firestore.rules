@@ -1,0 +1,95 @@
+rules_version = '2';
+service cloud.firestore {
+  
+  function isAuthenticated() {
+    return request.auth != null;
+  }
+
+  function userRole() {
+    return get(/databases/(default)/documents/users/$(request.auth.uid)).data.role;
+  }
+
+  function isAdmin() {
+    return isAuthenticated() && userRole() == "admin";
+  }
+
+  function isSecretary() {
+    return isAuthenticated() && userRole() == "secretary";
+  }
+
+  function isStaff() {
+    return isAuthenticated() && userRole() == "staff";
+  }
+
+  function isSK() {
+    return isAuthenticated() && userRole() == "sk";
+  }
+
+  function isResident() {
+    return isAuthenticated() && userRole() == "resident";
+  }
+
+  function isAdminOrSecretary() {
+    return isAuthenticated() && userRole() in ["admin", "secretary"];
+  }
+
+  function isAdminOrStaff() {
+    return isAuthenticated() && userRole() in ["admin", "staff"];
+  }
+
+  function isAdminStaffResident() {
+    return isAuthenticated() && userRole() in ["admin", "staff", "resident"];
+  }
+
+  match /databases/{database}/documents {
+
+    // 🔐 User profiles
+    match /users/{uid} {
+      allow read: if isAuthenticated() && (request.auth.uid == uid || isAdmin());
+      allow write, delete: if isAdmin();
+    }
+
+    // 👥 Residents
+    match /residents/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdminOrStaff();
+    }
+
+    // 💼 Businesses
+    match /businesses/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdminOrStaff();
+    }
+
+    // 🧒 Youth Registry (SK)
+    match /youth/{docId} {
+      allow read: if isAdmin() || isSK();
+    }
+
+    // 📄 Documents (Admin + Secretary)
+    match /documents/{docId} {
+      allow read: if isAdminOrSecretary() || isResident();
+      allow write: if isAdminOrSecretary();
+    }
+
+    // 🗣️ Complaints (Admin + Staff + Resident)
+    match /complaints/{docId} {
+      allow read, write: if isAdminStaffResident();
+    }
+
+    // ⚠️ Incidents (Admin + Staff)
+    match /incidents/{docId} {
+      allow read, write: if isAdminOrStaff();
+    }
+
+    // 📊 Logins (Admin only)
+    match /logins/{docId} {
+      allow read: if isAdmin();
+    }
+
+    match /fees/{docId} {
+      allow read: if isAdminOrStaff();
+      allow write: if isAdmin();
+    }
+  }
+}

@@ -1,0 +1,168 @@
+/* ===============================
+📄 Document Queue
+================================ */
+.document-queue {
+  margin-top: var(--space-md);
+  background: var(--gradient-card);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.document-queue h3 {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-accent);
+  margin-bottom: var(--space-md);
+}
+
+/* ===============================
+📊 Table
+================================ */
+.queue-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.queue-table th,
+.queue-table td {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.queue-table th {
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.queue-table tr:hover {
+  background: var(--color-table-row-hover);
+  color: var(--color-text-strong); /* ✅ ensures text stays visible */
+}
+
+/* ===============================
+🏷️ Status Badges
+================================ */
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-transform: capitalize;
+  color: #fff;
+}
+
+.status-badge.pending { background: var(--color-warning); }
+.status-badge.approved { background: var(--color-success); }
+.status-badge.rejected { background: var(--color-danger); }
+
+/* ===============================
+⚙️ Action Buttons
+================================ */
+.review-btn,
+.approve-btn,
+.reject-btn {
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  color: #fff;
+}
+
+.review-btn {
+  background: var(--color-accent);
+}
+.review-btn:hover {
+  background: var(--color-accent-hover);
+}
+
+.approve-btn {
+  background: var(--color-success);
+}
+.approve-btn:hover {
+  background: var(--color-success-hover);
+}
+
+.reject-btn {
+  background: var(--color-danger);
+}
+.reject-btn:hover {
+  background: var(--color-danger-hover);
+}
+
+/* ===============================
+🪟 Modal
+================================ */
+.modal-overlay {
+  position: fixed;
+  inset: 0; /* shorthand for top/left/right/bottom:0 */
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+}
+
+.modal {
+  background: var(--color-card-bg, #fff);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  width: 400px;
+  max-width: 90%;
+  box-shadow: var(--shadow-lg);
+  animation: fadeIn 0.3s ease;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-sm);
+}
+
+.modal-header h4 {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+  color: var(--color-text-strong); /* ✅ visible in light mode */
+  transition: color 0.2s ease;
+}
+.close-btn:hover {
+  color: var(--color-danger); /* red highlight on hover */
+}
+
+.modal-body p {
+  margin: var(--space-xs) 0;
+  font-size: var(--font-size-sm);
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+/* ===============================
+✨ Effects
+================================ */
+.document-queue.blurred {
+  filter: blur(4px);
+  pointer-events: none; /* prevent clicks behind modal */
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}

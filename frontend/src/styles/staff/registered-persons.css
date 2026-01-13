@@ -1,0 +1,40 @@
+.registered-persons {
+  background: var(--color-card-bg);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  margin-top: var(--space-lg);
+}
+
+.rp-header h3 {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  color: var(--color-text-strong);
+}
+
+.rp-header p {
+  margin: var(--space-xs) 0 var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.rp-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.rp-table th,
+.rp-table td {
+  padding: var(--space-sm);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.rp-table tr:hover {
+  background-color: var(--color-table-row-hover);
+}
+
+/* Role colors */
+.role-resident { color: var(--color-resident); font-weight: var(--font-weight-bold); }
+.role-staff    { color: var(--color-staff); font-weight: var(--font-weight-bold); }
+.role-admin    { color: var(--color-admin); font-weight: var(--font-weight-bold); }

@@ -1,0 +1,78 @@
+/* ===============================
+🛂 Role Manager
+================================ */
+.role-manager {
+  background: var(--gradient-card);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--color-border);
+}
+
+.role-manager h3 {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-accent);
+  margin-bottom: var(--space-md);
+}
+
+/* Table */
+.role-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.role-table th,
+.role-table td {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.role-table th {
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+/* Role badges */
+.role-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.role-badge.admin { background: var(--color-danger); color: #fff; }
+.role-badge.staff { background: var(--color-success); color: #fff; }
+.role-badge.secretary { background: var(--color-info); color: #fff; }
+.role-badge.treasurer { background: var(--color-warning); color: #fff; }
+.role-badge.sk { background: var(--color-youth); color: #fff; }
+.role-badge.dilg { background: var(--color-neutral); color: #fff; }
+.role-badge.resident { background: var(--color-accent); color: #fff; }
+
+/* Actions */
+select {
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-input-bg);
+}
+
+.delete-btn {
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.delete-btn.danger {
+  background: var(--color-danger);
+  color: #fff;
+}
+
+.delete-btn.danger:hover {
+  background: var(--color-danger-hover);
+}

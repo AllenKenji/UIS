@@ -1,0 +1,122 @@
+/* resident-form.css */
+
+.resident-form {
+  max-width: 600px;
+  margin: 2rem auto;
+  padding: 1.5rem;
+  background: #f9f9f9;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  font-family: system-ui, sans-serif;
+}
+
+.resident-form label {
+  display: block;
+  margin-top: 1rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.resident-form input,
+.resident-form select,
+.resident-form textarea {
+  width: 100%;
+  padding: 0.5rem;
+  margin-top: 0.25rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+}
+
+.resident-form input:focus,
+.resident-form select:focus,
+.resident-form textarea:focus {
+  outline: none;
+  border-color: #0078d4;
+  box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.2);
+}
+
+.resident-form fieldset {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
+.resident-form legend {
+  font-weight: 600;
+  color: #444;
+  padding: 0 0.5rem;
+}
+
+.error {
+  color: #d93025;
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
+  display: block;
+}
+
+.auth-warning {
+  text-align: center;
+  color: #d93025;
+  font-weight: 600;
+  margin-top: 2rem;
+}
+
+.photo-preview-wrapper,
+.fingerprint-preview-wrapper {
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.photo-preview,
+.fingerprint-preview {
+  max-width: 120px;
+  max-height: 120px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.resident-form button {
+  margin-top: 1.5rem;
+  padding: 0.6rem 1.2rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.resident-form button[type="submit"] {
+  background-color: #0078d4;
+  color: #fff;
+}
+
+.resident-form button[type="submit"]:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.resident-form button[type="button"] {
+  background-color: #f3f3f3;
+  color: #333;
+}
+
+.resident-form button[type="button"]:hover {
+  background-color: #e1e1e1;
+}
+
+.signature-preview-wrapper {
+  margin-top: 10px;
+}
+
+.signature-preview {
+  max-width: 200px;
+  height: 60px;
+  object-fit: contain;
+  border-bottom: 1px solid #000;
+}

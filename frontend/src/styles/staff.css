@@ -1,0 +1,15 @@
+/* ===============================
+🧑‍💼 Staff Dashboard Layout
+================================ */
+.staff-dashboard {
+  padding: 2rem;
+}
+
+.staff-dashboard .staff-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+/* Add staff-specific cards, tables, or forms here */

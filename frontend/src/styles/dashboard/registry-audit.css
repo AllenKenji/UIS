@@ -1,0 +1,52 @@
+.registry-audit {
+  background: var(--gradient-card);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--color-border);
+}
+
+.registry-audit h3 {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-accent);
+  margin-bottom: var(--space-md);
+}
+
+.registry-audit ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.audit-entry {
+  padding: var(--space-sm);
+  background-color: var(--color-card-muted);
+  border-radius: var(--radius-sm);
+  transition: background-color 0.2s ease;
+}
+
+.audit-entry:hover {
+  background-color: var(--color-table-row-hover);
+}
+
+.audit-entry strong {
+  color: var(--color-text-strong);
+}
+
+.audit-entry small {
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+
+/* Role-based accent borders */
+.audit-entry.accent  { border-left: 4px solid var(--color-accent); }
+.audit-entry.success { border-left: 4px solid var(--color-success); }
+.audit-entry.info    { border-left: 4px solid var(--color-info); }
+.audit-entry.danger  { border-left: 4px solid var(--color-danger); }
+.audit-entry.warning { border-left: 4px solid var(--color-warning); }
+.audit-entry.neutral { border-left: 4px solid var(--color-neutral); }
+.audit-entry.youth { border-left: 4px solid var(--color-youth); }

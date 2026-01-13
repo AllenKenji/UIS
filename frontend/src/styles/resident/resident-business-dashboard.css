@@ -1,0 +1,109 @@
+/* resident-business-dashboard.css */
+
+.resident-business-dashboard {
+  padding: 2rem;
+  max-width: 1000px;
+  margin: 0 auto;
+  font-family: system-ui, sans-serif;
+}
+
+.resident-business-dashboard h2 {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  color: #333;
+}
+
+.business-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.business-card {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.business-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+}
+
+.business-card h3 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  color: #2c3e50;
+}
+
+.business-card p {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.documents-list {
+  margin-top: 0.75rem;
+}
+
+.documents-list a {
+  display: inline-block;
+  margin-right: 0.5rem;
+  font-size: 0.85rem;
+  color: #0066cc;
+  text-decoration: none;
+}
+
+.documents-list a:hover {
+  text-decoration: underline;
+}
+
+.qr-wrapper {
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.qr-wrapper p {
+  font-size: 0.85rem;
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+}
+
+.payment-section {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: #f9f9f9;
+  border: 1px dashed #ccc;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.payment-section p {
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  color: #444;
+}
+
+.pay-btn {
+  background: #28a745;
+  color: #fff;
+  border: none;
+  padding: 0.5rem 1.25rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s ease;
+}
+
+.pay-btn:hover {
+  background: #218838;
+}
+
+.warning-text {
+  color: #d9534f;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}

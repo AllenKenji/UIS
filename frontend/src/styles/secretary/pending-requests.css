@@ -1,0 +1,196 @@
+/* Container */
+.pending-requests {
+  padding: 24px;
+  background-color: #f4f7fa;
+  border-radius: 12px;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+/* Header */
+.pending-requests h3 {
+  font-size: 1.4rem;
+  margin-bottom: 20px;
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+/* Status message */
+.status-message {
+  color: #7f8c8d;
+  font-style: italic;
+  margin-top: 8px;
+}
+
+/* Request list */
+.request-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.request-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #dce3ea;
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+  transition: box-shadow 0.2s ease;
+}
+
+.request-card:hover {
+  box-shadow: 0 4px 8px rgba(0,0,0,0.06);
+}
+
+.request-info strong {
+  display: block;
+  font-size: 1.05rem;
+  color: #2c3e50;
+  font-weight: 500;
+}
+
+.request-info span {
+  font-size: 0.9rem;
+  color: #7f8c8d;
+}
+
+/* View button */
+.btn-view {
+  background: #eaf0f6;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #2c3e50;
+  transition: background 0.2s ease;
+}
+
+.btn-view:hover {
+  background: #d6e0eb;
+}
+
+/* Detail panel */
+.doc-panel {
+  margin-top: 24px;
+  background: #ffffff;
+  border: 1px solid #dce3ea;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+}
+
+.doc-panel header h4 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.doc-panel .doc-type {
+  font-size: 1rem;
+  color: #7f8c8d;
+  margin-bottom: 16px;
+}
+
+.doc-meta p {
+  margin: 6px 0;
+  color: #4b5563;
+  font-size: 0.95rem;
+}
+
+/* Attachments */
+.doc-attachments h5 {
+  margin-top: 20px;
+  font-size: 1.05rem;
+  color: #34495e;
+  font-weight: 500;
+}
+
+.doc-attachments ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.doc-attachments li {
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+}
+
+.doc-attachments a {
+  color: #3498db;
+  text-decoration: none;
+}
+
+.doc-attachments a:hover {
+  text-decoration: underline;
+}
+
+/* Action buttons */
+.doc-actions {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.doc-actions button {
+  padding: 10px 16px;
+  font-size: 0.9rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s ease;
+}
+
+/* Button styles */
+.btn-awaiting {
+  background: #f39c12;
+  color: #fff;
+}
+
+.btn-awaiting:hover {
+  background: #d68910;
+}
+
+.btn-reject {
+  background: #e74c3c;
+  color: #fff;
+}
+
+.btn-reject:hover {
+  background: #c0392b;
+}
+
+.btn-close {
+  background: #95a5a6;
+  color: #fff;
+}
+
+.btn-close:hover {
+  background: #7f8c8d;
+}
+
+/* Rejection notes */
+.reject-section {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reject-textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 10px;
+  font-size: 0.9rem;
+  border: 1px solid #ccd6dd;
+  border-radius: 6px;
+  resize: vertical;
+  font-family: 'Segoe UI', sans-serif;
+}

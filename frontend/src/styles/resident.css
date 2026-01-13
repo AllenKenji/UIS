@@ -1,0 +1,15 @@
+/* ===============================
+🏠 Resident Dashboard Layout
+================================ */
+.resident-dashboard {
+  padding: 2rem;
+}
+
+.resident-dashboard .resident-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+/* Add more resident-specific tools or forms here */

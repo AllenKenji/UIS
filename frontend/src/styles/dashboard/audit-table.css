@@ -1,0 +1,72 @@
+/* audit-table.css */
+
+/* Container */
+.audit-table {
+  margin-top: 1.5rem;
+  background-color: #fff;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  padding: 1rem;
+}
+
+/* Heading */
+.audit-table h3 {
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+  color: #111827;
+}
+
+/* Status messages */
+.audit-table .status-message {
+  margin: 0.5rem 0;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  background-color: #fff3cd;
+  color: #856404;
+  font-size: 0.9rem;
+}
+
+/* Table */
+.audit-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.audit-table th,
+.audit-table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.audit-table th {
+  background-color: #f3f4f6;
+  font-weight: 600;
+  color: #111827;
+}
+
+.audit-table tr:hover {
+  background-color: #f9fafb;
+}
+
+/* Action column (if you add buttons later) */
+.audit-table td button {
+  background: none;
+  border: none;
+  color: #2563eb;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.audit-table td button:hover {
+  text-decoration: underline;
+}
+
+/* Empty state */
+.audit-table p {
+  margin: 1rem 0;
+  color: #6b7280;
+  font-style: italic;
+}

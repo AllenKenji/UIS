@@ -1,0 +1,138 @@
+/* ===============================
+👤 Form Wrapper
+================================ */
+.create-account-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  background: var(--gradient-card);
+  padding: var(--space-lg);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  max-width: 500px;
+  width: 100%;
+  margin: 0 auto;
+  color: var(--color-text);
+}
+
+.create-account-form h3 {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-accent);
+  margin-bottom: var(--space-sm);
+}
+
+.create-account-form label {
+  display: flex;
+  flex-direction: column;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-normal);
+  color: var(--color-text-strong);
+}
+
+/* ===============================
+✏️ Inputs & Selects
+================================ */
+.create-account-form input,
+.create-account-form select {
+  margin-top: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-input-bg);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.create-account-form input:focus,
+.create-account-form select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-focus);
+}
+
+/* ===============================
+🖲️ Buttons
+================================ */
+.create-account-form button,
+.create-account-form .btn {
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  border: none;
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+  transition: background-color 0.25s ease, transform 0.15s ease;
+}
+
+.create-account-form button:hover:not(:disabled),
+.create-account-form .btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.create-account-form button:disabled,
+.create-account-form .btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Button Variants */
+.btn-success   { background-color: var(--color-success); color: #fff; }
+.btn-success:hover { background-color: var(--color-success-hover); }
+
+.btn-danger    { background-color: var(--color-danger); color: #fff; }
+.btn-danger:hover { background-color: var(--color-danger-hover); }
+
+.btn-accent    { background-color: var(--color-accent); color: #fff; }
+.btn-accent:hover { background-color: var(--color-accent-hover); }
+
+/* ===============================
+✅ Confirmation Block
+================================ */
+.confirm-actions {
+  background-color: var(--color-confirm-bg);
+  color: var(--color-confirm-text);
+  border: 1px solid var(--color-confirm-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.confirm-actions p {
+  margin: 0;
+  font-size: var(--font-size-md);
+}
+
+/* ===============================
+📱 Responsive Form Variant
+================================ */
+.create-account-form.responsive {
+  max-width: 700px;
+}
+
+@media (min-width: var(--bp-md)) {
+  .create-account-form.responsive label {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .create-account-form.responsive label span {
+    flex: 0 0 30%;
+    margin-right: var(--space-sm);
+  }
+
+  .create-account-form.responsive input,
+  .create-account-form.responsive select {
+    flex: 1;
+    margin-top: 0;
+  }
+
+  .create-account-form.responsive .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-sm);
+  }
+}

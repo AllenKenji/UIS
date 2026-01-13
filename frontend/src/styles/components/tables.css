@@ -1,0 +1,108 @@
+/* ===============================
+📊 Tables (Base)
+================================ */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: var(--color-card-bg);
+  color: var(--color-text);
+  font-size: clamp(0.875rem, 1vw + 0.75rem, 1rem); /* responsive text */
+  border-radius: var(--radius-md);
+  overflow: hidden; /* keeps rounded corners */
+}
+
+th, td {
+  padding: var(--space-sm) var(--space-md);
+  text-align: left;
+  vertical-align: middle;
+}
+
+th {
+  background-color: var(--color-table-header);
+  color: var(--color-text-strong);
+  font-weight: 600;
+  border-bottom: 2px solid var(--color-border-strong);
+}
+
+td {
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Row Styling */
+tr:nth-child(even) { background-color: var(--color-table-row-even); }
+tr:hover {
+  background-color: var(--color-accent-hover);
+  color: #fff;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* ===============================
+📱 Responsive Wrapper
+================================ */
+.table-responsive {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ===============================
+🛡️ Accessibility
+================================ */
+th[scope="col"] {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+tr:focus-within {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* ===============================
+📊 Table Variants
+================================ */
+.table-striped tr:nth-child(even) { background-color: var(--color-table-row-even); }
+
+.table-bordered {
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.table-bordered th,
+.table-bordered td { border: 1px solid var(--color-border); }
+
+.table-hover tr:hover {
+  background-color: var(--color-accent-hover);
+  color: #fff;
+}
+
+.table-compact th,
+.table-compact td {
+  padding: var(--space-xs) var(--space-sm);
+  font-size: 0.875rem;
+}
+
+.table-dark {
+  background-color: var(--color-card-muted);
+  color: var(--color-text-strong);
+}
+.table-dark th {
+  background-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+.table-dark tr:nth-child(even) { background-color: var(--color-bg); }
+
+/* ===============================
+📊 Table Row Status Variants
+================================ */
+tr.row-success { background-color: var(--color-success); color: #fff; }
+tr.row-success:hover { background-color: var(--color-success-hover); }
+
+tr.row-danger { background-color: var(--color-danger); color: #fff; }
+tr.row-danger:hover { background-color: var(--color-danger-hover); }
+
+tr.row-warning { background-color: var(--color-confirm-bg); color: var(--color-confirm-text); }
+tr.row-warning:hover { background-color: var(--color-confirm-border); }
+
+tr.row-info { background-color: var(--color-accent); color: #fff; }
+tr.row-info:hover { background-color: var(--color-accent-hover); }

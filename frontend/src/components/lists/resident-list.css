@@ -1,0 +1,267 @@
+/* 🔖 General layout */
+.resident-list {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: "Segoe UI", Arial, sans-serif;
+  color: #333;
+}
+
+.resident-list h2 {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+/* 🔍 Filters */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+  justify-content: center;
+}
+
+.filters input,
+.filters select,
+.filters button {
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+}
+
+.filters button {
+  background: #007bff;
+  color: #fff;
+  cursor: pointer;
+  border: none;
+}
+
+.filters button:hover {
+  background: #0056b3;
+}
+
+/* 📊 Barangay summary */
+.barangay-summary {
+  margin: 20px 0;
+}
+
+.barangay-summary h3 {
+  margin-bottom: 10px;
+}
+
+.barangay-summary ul {
+  list-style: none;
+  padding: 0;
+}
+
+.barangay-summary li {
+  margin: 4px 0;
+}
+
+/* 📊 Pie chart container */
+.recharts-wrapper {
+  margin: 0 auto;
+  display: block;
+}
+
+/* 🧑 Resident grid */
+.resident-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.resident-card {
+  background: #f9f9f9;
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  transition: transform 0.2s ease;
+}
+
+.resident-card:hover {
+  transform: translateY(-4px);
+}
+
+.resident-photo {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 10px;
+}
+
+.resident-name {
+  display: block;
+  margin: 8px 0;
+  font-weight: bold;
+  background: none;
+  border: none;
+  color: #007bff;
+  cursor: pointer;
+}
+
+.resident-name:hover {
+  text-decoration: underline;
+}
+
+.delete-btn {
+  background: #dc3545;
+  color: #fff;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.delete-btn:hover {
+  background: #a71d2a;
+}
+
+/* 🗑️ Pop-up overlay */
+.popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+/* 🗑️ Pop-up window */
+.popup-window {
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  width: 400px;
+  max-height: 85vh;
+  overflow-y: auto;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  position: relative;
+}
+
+.popup-window h3 {
+  margin-top: 0;
+}
+
+.popup-actions {
+  margin-top: 20px;
+  display: flex;
+  justify-content: space-around;
+}
+
+.confirm-btn {
+  background: #d9534f;
+  color: #fff;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.confirm-btn:hover {
+  background: #a71d2a;
+}
+
+.cancel-btn {
+  background: #6c757d;
+  color: #fff;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.cancel-btn:hover {
+  background: #565e64;
+}
+
+/* 👤 Resident details pop-up */
+.resident-details-popup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.close-btn {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #333;
+}
+
+.close-btn:hover {
+  color: #d9534f;
+}
+
+.photo-section {
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.resident-photo-large {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.details-section {
+  align-self: flex-start;
+  text-align: left;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.details-section p {
+  margin: 6px 0;
+  font-size: 14px;
+}
+
+/* Fingerprint boxes */
+.fingerprint-section {
+  display: flex;
+  justify-content: space-around;
+  width: 100%;
+  margin: 20px 0;
+}
+
+.finger-box {
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 10px;
+  width: 45%;
+  text-align: center;
+}
+
+.finger-box img {
+  max-width: 100%;
+  height: 80px;
+  object-fit: contain;
+}
+
+/* Signature section */
+.signature-section {
+  margin-top: 20px;
+  text-align: left;
+  width: 100%;
+}
+
+.signature-section img {
+  max-width: 200px;
+  height: 60px;
+  object-fit: contain;
+  border-bottom: 1px solid #000;
+}

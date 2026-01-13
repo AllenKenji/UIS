@@ -1,0 +1,81 @@
+.resident-document-form {
+  max-width: 500px;
+  margin: 2rem auto;
+  padding: 1.5rem;
+  background: #ffffff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-family: system-ui, sans-serif;
+}
+
+.resident-document-form h2 {
+  margin-bottom: 1rem;
+  font-size: 1.25rem;
+  color: #333;
+  text-align: center;
+}
+
+.resident-document-form form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.resident-document-form label {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  color: #444;
+}
+
+.resident-document-form input,
+.resident-document-form select,
+.resident-document-form textarea {
+  padding: 0.5rem;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.resident-document-form textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.resident-document-form button {
+  background-color: #0066cc;
+  color: #fff;
+  font-weight: 600;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s ease-in-out;
+}
+
+.resident-document-form button:hover {
+  background-color: #004999;
+}
+
+.status-message {
+  margin-top: 1rem;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+.status-message::before {
+  content: "ℹ️ ";
+}
+
+.status-message {
+  color: #333;
+}
+
+.status-message:contains("✅") {
+  color: green;
+}
+
+.status-message:contains("❌") {
+  color: red;
+}

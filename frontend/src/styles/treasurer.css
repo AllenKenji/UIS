@@ -1,0 +1,74 @@
+/* ===============================
+💰 Treasurer Dashboard Layout
+================================ */
+.treasurer-dashboard {
+  padding: 2rem;
+}
+
+.treasurer-dashboard .tool-section {
+  background-color: var(--card-bg);
+  padding: 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.treasurer-dashboard .tool-section h3 {
+  margin-bottom: 1rem;
+  font-size: 1.2rem;
+  color: var(--accent);
+}
+
+.treasurer-dashboard .treasurer-tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+/* ===============================
+📊 Fee Tracker & Verification
+================================ */
+.fee-tracker table,
+.payment-verification table {
+  width: 100%;
+  margin-top: 1rem;
+  border-collapse: collapse;
+}
+
+.fee-tracker th,
+.fee-tracker td,
+.payment-verification th,
+.payment-verification td {
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+.payment-verification button,
+.ledger-export button {
+  background-color: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.payment-verification button:hover,
+.ledger-export button:hover {
+  background-color: var(--accent-hover);
+}
+
+/* ===============================
+📈 Financial Report
+================================ */
+.financial-report ul {
+  list-style: none;
+  padding: 0;
+  margin-top: 1rem;
+}
+
+.financial-report li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}

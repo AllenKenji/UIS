@@ -1,0 +1,183 @@
+/* Container */
+.my-documents {
+  padding: 24px;
+  background-color: #f9fbfd;
+  border-radius: 12px;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+/* Header */
+.my-documents h3 {
+  font-size: 1.4rem;
+  margin-bottom: 20px;
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.tabs button {
+  padding: 10px 18px;
+  border: 2px solid #dce3ea;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #34495e;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.tabs button:hover {
+  background-color: #ecf0f1;
+  border-color: #bfcbd9;
+}
+
+.tabs button.active {
+  background-color: #3498db;
+  color: #fff;
+  border-color: #3498db;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+
+/* Document list */
+.doc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.doc-card {
+  background: #ffffff;
+  border: 1px solid #dce3ea;
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 14px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  transition: box-shadow 0.2s ease;
+}
+
+.doc-card:hover {
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+/* Document info */
+.doc-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.doc-info strong {
+  font-size: 1.05rem;
+  color: #2c3e50;
+  font-weight: 500;
+}
+
+.doc-info span {
+  font-size: 0.9rem;
+  color: #7f8c8d;
+}
+
+/* Remarks */
+.doc-remarks {
+  margin-top: 8px;
+  font-size: 0.9rem;
+  color: #c0392b; /* red tone for emphasis */
+  font-style: italic;
+}
+
+/* Status badge styles */
+.status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-top: 6px;
+  width: fit-content;
+}
+
+/* Status colors */
+.status-pending {
+  background-color: #f1c40f;
+  color: #fff;
+}
+
+.status-awaiting_payment {
+  background-color: #e67e22;
+  color: #fff;
+}
+
+.status-paid {
+  background-color: #27ae60;
+  color: #fff;
+}
+
+.status-approved {
+  background-color: #2ecc71;
+  color: #fff;
+}
+
+.status-rejected {
+  background-color: #e74c3c;
+  color: #fff;
+}
+
+/* Resubmit button */
+.btn-resubmit {
+  margin-top: 10px;
+  padding: 8px 14px;
+  background-color: #3498db;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s ease;
+}
+
+.btn-resubmit:hover {
+  background-color: #2980b9;
+}
+
+.btn-pay {
+  background-color: #27ae60;
+  color: #fff;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.btn-pay:hover {
+  background-color: #219150;
+}
+
+/* Responsive tweaks */
+@media (max-width: 600px) {
+  .doc-card {
+    padding: 14px;
+  }
+
+  .doc-info strong {
+    font-size: 1rem;
+  }
+
+  .doc-info span {
+    font-size: 0.85rem;
+  }
+
+  .tabs {
+    flex-direction: column;
+    gap: 8px;
+  }
+}

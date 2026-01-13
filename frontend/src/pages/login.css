@@ -1,0 +1,192 @@
+/* ===============================
+🔐 Login Page Styles
+================================ */
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: var(--color-bg);
+  padding: var(--space-lg);
+}
+
+.login-form {
+  background: var(--gradient-card);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-lg);
+  width: 100%;
+  max-width: 400px;
+  color: var(--color-text);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.login-form h2 {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  color: var(--color-accent);
+  margin-bottom: var(--space-md);
+  text-align: center;
+}
+
+/* ===============================
+📋 Form Groups
+================================ */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  position: relative; /* allow absolute positioning for eye icon */
+}
+
+.form-group label {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.form-group input {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-input-bg);
+  font-size: var(--font-size-md);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-focus);
+}
+
+/* ===============================
+👁️ Password Toggle (stable)
+================================ */
+.password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-wrapper input {
+  width: 100%;
+  padding-right: 2.5rem; /* reserve space for eye icon */
+  box-sizing: border-box;
+}
+
+.toggle-password {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%); /* lock vertical centering */
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-strong);
+
+  /* lock dimensions so hover doesn't shift */
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  margin: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  line-height: 1; /* prevent baseline wiggle */
+  transition: color 0.2s ease;
+}
+
+.toggle-password:hover {
+  color: var(--color-accent);
+  transform: translateY(-50%); /* keep same transform on hover */
+}
+
+.toggle-password:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.toggle-password svg {
+  width: 20px;
+  height: 20px;
+  display: block; /* removes inline baseline jump */
+  pointer-events: none;
+}
+
+
+/* ===============================
+⚙️ Options
+================================ */
+.form-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--font-size-sm);
+}
+
+.remember-me {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.forgot-password a {
+  color: var(--color-link);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.forgot-password a:hover {
+  color: var(--color-link-hover);
+}
+
+/* ===============================
+🖲️ Login Button
+================================ */
+.login-button {
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  border: none;
+  font-weight: 600;
+  font-size: var(--font-size-md);
+  cursor: pointer;
+  background: var(--color-accent);
+  color: #fff;
+  transition: background-color 0.25s ease, transform 0.15s ease;
+}
+
+.login-button:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  transform: translateY(-2px);
+}
+
+.login-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ===============================
+📱 Responsive
+================================ */
+@media (max-width: var(--bp-sm)) {
+  .login-form {
+    padding: var(--space-md);
+  }
+
+  .form-options {
+    flex-direction: column;
+    gap: var(--space-sm);
+    align-items: flex-start;
+  }
+
+  .login-button {
+    width: 100%;
+  }
+}

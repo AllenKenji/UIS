@@ -1,0 +1,19 @@
+/* ===============================
+📋 Registry Overview
+================================ */
+.registry-overview {
+  margin-top: var(--space-md);
+}
+
+.registry-overview h3 {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-accent);
+  margin-bottom: var(--space-md);
+}
+
+.registry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-md);
+}
