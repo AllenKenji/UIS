@@ -1,0 +1,94 @@
+/* staff-business-dashboard.css */
+
+/* Overall container */
+.staff-business-dashboard {
+  padding: 2rem;
+  font-family: "Segoe UI", Arial, sans-serif;
+  background-color: #f9fafb;
+  min-height: 100vh;
+}
+
+/* Heading */
+.staff-business-dashboard h2 {
+  margin-bottom: 1.5rem;
+  font-size: 1.6rem;
+  color: #333;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.tabs button {
+  padding: 0.6rem 1.2rem;
+  border: 1px solid #ccc;
+  background-color: #fff;
+  cursor: pointer;
+  border-radius: 4px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.tabs button:hover {
+  background-color: #f0f0f0;
+}
+
+.tabs button.active {
+  background-color: #0078d4;
+  color: #fff;
+  border-color: #0078d4;
+}
+
+/* Business grid */
+.business-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+/* Business card */
+.business-card {
+  background-color: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  transition: transform 0.2s ease;
+}
+
+.business-card:hover {
+  transform: translateY(-2px);
+}
+
+.business-card h3 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  font-size: 1.2rem;
+  color: #0078d4;
+}
+
+.business-card p {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+/* Evaluate button */
+.business-card button {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  background-color: #0078d4;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+
+.business-card button:hover {
+  background-color: #005a9e;
+}
