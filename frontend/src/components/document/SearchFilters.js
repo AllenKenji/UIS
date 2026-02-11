@@ -2,24 +2,27 @@ import React, { useState } from "react";
 import "../../styles/dashboard/search-filters.css";
 
 const SearchFilters = ({ onSearch }) => {
-  const [type, setType] = useState("");
-  const [staff, setStaff] = useState("");
+  const [documentType, setDocumentType] = useState("");
+  const [issuedBy, setIssuedBy] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSearch({
-      type,
-      staff,
-      from_date: fromDate,
-      to_date: toDate,
-    });
+
+    // Build filters object only with non-empty values
+    const filters = {};
+    if (documentType) filters.documentType = documentType;
+    if (issuedBy) filters.issuedBy = issuedBy;
+    if (fromDate) filters.fromDate = fromDate;
+    if (toDate) filters.toDate = toDate;
+
+    onSearch(filters);
   };
 
   const handleReset = () => {
-    setType("");
-    setStaff("");
+    setDocumentType("");
+    setIssuedBy("");
     setFromDate("");
     setToDate("");
     onSearch({});
@@ -31,12 +34,21 @@ const SearchFilters = ({ onSearch }) => {
 
       <div className="filter-row">
         <label htmlFor="type">Type:</label>
-        <select id="type" value={type} onChange={(e) => setType(e.target.value)}>
+        <select
+          id="type"
+          value={documentType}
+          onChange={(e) => setDocumentType(e.target.value)}
+        >
           <option value="">All</option>
-          <option value="certificate">Certificate</option>
-          <option value="permit">Permit</option>
-          <option value="clearance">Clearance</option>
-          <option value="affidavit">Affidavit</option>
+          <option value="Resident Certificate">Residency</option>
+          <option value="Barangay Clearance">Clearance</option>
+          <option value="Indigency Certificate">Indigency</option>
+          <option value="Good Moral Certificate">Good Moral</option>
+          <option value="Business Clearance">Business Clearance</option>
+          <option value="Activity Permit">Activity Permit</option>
+          <option value="Blotter Report">Blotter Report</option>
+          <option value="Health Certificate">Health Certificate</option>
+          <option value="Barangay ID">Barangay ID</option>
         </select>
       </div>
 
@@ -45,8 +57,8 @@ const SearchFilters = ({ onSearch }) => {
         <input
           id="staff"
           type="text"
-          value={staff}
-          onChange={(e) => setStaff(e.target.value)}
+          value={issuedBy}
+          onChange={(e) => setIssuedBy(e.target.value)}
           placeholder="Staff/Secretary name"
         />
       </div>

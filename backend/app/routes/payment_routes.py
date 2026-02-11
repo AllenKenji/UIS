@@ -1,158 +1,155 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 import logging
-from backend.app.services.paymongo_service import create_payment_link, get_payment_link
+import hmac
+import hashlib
+import os
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
+from google.cloud import firestore
 from backend.app.core.firebase import get_firestore
+from fastapi.concurrency import run_in_threadpool
 
-db = get_firestore()
 logger = logging.getLogger("uvicorn.error")
-
 router = APIRouter(prefix="/paymongo", tags=["Payments"])
+db = get_firestore()
+
+PAYMONGO_WEBHOOK_SECRET = os.getenv("PAYMONGO_WEBHOOK_SECRET", "")
 
 
-class DocumentPaymentRequest(BaseModel):
-    documentId: str
-    documentType: str   # 🔎 Resident specifies type (e.g. "Barangay Clearance")
-    remarks: str = ""
+def verify_signature(raw_body: bytes, header_signature: str) -> bool:
+    if not PAYMONGO_WEBHOOK_SECRET:
+        logger.error("❌ PAYMONGO_WEBHOOK_SECRET not set")
+        return False
+
+    parts = {}
+    for item in header_signature.split(","):
+        if "=" in item:
+            k, v = item.split("=", 1)
+            parts[k.strip()] = v.strip()
+
+    timestamp = parts.get("t")
+    provided = parts.get("s") or parts.get("te") or parts.get("li")
+
+    if not timestamp or not provided:
+        logger.error("❌ Missing timestamp or signature field in header: %s", header_signature)
+        return False
+
+    signed_payload = f"{timestamp}.{raw_body.decode('utf-8')}".encode("utf-8")
+    computed = hmac.new(
+        PAYMONGO_WEBHOOK_SECRET.encode("utf-8"),
+        signed_payload,
+        hashlib.sha256
+    ).hexdigest()
+
+    valid = hmac.compare_digest(computed, provided)
+    if not valid:
+        logger.warning("⚠️ Signature mismatch. computed=%s provided=%s", computed, provided)
+    return valid
 
 
-class BusinessPaymentRequest(BaseModel):
-    businessId: str
-    businessType: str   # 🔎 e.g. "Retail Store"
-    feeType: str        # 🔎 "registrationFee" or "annualFee"
-    remarks: str = ""
-
-
-def _get_document_doc(document_id: str):
-    docs = db.collection("documents").where("id", "==", document_id).limit(1).get()
-    return docs[0] if docs else None
-
-
-def _get_document_fee(document_type: str) -> int:
-    docs = db.collection("document_types").where("documentType", "==", document_type).limit(1).get()
-    if not docs:
-        raise ValueError(f"No fee configured for document type: {document_type}")
-    return docs[0].to_dict().get("fee", 0)
-
-
-def _get_business_doc(business_id: str):
-    docs = db.collection("businesses").where("businessId", "==", business_id).limit(1).get()
-    return docs[0] if docs else None
-
-
-def _get_business_fee(business_type: str, fee_type: str) -> int:
-    docs = db.collection("business_types").where("businessType", "==", business_type).limit(1).get()
-    if not docs:
-        raise ValueError(f"No fee configured for business type: {business_type}")
-    data = docs[0].to_dict()
-    fee = data.get(fee_type)
-    if fee is None:
-        raise ValueError(f"No {fee_type} configured for business type: {business_type}")
-    return fee
-
-
-@router.post("/create-document-link")
-async def create_document_payment_link(payload: DocumentPaymentRequest) -> dict:
+@router.post("/webhook")
+async def paymongo_webhook(request: Request):
     try:
-        # 🔎 Lookup fee from document_types collection
-        fee = _get_document_fee(payload.documentType)
-        if fee <= 0:
-            raise ValueError(f"Invalid fee for document type: {payload.documentType}")
+        raw_body = await request.body()
+        header_signature = request.headers.get("Paymongo-Signature", "")
 
-        doc = _get_document_doc(payload.documentId)
-        if doc:
-            existing = doc.to_dict()
-            link_id = existing.get("paymongoLinkId")
-            checkout_url = existing.get("checkoutUrl")
+        logger.debug("📥 Raw webhook body=%s", raw_body.decode("utf-8"))
+        logger.debug("📥 Signature header=%s", header_signature)
 
-            if link_id:
-                try:
-                    link_info = get_payment_link(link_id)
-                    if link_info.get("status") == "active":
-                        return {"success": True, "checkout_url": checkout_url, "link_id": link_id}
-                except Exception as e:
-                    logger.warning("⚠️ Could not verify existing document link %s: %s", link_id, e)
+        if not header_signature or not verify_signature(raw_body, header_signature):
+            return JSONResponse(status_code=400, content={"success": False, "message": "Invalid signature"})
 
-        # 📝 Create new PayMongo link
-        description = f"{payload.documentType} Request {payload.documentId}"
-        result = create_payment_link(
-            amount=fee,
-            description=description,
-            remarks=payload.remarks,
-            metadata={"documentId": payload.documentId, "documentType": payload.documentType},
-            success_url="https://your-app.com/documents/payment-success",
-            cancel_url="https://your-app.com/documents/payment-cancel"
+        payload = await request.json()
+        attributes = payload.get("data", {}).get("attributes", {})
+        event_type = attributes.get("type")
+        inner_data = attributes.get("data", {})
+        inner_attrs = inner_data.get("attributes", {})
+
+        status = inner_attrs.get("status")
+        metadata = inner_attrs.get("metadata", {}) or {}
+        reference_number = (
+            inner_attrs.get("reference_number")
+            or inner_attrs.get("externalReferenceNumber")
+            or metadata.get("pmReferenceNumber")
         )
+        paid_at = inner_attrs.get("paidAt")
 
-        link_id = result.get("link_id")
-        checkout_url = result.get("checkout_url")
-        if not link_id or not checkout_url:
-            raise ValueError("Missing link_id or checkout_url from PayMongo response")
+        transaction_id = inner_data.get("id")
+        intent_id = inner_attrs.get("paymentIntentId")
 
-        doc.reference.update({
-            "paymongoLinkId": link_id,
-            "checkoutUrl": checkout_url,
-            "paymentStatus": "awaiting_payment",
-            "status": "awaiting_payment",
-            "fee": fee
-        })
+        logger.info("📦 Webhook event=%s status=%s metadata=%s ref=%s",
+                    event_type, status, metadata, reference_number)
 
-        return {"success": True, "checkout_url": checkout_url, "link_id": link_id, "fee": fee}
+        allowed_events = {
+            "link.payment.paid",
+            "payment.paid",
+            "payment.failed",
+            "payment.cancelled",
+            "payment.refunded",
+            "source.chargeable",
+            "source.consumed"
+        }
+        if event_type not in allowed_events:
+            return JSONResponse(status_code=200, content={"success": True, "message": f"Ignored event {event_type}"})
+
+        if not status:
+            return JSONResponse(status_code=400, content={"success": False, "message": "Invalid payload"})
+
+        workflow_map = {
+            "paid": "payment_submitted",
+            "failed": "payment_failed",
+            "cancelled": "payment_cancelled",
+            "refunded": "payment_refunded"
+        }
+        workflow_status = workflow_map.get(status, status)
+
+        update_data = {
+            "paymentStatus": status,
+            "status": workflow_status,
+            "transactionId": transaction_id,
+            "paymentIntentId": intent_id,
+            "paymentDate": paid_at or firestore.SERVER_TIMESTAMP,
+            "eventType": event_type
+        }
+
+        # --- Business update ---
+        if "businessId" in metadata:
+            docs = db.collection("businesses").where("businessId", "==", metadata["businessId"]).limit(1).get()
+            if docs:
+                await run_in_threadpool(docs[0].reference.update, update_data)
+                logger.info("✅ Updated business=%s status=%s", metadata["businessId"], status)
+
+        # --- Document update via Firestore ID ---
+        elif "documentId" in metadata:
+            docs = db.collection("documents").where("documentId", "==", metadata["documentId"]).limit(1).get()
+            if docs:
+                await run_in_threadpool(docs[0].reference.update, update_data)
+                logger.info("✅ Updated document via documentId=%s status=%s", metadata["documentId"], status)
+            else:
+                logger.warning("⚠️ No document found for documentId=%s", metadata["documentId"])
+
+        # --- Fallback: referenceNumber ---
+        elif reference_number:
+            # Try businesses first
+            docs = db.collection("businesses").where("referenceNumber", "==", reference_number).limit(1).get()
+            if docs:
+                await run_in_threadpool(docs[0].reference.update, update_data)
+                logger.info("✅ Updated business via referenceNumber=%s status=%s", reference_number, status)
+            else:
+                # Then try documents
+                docs = db.collection("documents").where("referenceNumber", "==", reference_number).limit(1).get()
+                if docs:
+                    await run_in_threadpool(docs[0].reference.update, update_data)
+                    logger.info("✅ Updated document via referenceNumber=%s status=%s", reference_number, status)
+                else:
+                    logger.warning("⚠️ No record found for referenceNumber=%s", reference_number)
+                    return JSONResponse(status_code=200, content={"success": False, "message": "Unmatched webhook"})
+
+        else:
+            logger.warning("⚠️ No identifiers in webhook payload: %s", payload)
+            return JSONResponse(status_code=200, content={"success": False, "message": "Unmatched webhook"})
+
+        return {"success": True}
 
     except Exception as e:
-        logger.exception("❌ Failed to create document payment link")
-        raise HTTPException(status_code=500, detail=f"Failed to create document payment link: {str(e)}")
-
-
-@router.post("/create-business-link")
-async def create_business_payment_link(payload: BusinessPaymentRequest) -> dict:
-    try:
-        # 🔎 Lookup fee from business_types collection
-        fee = _get_business_fee(payload.businessType, payload.feeType)
-        if fee <= 0:
-            raise ValueError(f"Invalid fee for {payload.feeType} of {payload.businessType}")
-
-        doc = _get_business_doc(payload.businessId)
-        if doc:
-            existing = doc.to_dict()
-            link_id = existing.get("paymongoLinkId")
-            checkout_url = existing.get("checkoutUrl")
-
-            if link_id:
-                try:
-                    link_info = get_payment_link(link_id)
-                    if link_info.get("status") == "active":
-                        return {"success": True, "checkout_url": checkout_url, "link_id": link_id}
-                except Exception as e:
-                    logger.warning("⚠️ Could not verify existing business link %s: %s", link_id, e)
-
-        # 📝 Create new PayMongo link
-        description = f"{payload.feeType} for {payload.businessType} ({payload.businessId})"
-        result = create_payment_link(
-            amount=fee,
-            description=description,
-            remarks=payload.remarks,
-            metadata={"businessId": payload.businessId, "businessType": payload.businessType, "feeType": payload.feeType},
-            success_url="https://your-app.com/business/payment-success",
-            cancel_url="https://your-app.com/business/payment-cancel"
-        )
-
-        link_id = result.get("link_id")
-        checkout_url = result.get("checkout_url")
-        if not link_id or not checkout_url:
-            raise ValueError("Missing link_id or checkout_url from PayMongo response")
-
-        doc.reference.update({
-            "paymongoLinkId": link_id,
-            "checkoutUrl": checkout_url,
-            "paymentStatus": "for_payment",
-            "status": "for_payment",
-            "fee": fee,
-            "feeType": payload.feeType
-        })
-
-        return {"success": True, "checkout_url": checkout_url, "link_id": link_id, "fee": fee}
-
-    except Exception as e:
-        logger.exception("❌ Failed to create business payment link")
-        raise HTTPException(status_code=500, detail=f"Failed to create business payment link: {str(e)}")
+        logger.exception("❌ Webhook processing failed: %s", e)
+        return JSONResponse(status_code=500, content={"success": False, "message": "Webhook error"})

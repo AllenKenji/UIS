@@ -5,18 +5,24 @@
 .staff-dashboard-content.blurred {
   filter: blur(4px);
   pointer-events: none;
-  user-select: none;
+  -webkit-user-select: none; /* ✅ Safari/iOS support */
+  user-select: none;          /* ✅ Standard property */
 }
+
 
 .form-overlay {
   position: fixed;
-  inset: 0;
+  top: 0;   /* fallback for older Safari/iOS */
+  right: 0;
+  bottom: 0;
+  left: 0;
   background: rgba(0,0,0,0.4);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
 }
+
 
 .form-container {
   background: var(--color-card-bg);

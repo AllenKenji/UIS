@@ -36,16 +36,41 @@
 
 .complaint-table tr:hover {
   background: var(--color-table-row-hover);
-  color: var(--color-text-strong); /* ✅ ensures readability in light mode */
+  color: var(--color-text-strong);
 }
 
-/* Issue badge */
-.issue-badge {
+/* Status badges */
+.status-badge {
   display: inline-block;
   padding: 0.25rem 0.5rem;
   border-radius: var(--radius-sm);
   font-size: var(--font-size-sm);
   font-weight: 600;
-  background: var(--color-warning);
+  text-transform: capitalize;
   color: #fff;
+}
+
+/* Open = amber */
+.status-badge.open {
+  background: var(--color-warning);
+}
+
+/* In Review = blue */
+.status-badge.inreview {
+  background: var(--color-review); 
+}
+
+/* Resolved = green */
+.status-badge.resolved {
+  background: var(--color-success);
+}
+
+/* Rejected = red */
+.status-badge.rejected {
+  background: var(--color-danger);
+}
+
+/* Escalated = purple/accent */
+.status-badge.escalated {
+  background: var(--color-accent);
 }

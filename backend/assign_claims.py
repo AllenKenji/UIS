@@ -2,12 +2,9 @@ import logging
 import os
 import sys
 import argparse
-import firebase_admin
-from firebase_admin import auth, credentials
-from google.cloud import firestore
-
-# ✅ Import ROLE_PERMISSIONS from your core module
+from firebase_admin import auth
 from backend.app.core.roles import ROLE_PERMISSIONS
+from backend.app.core.firebase import ensure_firebase_initialized, get_firestore  # ✅ centralized helpers
 
 # Configure logging
 logging.basicConfig(
@@ -17,26 +14,12 @@ logging.basicConfig(
 logger = logging.getLogger("uvicorn.error")
 
 
-def ensure_firebase_initialized():
-    """Initialize Firebase app if not already initialized."""
-    try:
-        firebase_admin.get_app()
-    except ValueError:
-        cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
-        if not cred_path or not os.path.exists(cred_path):
-            logger.error("❌ Set GOOGLE_APPLICATION_CREDENTIALS to your service account JSON path")
-            sys.exit(2)
-        cred = credentials.Certificate(cred_path)
-        firebase_admin.initialize_app(cred)
-        logger.info("✅ Firebase initialized with %s", cred_path)
-
-
 def assign_role_claims(dry_run: bool = False,
                        filter_role: str = None,
                        filter_uid: str = None):
     """Assign custom claims to users based on their role."""
     ensure_firebase_initialized()
-    db = firestore.Client()
+    db = get_firestore()
 
     users_ref = db.collection("users")
     docs = users_ref.stream()
@@ -57,12 +40,10 @@ def assign_role_claims(dry_run: bool = False,
             continue
 
         if filter_role and role != filter_role.lower():
-            logger.debug("⏭️ Skipped UID %s due to role filter (%s)", uid, filter_role)
             skipped += 1
             continue
 
         if filter_uid and uid != filter_uid:
-            logger.debug("⏭️ Skipped UID %s due to UID filter (%s)", uid, filter_uid)
             skipped += 1
             continue
 
@@ -77,9 +58,6 @@ def assign_role_claims(dry_run: bool = False,
         try:
             current_claims = auth.get_user(uid).custom_claims or {}
             desired_claims = {"role": role, "permissions": permissions}
-
-            logger.debug("🔍 Current claims for UID %s: %s", uid, current_claims)
-            logger.debug("🔧 Desired claims for UID %s: %s", uid, desired_claims)
 
             if (current_claims.get("role") == role and
                     current_claims.get("permissions") == permissions):
@@ -103,10 +81,7 @@ def assign_role_claims(dry_run: bool = False,
     logger.info("🔄 Sync complete: %s updated, %s skipped, %s failed.",
                 updated, skipped, failed)
 
-    if failed > 0:
-        sys.exit(1)
-    else:
-        sys.exit(0)
+    sys.exit(1 if failed > 0 else 0)
 
 
 if __name__ == "__main__":

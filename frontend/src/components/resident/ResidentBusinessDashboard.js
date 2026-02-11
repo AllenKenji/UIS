@@ -3,13 +3,17 @@ import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "../../services/firebase";
 import { useUser } from "../../context/UserContext";
 import { QRCodeCanvas } from "qrcode.react";
+import ResidentBusinessPayment from "./ResidentBusinessPayment";
+
 import "../../styles/resident/resident-business-dashboard.css";
 
 const ResidentBusinessDashboard = () => {
   const { userInfo: user } = useUser();
   const [businesses, setBusinesses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("inProgress"); // 🔧 tab state
 
+  // 🔄 Fetch businesses owned by current user
   useEffect(() => {
     const fetchMyBusinesses = async () => {
       if (!user?.email) return;
@@ -28,35 +32,6 @@ const ResidentBusinessDashboard = () => {
     fetchMyBusinesses();
   }, [user]);
 
-  // 🔗 Payment handler
-  const handlePayment = async (businessId, checkoutUrl) => {
-    try {
-      // If checkoutUrl already exists in Firestore, use it directly
-      if (checkoutUrl) {
-        window.open(checkoutUrl, "_blank", "noopener,noreferrer");
-        return;
-      }
-
-      const res = await fetch("/api/paymongo/create-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          businessId,
-          amount: 100, // replace with actual fee
-          remarks: "Business registration fee",
-        }),
-      });
-
-      if (!res.ok) throw new Error(`Failed to create payment link: ${res.statusText}`);
-
-      const { checkout_url } = await res.json();
-      window.open(checkout_url, "_blank", "noopener,noreferrer");
-    } catch (err) {
-      console.error("❌ Payment error:", err);
-      alert("Failed to initiate payment. Please try again.");
-    }
-  };
-
   // 🧩 Render status message
   const renderStatus = (b) => {
     const status = b.status || b.paymentStatus || "pending_evaluation";
@@ -67,9 +42,7 @@ const ResidentBusinessDashboard = () => {
         return (
           <div className="payment-section">
             <p>💳 Your application is ready for payment.</p>
-            <button className="pay-btn" onClick={() => handlePayment(b.businessId, b.checkoutUrl)}>
-              Proceed to Payment
-            </button>
+            <ResidentBusinessPayment business={b} />
           </div>
         );
       case "payment_submitted":
@@ -78,7 +51,7 @@ const ResidentBusinessDashboard = () => {
         return (
           <div className="qr-wrapper">
             <p>✅ Approved — Permit Number: {b.permitNumber}</p>
-            <QRCodeCanvas value={b.businessId} size={96} />
+            <QRCodeCanvas value={b.businessId || b.id} size={96} />
           </div>
         );
       case "rejected":
@@ -93,43 +66,65 @@ const ResidentBusinessDashboard = () => {
   };
 
   // 🧩 Render documents
-  const renderDocuments = (b) => (
-    <div className="documents-list">
-      {b.validId && (
-        <p>
-          <a href={b.validId} target="_blank" rel="noopener noreferrer">📎 View Valid ID</a>
-        </p>
-      )}
-      {b.proofOfAddress && (
-        <p>
-          <a href={b.proofOfAddress} target="_blank" rel="noopener noreferrer">📎 View Proof of Address</a>
-        </p>
-      )}
-      {b.dtiCert && (
-        <p>
-          <a href={b.dtiCert} target="_blank" rel="noopener noreferrer">📎 View DTI Certificate</a>
-        </p>
-      )}
-      {b.businessLogo && (
-        <p>
-          <a href={b.businessLogo} target="_blank" rel="noopener noreferrer">📎 View Business Logo</a>
-        </p>
-      )}
-    </div>
-  );
+  const renderDocuments = (b) => {
+    const docs = [
+      { key: "validId", label: "Valid ID" },
+      { key: "proofOfAddress", label: "Proof of Address" },
+      { key: "dtiCert", label: "DTI Certificate" },
+      { key: "businessLogo", label: "Business Logo" },
+    ];
+
+    return (
+      <div className="documents-list">
+        {docs.map(
+          ({ key, label }) =>
+            b[key] && (
+              <p key={key}>
+                <a href={b[key]} target="_blank" rel="noopener noreferrer">
+                  📎 View {label}
+                </a>
+              </p>
+            )
+        )}
+      </div>
+    );
+  };
+
+  // 🔎 Separate approved from others
+  const approvedBusinesses = businesses.filter((b) => b.status === "approved");
+  const inProgressBusinesses = businesses.filter((b) => b.status !== "approved");
+
+  // 🔧 Choose which list to show based on activeTab
+  const listToRender = activeTab === "inProgress" ? inProgressBusinesses : approvedBusinesses;
 
   return (
     <div className="resident-business-dashboard">
       <h2>🏢 My Business Applications</h2>
 
+      {/* Tabs */}
+      <div className="tabs">
+        <button
+          className={activeTab === "inProgress" ? "active" : ""}
+          onClick={() => setActiveTab("inProgress")}
+        >
+          🕑 In Progress
+        </button>
+        <button
+          className={activeTab === "approved" ? "active" : ""}
+          onClick={() => setActiveTab("approved")}
+        >
+          ✅ Approved
+        </button>
+      </div>
+
       {loading ? (
         <p>Loading your businesses...</p>
-      ) : businesses.length === 0 ? (
-        <p>You have not registered any businesses yet.</p>
+      ) : listToRender.length === 0 ? (
+        <p>No businesses found in this tab.</p>
       ) : (
         <div className="business-grid">
-          {businesses.map((b) => (
-            <div key={b.businessId} className="business-card">
+          {listToRender.map((b) => (
+            <div key={b.id} className="business-card">
               <h3>{b.businessName}</h3>
               <p><strong>Type:</strong> {b.businessType}</p>
               <p><strong>Barangay:</strong> {b.barangay}</p>

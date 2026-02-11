@@ -1,58 +1,163 @@
 import React, { useState, useEffect } from "react";
-import { api, endpoints } from "../../services/api"; // ✅ Use shared Axios instance
+import { api, endpoints } from "../../services/api";
+import { auth, db } from "../../services/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { toast } from "react-toastify";
 import "./incident-form.css";
 
-const IncidentForm = ({ onSubmitSuccess }) => {
+const IncidentForm = ({ role = "resident", userInfo, onSubmitSuccess }) => {
   const [residents, setResidents] = useState([]);
-  const [formData, setFormData] = useState({
+  const [loading, setLoading] = useState(false);
+
+  const initialForm = {
     type: "",
     description: "",
     location: "",
-    reported_by: "", // resident ID
-  });
+    date: "",
+    time: "",
+    witness: "",
+    // ✅ Always ensure residentId is set
+    residentId: role === "resident" ? userInfo?.uid || "" : "",
+  };
+
+  const [formData, setFormData] = useState(initialForm);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const resetForm = () => {
+    setFormData({
+      ...initialForm,
+      residentId: role === "resident" ? userInfo?.uid || "" : "",
+    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const payload = {
-      ...formData,
-      timestamp: new Date().toISOString(),
-    };
+    setLoading(true);
+
     try {
-      await api.post(endpoints.incidents, payload);
+      // ✅ Basic validation
+      if (formData.description.trim().length < 5) {
+        toast.error("Description must be at least 5 characters long.");
+        setLoading(false);
+        return;
+      }
+
+      if (role === "resident") {
+        // 🔐 Ensure we have a logged-in Firebase user
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          toast.error("You must be logged in to report an incident.");
+          setLoading(false);
+          return;
+        }
+
+        // Resident self-report → Firestore
+        const incidentAt = new Date(`${formData.date}T${formData.time}`);
+        const docRef = await addDoc(collection(db, "incidents"), {
+          type: formData.type,
+          description: formData.description,
+          location: formData.location,
+          witness: formData.witness,
+          authUid: currentUser.uid,     // ✅ always from Firebase Auth
+          residentId: currentUser.uid,  // ✅ same for self-report
+          status: "pending",
+          incidentAt,
+          createdAt: serverTimestamp(),
+        });
+
+        // Notification for admins/staff
+        await addDoc(collection(db, "notifications"), {
+          type: "incident",
+          refId: docRef.id,
+          message: `New incident reported: ${formData.type} at ${formData.location}`,
+          notifyRoles: ["staff"], // ✅ only staff now
+          createdAt: serverTimestamp(),
+          readBy: [],
+        });
+
+        toast.success("✅ Incident report submitted!");
+      } else if (role === "staff") {
+        // Staff reporting → Firestore directly
+        if (!formData.residentId) {
+          toast.error("Please select a resident.");
+          setLoading(false);
+          return;
+        }
+
+        // 🔐 Ensure we have a logged-in Firebase user
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          toast.error("You must be logged in as staff to log an incident.");
+          setLoading(false);
+          return;
+        }
+
+        // Staff logs incident on behalf of a resident
+        const docRef = await addDoc(collection(db, "incidents"), {
+          type: formData.type,
+          description: formData.description,
+          location: formData.location,
+          authUid: currentUser.uid,       // ✅ staff UID
+          residentId: formData.residentId, // ✅ resident selected
+          status: "pending",
+          incidentAt: new Date().toISOString(), // staff logs current time
+          createdAt: serverTimestamp(),
+        });
+
+        // Notification for staff
+        await addDoc(collection(db, "notifications"), {
+          type: "incident",
+          refId: docRef.id,
+          message: `Incident logged: ${formData.type} at ${formData.location}`,
+          notifyRoles: ["staff"],
+          createdAt: serverTimestamp(),
+          readBy: [],
+        });
+
+        toast.success("✅ Incident logged on behalf of resident!");
+      }
+
+      // ✅ Reset and refresh
       onSubmitSuccess?.();
-      setFormData({ type: "", description: "", location: "", reported_by: "" });
+      resetForm();
     } catch (err) {
-      const msg = err.response?.data?.detail || err.message;
-      console.error("❌ Incident submission failed:", msg);
+      console.error("❌ Incident submission failed:", err.response?.data || err.message);
+      toast.error("❌ Failed to report incident. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // 📥 Fetch resident list
+  // Staff only: fetch resident list
   useEffect(() => {
-    api
-      .get(endpoints.residents, { params: { limit: 100 } })
-      .then((res) => {
-        const raw = res.data;
-        const normalized = Array.isArray(raw)
-          ? raw
-          : Array.isArray(raw?.results)
-          ? raw.results
-          : [];
-        setResidents(normalized);
-      })
-      .catch((err) => {
-        const msg = err.response?.data?.detail || err.message;
-        console.error("❌ Failed to load residents:", msg);
-      });
-  }, []);
+    if (role === "staff") {
+      api.get(endpoints.residents, { params: { limit: 100 } })
+        .then((res) => {
+          const raw = res.data;
+          const normalized = Array.isArray(raw)
+            ? raw
+            : Array.isArray(raw?.results)
+            ? raw.results
+            : Array.isArray(raw?.items)
+            ? raw.items
+            : Array.isArray(raw?.data)
+            ? raw.data
+            : [];
+          setResidents(normalized);
+        })
+        .catch((err) => {
+          console.error("❌ Failed to load residents:", err.response?.data || err.message);
+        });
+    }
+  }, [role]);
 
   return (
     <form className="incident-form" onSubmit={handleSubmit}>
-      <h2>Report Incident</h2>
+      <h2>{role === "staff" ? "Log Incident (on behalf of resident)" : "Report Incident"}</h2>
 
       <label>Type</label>
       <select name="type" value={formData.type} onChange={handleChange} required>
@@ -64,27 +169,52 @@ const IncidentForm = ({ onSubmitSuccess }) => {
       </select>
 
       <label>Description</label>
-      <textarea name="description" value={formData.description} onChange={handleChange} required />
+      <textarea
+        name="description"
+        value={formData.description}
+        onChange={handleChange}
+        required
+        minLength={5}
+      />
 
       <label>Location</label>
       <input name="location" value={formData.location} onChange={handleChange} required />
 
-      <label>Reported By (Resident ID)</label>
-      <select
-        name="reported_by"
-        value={formData.reported_by}
-        onChange={handleChange}
-        required
-      >
-        <option value="">Select a resident</option>
-        {residents.map((r) => (
-          <option key={r.id} value={r.id}>
-            {r.fullName || "Unnamed"} ({r.address?.barangay || "No barangay"})
-          </option>
-        ))}
-      </select>
+      {role === "resident" && (
+        <>
+          <label>Date</label>
+          <input type="date" name="date" value={formData.date} onChange={handleChange} required />
 
-      <button type="submit">Submit</button>
+          <label>Time</label>
+          <input type="time" name="time" value={formData.time} onChange={handleChange} required />
+
+          <label>Witness (optional)</label>
+          <input name="witness" value={formData.witness} onChange={handleChange} />
+        </>
+      )}
+
+      {role === "staff" && (
+        <>
+          <label>Reported Resident</label>
+          <select
+            name="residentId"
+            value={formData.residentId}
+            onChange={handleChange}
+            required
+          >
+            <option value="">Select a resident</option>
+            {residents.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.fullName || r.name || "Unnamed"} — Barangay {r.address?.barangay || "N/A"}
+              </option>
+            ))}
+          </select>
+        </>
+      )}
+
+      <button type="submit" disabled={loading}>
+        {loading ? "Submitting…" : "Submit Report"}
+      </button>
     </form>
   );
 };

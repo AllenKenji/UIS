@@ -21,13 +21,18 @@ class ComplaintBase(BaseModel):
     description: Annotated[str, StringConstraints(min_length=5, max_length=500)]
     location: str
     filed_by: Annotated[str, StringConstraints(min_length=28, max_length=28)] = Field(
-        ..., description="Resident UID who filed the complaint"
+        ..., description="UID of user who entered the complaint (resident self-filing or staff/admin proxy)"
+    )
+    filed_for: Optional[Annotated[str, StringConstraints(min_length=28, max_length=28)]] = Field(
+        None, description="Resident UID the complaint is about (defaults to filed_by if resident self-filing)"
     )
 
 # 🆕 Complaint creation schema
 class ComplaintCreate(ComplaintBase):
     """
-    Used when a resident files a complaint.
+    Used when a complaint is filed.
+    - filed_by: who entered the complaint (resident or staff/admin)
+    - filed_for: resident the complaint is about (optional if resident self-filing)
     Timestamp is set by backend (Firestore SERVER_TIMESTAMP).
     """
     pass
@@ -39,6 +44,7 @@ class Complaint(BaseModel):
     description: str
     location: str
     filed_by: str
+    filed_for: Optional[str] = None
     timestamp: datetime
     status: ComplaintStatus = ComplaintStatus.open
     resolution_notes: Optional[str] = None
@@ -67,6 +73,7 @@ class Complaint(BaseModel):
         """
         return self.dict(exclude_none=True)
 
-# 📤 Complaint with resident details
+# 📤 Complaint with resident + filer details
 class ComplaintWithResident(Complaint):
-    filed_by_name: str = Field(..., description="Resident full name for display")
+    filed_for_name: str = Field(..., description="Resident full name for display")
+    filed_by_name: Optional[str] = Field(None, description="Name of user who filed (staff/admin or resident)")

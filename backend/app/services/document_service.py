@@ -1,11 +1,13 @@
-from email import generator
-from fastapi import HTTPException
-from datetime import timedelta, datetime
-import uuid
 import logging
-
-from backend.app.models.document import Document
-from backend.app.core.firebase import get_firestore, get_storage_bucket
+from datetime import datetime, timedelta, timezone
+from fastapi import HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
+from typing import Optional
+from backend.app.models.document import Document, DocumentStatus
+import json
+from backend.app.services.resident_service import get_resident_by_id
+from backend.app.services.fee_service import resolve_document_fee
+from backend.app.core.firebase import get_firestore, upload_file, get_storage_bucket
 from backend.app.utils.barangay_documents import (
     generate_barangay_clearance_pdf,
     generate_residency_certificate_pdf,
@@ -15,241 +17,592 @@ from backend.app.utils.barangay_documents import (
     generate_activity_permit_pdf,
     generate_blotter_report_pdf,
     generate_health_certificate_pdf,
-    generate_barangay_id_pdf
+    generate_barangay_id_pdf,
 )
 
 logger = logging.getLogger("uvicorn.error")
-
-# 🧠 Document type aliases
-DOC_TYPE_ALIASES = {
-    "Residency": "Certificate of Residency",
-    "Clearance": "Barangay Clearance",
-    "Indigency": "Certificate of Indigency",
-    "Good Moral": "Certificate of Good Moral Character",
-    "Business": "Barangay Business Clearance",
-    "Activity": "Permit to Conduct Activities",
-    "Blotter": "Blotter Report",
-    "Health": "Health Certificate",
-    "ID": "Barangay ID"
-}
+db = get_firestore()
 
 # 📦 Document type dispatch
 DOCUMENT_GENERATORS = {
-    "Barangay Clearance": lambda data, doc_id, issued_by, issued_at: generate_barangay_clearance_pdf(data, issued_by, issued_at, doc_id),
-    "Certificate of Residency": lambda data, doc_id, issued_by, issued_at: generate_residency_certificate_pdf(data, issued_by, issued_at, doc_id),
-    "Certificate of Indigency": lambda data, doc_id, issued_by, issued_at: generate_indigency_certificate_pdf(data, issued_by, issued_at, doc_id),
-    "Certificate of Good Moral Character": lambda data, doc_id, issued_by, issued_at: generate_good_moral_certificate_pdf(data, issued_by, issued_at, doc_id),
-    "Barangay Business Clearance": lambda data, doc_id, issued_by, issued_at: generate_business_clearance_pdf(
-        data.get("business_name", "Unnamed Business"),
-        data.get("fullName", "Unnamed"),
-        data.get("address", {}),
-        issued_by,
-        issued_at,
-        doc_id
-    ),
-    "Permit to Conduct Activities": lambda data, doc_id, issued_by, issued_at: generate_activity_permit_pdf(
-        data.get("fullName", "Organizer"),
-        data.get("activity_name", "Unnamed Activity"),
-        data.get("location", data.get("address", {})),
-        parse_date(data.get("activity_date"), issued_at),
-        issued_by,
-        issued_at,
-        doc_id
-    ),
-    "Blotter Report": lambda data, doc_id, issued_by, issued_at: generate_blotter_report_pdf(
-        data.get("complainant", "N/A"),
-        data.get("respondent", "N/A"),
-        data.get("incident", "N/A"),
-        data.get("location", data.get("address", {})),
-        parse_date(data.get("date_reported"), issued_at),
-        issued_by,
-        issued_at,
-        doc_id
-    ),
-    "Health Certificate": lambda data, doc_id, issued_by, issued_at: generate_health_certificate_pdf(
-        data, data.get("purpose", "unspecified"), issued_by, issued_at, doc_id
-    ),
-    "Barangay ID": lambda data, doc_id, issued_by, issued_at: generate_barangay_id_pdf(data, issued_by, issued_at, doc_id)
+    "Barangay Clearance": lambda data, issued_by, issued_at, doc_id: 
+        generate_barangay_clearance_pdf(data, issued_by, issued_at, doc_id),
+
+    "Resident Certificate": lambda data, issued_by, issued_at, doc_id: 
+        generate_residency_certificate_pdf(data, issued_by, issued_at, doc_id),
+
+    "Indigency Certificate": lambda data, issued_by, issued_at, doc_id: 
+        generate_indigency_certificate_pdf(data, issued_by, issued_at, doc_id),
+
+    "Good Moral Certificate": lambda data, issued_by, issued_at, doc_id: 
+        generate_good_moral_certificate_pdf(data, issued_by, issued_at, doc_id),
+
+    "Business Clearance": lambda data, issued_by, issued_at, doc_id: 
+        generate_business_clearance_pdf(data, issued_by, issued_at, doc_id),
+
+    "Activity Permit": lambda data, issued_by, issued_at, doc_id: 
+        generate_activity_permit_pdf(data, issued_by, issued_at, doc_id),
+
+    "Blotter Report": lambda data, issued_by, issued_at, doc_id: 
+        generate_blotter_report_pdf(data, issued_by, issued_at, doc_id),
+
+    "Health Certificate": lambda data, issued_by, issued_at, doc_id: 
+        generate_health_certificate_pdf(data, issued_by, issued_at, doc_id),
+
+    "Barangay ID": lambda data, issued_by, issued_at, doc_id: 
+        generate_barangay_id_pdf(data, issued_by, issued_at, doc_id),
 }
 
-def parse_date(date_str, fallback=None):
-    if isinstance(date_str, str):
+def prepare_generator_data(doc: Document) -> dict:
+    resident = {}
+    if getattr(doc, "residentId", None):
         try:
-            return datetime.strptime(date_str, "%Y-%m-%d")
+            resident_out = get_resident_by_id(doc.residentId)
+            resident = resident_out.model_dump(by_alias=True)
+            logger.info("Fetched resident from Firestore: %s", resident_out.full_name)
+        except Exception as e:
+            logger.warning("Failed to fetch resident %s: %s", doc.residentId, e)
+
+    # fallback if resident already embedded
+    if not resident:
+        resident = getattr(doc, "resident", {}) or {}
+        logger.info("Using embedded resident: %s", resident)
+
+
+    address = resident.get("address", {}) or {}
+    normalized_address = {} 
+    key_map = { 
+        "houseNumber": "house_number", 
+        "street": "street", 
+        "purok": "purok", 
+        "barangay": "barangay", 
+        "city": "city", 
+        "province": "province", 
+        "zipCode": "zip_code", 
+    } 
+    for k, v in address.items(): 
+        if v: 
+            normalized_address[key_map.get(k, k.lower())] = v
+
+    def safe_field(resident_dict, key, default="N/A"): 
+        val = resident_dict.get(key) 
+        return val if val not in (None, "", "null") else default
+    
+    def clean_enum(val, default="N/A"):
+        if val is None or val in ("null", ""):
+            return default
+        val_str = str(val)  # force string conversion
+        # Strip enum prefixes like "CivilStatus.", "Gender.", "VoterStatus."
+        if "." in val_str:
+            return val_str.split(".")[-1]
+        return val_str
+
+
+    def format_address(addr: dict) -> str: 
+        if not addr: 
+            return "N/A" 
+        line1 = " ".join([addr.get("houseNumber", ""), addr.get("street", "")]).strip() 
+        line2_parts = [] 
+        if addr.get("barangay"): 
+            line2_parts.append(f"Brgy. {addr['barangay']}") 
+        if addr.get("city"): 
+            line2_parts.append(addr["city"]) 
+        if addr.get("province"): 
+            line2_parts.append(addr["province"]) 
+        if addr.get("zipCode"): 
+            line2_parts.append(addr["zipCode"]) 
+        line2 = ", ".join(line2_parts) 
+        return f"{line1}\n{line2}" if line2 else line1
+
+    data = {
+        "resident": { 
+            "fullName": safe_field(resident, "fullName", "Unnamed") or resident.get("full_name", "Unnamed"), 
+            "address": normalized_address, # ✅ keep dict for generator 
+            "address_str": format_address(resident.get("address", {})),
+            "birthDate": safe_field(resident, "birthDate"), 
+            "gender": clean_enum(safe_field(resident, "gender")), 
+            "civilStatus": clean_enum(safe_field(resident, "civilStatus")), 
+            "occupation": safe_field(resident, "occupation"), 
+            "contactNumber": safe_field(resident, "contactNumber", ""), 
+            "voterStatus": clean_enum(safe_field(resident, "voterStatus")), 
+            "photoUrl": resident.get("photoUrl"),
+        },
+        "purpose": getattr(doc, "purpose", None),
+        "remarks": getattr(doc, "remarks", None),
+        "occupation": getattr(doc, "occupation", None),
+        "attachments": getattr(doc, "attachments", {}),
+    }
+    
+    # ✅ Ensure photoUrl is preserved 
+    if not data["resident"].get("photoUrl"): 
+        if doc.attachments.get("photoAttachment"): 
+            data["resident"]["photoUrl"] = doc.attachments["photoAttachment"] 
+        elif getattr(doc, "extraFields", {}).get("photoUrl"): 
+            data["resident"]["photoUrl"] = doc.extraFields["photoUrl"]
+
+    # Merge extraFields if present
+    if getattr(doc, "extraFields", None):
+        logger.info("Merging extraFields: %s", doc.extraFields)
+        data.update(doc.extraFields)
+
+    # Normalize keys (map camelCase → snake_case)
+    key_map = {
+        "businessName": "business_name",
+        "activityName": "activity_name",
+        "activityDate": "activity_date",
+        "dateReported": "date_reported",
+        "yearsOfStay": "years_of_stay",
+        "medicalAttachment": "medical_attachment",
+    }
+    for old_key, new_key in key_map.items():
+        if old_key in data:
+            data[new_key] = data[old_key]
+            logger.info("Normalized key %s → %s: %s", old_key, new_key, data[new_key])
+
+    # ✅ Normalize location
+    loc = data.get("location", None) or normalized_address
+
+    if isinstance(loc, str):
+        try:
+            loc = json.loads(loc)
+            logger.info("Parsed location string into dict: %s", loc)
+        except Exception:
+            logger.warning("Failed to parse location string: %s", loc)
+            loc = {}
+    elif not isinstance(loc, dict):
+        logger.warning("Location is unexpected type: %s", type(loc))
+        loc = {}
+
+    data["location"] = {k.lower(): v for k, v in loc.items() if v}
+    logger.info("Normalized location: %s", data["location"])
+
+    # Health certificate specific
+    data["health_purpose"] = getattr(doc, "purpose", None)
+
+    return data
+
+# ===============================
+# 🔧 Serialization Helpers
+# ===============================
+def _serialize(snapshot) -> Document:
+    if not snapshot or not snapshot.exists:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    data = snapshot.to_dict() or {}
+    data.pop("id", None)
+
+    # Convert status string → Enum
+    if "status" in data and isinstance(data["status"], str):
+        try:
+            data["status"] = DocumentStatus(data["status"])
         except ValueError:
             pass
-    return fallback or datetime.utcnow()
+
+    # Normalize extraFields
+    extra_fields = data.get("extraFields", {}) or {}
+
+    # Promote common extraFields to top-level
+    for key in ["complainant", "respondent", "incident", "location", "dateReported"]:
+        if key in extra_fields and key not in data:
+            data[key] = extra_fields[key]
+
+    # ✅ Ensure resident object is preserved
+    if "resident" in data and isinstance(data["resident"], dict):
+        # Normalize address keys inside resident
+        address = data["resident"].get("address", {}) or {}
+        normalized_address = {}
+        key_map = {
+            "houseNumber": "house_number",
+            "street": "street",
+            "purok": "purok",
+            "barangay": "barangay",
+            "city": "city",
+            "province": "province",
+            "zipCode": "zip_code",
+        }
+        for k, v in address.items():
+            if v:
+                normalized_address[key_map.get(k, k.lower())] = v
+        data["resident"]["address"] = normalized_address
+
+        # Provide safe defaults for missing fields
+        for field, default in {
+            "fullName": "Unnamed",
+            "birthDate": "N/A",
+            "civilStatus": "N/A",
+            "gender": "N/A",
+            "occupation": "N/A",
+            "voterStatus": "N/A",
+            "photoUrl": "",
+        }.items():
+            if not data["resident"].get(field):
+                data["resident"][field] = default
+
+    # Ensure extraFields is always present
+    data["extraFields"] = extra_fields
+
+    return Document(id=snapshot.id, **data)
+
+def get_and_serialize(doc_id: str) -> Document:
+    snapshot = db.collection("documents").document(doc_id).get()
+    if not snapshot.exists:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return _serialize(snapshot)
+
+async def update_document(doc_id: str, update_data: dict) -> Document:
+    update_data["updatedAt"] = datetime.now(timezone.utc)
+    await run_in_threadpool(
+        db.collection("documents").document(doc_id).update,
+        update_data
+    )
+    return get_and_serialize(doc_id)
 
 # ===============================
-# 📝 Phase 1: Resident Submission
+# 📤 List Documents
 # ===============================
-def create_document_request(data: dict) -> Document:
-    """
-    Resident submits a document request.
-    Stores metadata only, status = pending.
-    """
-    db = get_firestore()
+def list_documents(
+    uid: str,
+    residentId: Optional[str] = None,
+    documentType: Optional[str] = None,
+    issuedBy: Optional[str] = None,
+    fromDate: Optional[datetime] = None,
+    toDate: Optional[datetime] = None,
+) -> list[Document]:
+    user_doc = db.collection("users").document(uid).get()
+    role = user_doc.to_dict().get("role") if user_doc.exists else None
 
-    resident_id = data.get("resident_id")
-    if not resident_id:
-        raise HTTPException(status_code=400, detail="Missing resident_id")
+    query = db.collection("documents")
 
-    # Validate resident exists
-    resident_ref = db.collection("residents").document(resident_id)
-    resident_doc = resident_ref.get()
-    if not resident_doc.exists:
-        raise HTTPException(status_code=404, detail="Resident not found")
+    # Role-based filtering
+    if role in ("admin", "secretary") and residentId:
+        query = query.where("residentId", "==", residentId)
+    elif role not in ("admin", "secretary"):
+        query = query.where("residentId", "==", uid)
 
-    doc_id = str(uuid.uuid4())
-    created_at = datetime.utcnow()
-    doc_type = DOC_TYPE_ALIASES.get(data.get("document_type", ""), data.get("document_type", "Certificate of Residency"))
-    document_code = f"{doc_type[:2].upper()}-{created_at.strftime('%Y%m%d')}-{doc_id[:8].upper()}"
+    # Apply filters
+    if documentType:
+        query = query.where("documentType", "==", documentType)
+    if issuedBy:
+        query = query.where("issuedBy", "==", issuedBy)
+    if fromDate:
+        query = query.where("issuedAt", ">=", fromDate)
+    if toDate:
+        query = query.where("issuedAt", "<=", toDate)
 
-    resident_data = resident_doc.to_dict()
-    full_name = f"{resident_data.get('first_name','')} {resident_data.get('last_name','')}".strip()
+    return [_serialize(s) for s in query.stream()]
 
-    doc_data = {
-        "id": doc_id,
-        "resident_id": resident_id,
-        "resident_name": full_name,
-        "document_type": doc_type,
-        "purpose": data.get("purpose", "unspecified"),
-        "remarks": data.get("remarks", ""),
-        "status": DocumentStatus.pending.value,
-        "document_code": document_code,
-        "issued_by": None,
-        "issued_at": None,
-        "file_url": None,
-        "qr_code_url": None,
-        "verified": False,
-        "created_at": created_at,
-        "updated_at": created_at,
+def list_my_documents(resident_id: str) -> list[Document]:
+    return [_serialize(s) for s in db.collection("documents")
+            .where("residentId", "==", resident_id).stream()]
+
+def list_active_documents(resident_id: str) -> list[Document]:
+    active_statuses = {DocumentStatus.pending, DocumentStatus.awaiting_payment, DocumentStatus.paid}
+    return [doc for s in db.collection("documents")
+            .where("residentId", "==", resident_id).stream()
+            if (doc := _serialize(s)).status in active_statuses]
+
+def list_history_documents(resident_id: str) -> list[Document]:
+    return [doc for s in db.collection("documents")
+            .where("residentId", "==", resident_id).stream()
+            if (doc := _serialize(s)).status == DocumentStatus.approved
+            or (doc.status == DocumentStatus.rejected and doc.resubmitted)]
+
+def get_document(doc_id: str) -> Document:
+    return get_and_serialize(doc_id)
+
+# ===============================
+# 📝 Create Document with Type-Based Counter
+# ===============================
+async def create_document(
+    resident_id: str,
+    document_type: str,
+    purpose: Optional[str] = None,
+    remarks: Optional[str] = None,
+    idAttachment: UploadFile = None,
+    residencyAttachment: UploadFile = None,
+    complainant: Optional[str] = None,
+    respondent: Optional[str] = None,
+    incident: Optional[str] = None,
+    locationBarangay: Optional[str] = None,
+    locationStreet: Optional[str] = None,
+    locationCity: Optional[str] = None,
+    locationProvince: Optional[str] = None,
+    businessName: Optional[str] = None,
+    activityName: Optional[str] = None,
+    activityDate: Optional[str] = None,
+    occupation: Optional[str] = None,
+    voterStatus: Optional[str] = None,
+    yearsOfStay: Optional[int] = None,              # NEW
+    medicalAttachment: UploadFile = None,           # NEW
+    photoAttachment: UploadFile = None,
+) -> Document:
+    try:
+        doc_ref = db.collection("documents").document()
+        now = datetime.now(timezone.utc)
+
+        # Upload attachments if provided
+        id_url, residency_url, medical_url, photo_url = None, None, None, None 
+        if idAttachment: 
+            id_url = await run_in_threadpool( 
+                upload_file, idAttachment, f"documents/{doc_ref.id}/id_{idAttachment.filename}" 
+            ) 
+        if residencyAttachment: 
+            residency_url = await run_in_threadpool( 
+                upload_file, residencyAttachment, f"documents/{doc_ref.id}/residency_{residencyAttachment.filename}" 
+            ) 
+        if medicalAttachment: 
+            medical_url = await run_in_threadpool( 
+                upload_file, medicalAttachment, f"documents/{doc_ref.id}/medical_{medicalAttachment.filename}" 
+            ) 
+        if photoAttachment: 
+            photo_url = await run_in_threadpool( 
+                upload_file, photoAttachment, f"documents/{doc_ref.id}/photo_{photoAttachment.filename}" 
+            )
+
+        # 🔎 Fetch resident details
+        resident_snapshot = db.collection("residents").document(resident_id).get()
+        if not resident_snapshot.exists:
+            raise HTTPException(status_code=404, detail="Resident not found")
+        resident_data = resident_snapshot.to_dict()
+
+        # Counter for sequential IDs
+        counter_ref = db.collection("counters").document(document_type)
+        counter_snapshot = counter_ref.get()
+        last_number = counter_snapshot.to_dict().get("last_number", 0) if counter_snapshot.exists else 0
+        new_number = last_number + 1
+        await run_in_threadpool(counter_ref.set, {"last_number": new_number})
+
+        safe_type = document_type.replace(" ", "_")
+        document_id = f"{safe_type}-{new_number:04d}"
+
+        fee_info = resolve_document_fee(document_type)
+        amount = fee_info["totalFee"]
+
+        # Build attachments dynamically (only include non-None values) 
+        attachments = {} 
+        if id_url: 
+            attachments["idAttachment"] = id_url 
+        if residency_url: 
+            attachments["residencyAttachment"] = residency_url 
+        if medical_url: 
+            attachments["medicalAttachment"] = medical_url 
+        if photo_url: 
+            attachments["photoAttachment"] = photo_url
+
+        def safe_field(data: dict, key: str, default="N/A"): 
+            val = data.get(key) 
+            return val if val not in (None, "", "null") else default
+
+        # 📝 Base document data with embedded resident
+        document_data = {
+            "documentId": document_id,
+            "residentId": resident_id,
+            "resident": { 
+                "fullName": safe_field(resident_data, "fullName", "Unnamed"), 
+                "address": resident_data.get("address") or {}, 
+                "birthDate": safe_field(resident_data, "birthDate"), 
+                "gender": safe_field(resident_data, "gender"), 
+                "civilStatus": safe_field(resident_data, "civilStatus"), 
+                "contactNumber": safe_field(resident_data, "contactNumber", ""), 
+                "occupation": occupation or safe_field(resident_data, "occupation"), 
+                "voterStatus": voterStatus or safe_field(resident_data, "voterStatus"), 
+                "photoUrl": photo_url or resident_data.get("photoUrl") or "", 
+            },
+            "documentType": document_type,
+            "purpose": purpose,
+            "remarks": remarks,
+            "status": DocumentStatus.paid.value if amount == 0 else DocumentStatus.pending.value,
+            "createdAt": now,
+            "updatedAt": now,
+            "attachments": attachments,
+            "amount": amount,
+        }
+
+        # Type-specific handling
+        if document_type == "Blotter Report":
+            if not all([complainant, respondent, incident]):
+                raise HTTPException(
+                    status_code=422,
+                    detail="Complainant, respondent, and incident are required for blotter reports"
+                )
+
+            # ✅ Rebuild location dict
+            location_dict = {
+                "barangay": locationBarangay,
+                "street": locationStreet,
+                "city": locationCity,
+                "province": locationProvince,
+            }
+            location_dict = {k: v for k, v in location_dict.items() if v}
+
+            if not location_dict:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Location is required for blotter reports"
+                )
+
+            document_data["extraFields"] = {
+                "complainant": complainant,
+                "respondent": respondent,
+                "incident": incident,
+                "location": location_dict,
+                "dateReported": datetime.now().strftime("%Y-%m-%d"),
+            }
+
+
+        elif document_type == "Business Clearance":
+            if not businessName:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Business name is required for business clearance"
+                )
+
+            # ✅ Rebuild location dict
+            location_dict = {
+                "barangay": locationBarangay,
+                "street": locationStreet,
+                "city": locationCity,
+                "province": locationProvince,
+            }
+            location_dict = {k: v for k, v in location_dict.items() if v}
+
+            if not location_dict:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Business address/location is required for business clearance"
+                )
+
+            document_data["extraFields"] = {
+                "businessName": businessName,
+                "location": location_dict,
+            }
+
+
+        elif document_type == "Activity Permit":
+            if not all([activityName, activityDate]):
+                raise HTTPException(
+                    status_code=422,
+                    detail="Activity name and date are required for activity permits"
+                )
+
+            location_dict = {
+                "barangay": locationBarangay,
+                "street": locationStreet,
+                "city": locationCity,
+                "province": locationProvince,
+            }
+            location_dict = {k: v for k, v in location_dict.items() if v}
+
+            if not location_dict:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Location is required for activity permits"
+                )
+
+            document_data["extraFields"] = {
+                "activityName": activityName,
+                "activityDate": activityDate,
+                "location": location_dict,
+            }
+
+        elif document_type == "Resident Certificate": 
+            if not yearsOfStay: 
+                raise HTTPException(status_code=422, detail="Years of residency required") 
+            document_data["extraFields"] = {"yearsOfStay": yearsOfStay} 
+        
+        elif document_type == "Health Certificate": 
+            if not medical_url: 
+                raise HTTPException(status_code=422, detail="Medical result attachment required") 
+            document_data["extraFields"] = {"medicalAttachment": medical_url} 
+        
+        elif document_type == "Barangay ID": 
+            if not photo_url: 
+                raise HTTPException(status_code=422, detail="Resident photo required") 
+            # Embed photo into resident snapshot 
+            document_data["resident"]["photoUrl"] = photo_url
+
+        elif document_type == "Barangay Clearance":
+            # ✅ Always embed resident address into extraFields.location
+            address = resident_data.get("address", {}) or {}
+            # Normalize keys to lowercase
+            location_dict = {k.lower(): v for k, v in address.items() if v}
+            document_data["extraFields"] = {"location": dict(location_dict)}
+
+        await run_in_threadpool(doc_ref.set, document_data)
+        snapshot = doc_ref.get()
+        if not snapshot.exists:
+            raise HTTPException(status_code=500, detail="Document not saved")
+        return _serialize(snapshot)
+
+    except Exception as e:
+        logger.exception("❌ Error creating document: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to create document")
+
+# ===============================
+# 🔄 Workflow Functions
+# ===============================
+async def mark_resubmitted(doc_id: str) -> Document:
+    doc = get_and_serialize(doc_id)
+    if doc.status != DocumentStatus.rejected:
+        raise HTTPException(status_code=400, detail="Only rejected documents can be resubmitted")
+    return await update_document(doc_id, {"resubmitted": True})
+
+async def update_status(doc_id: str, new_status: DocumentStatus, remarks: Optional[str]) -> Document:
+    doc = get_and_serialize(doc_id)
+    if doc.amount == 0 and new_status in [DocumentStatus.awaiting_payment, DocumentStatus.payment_submitted]:
+        raise HTTPException(status_code=400, detail="Free documents do not require payment")
+    valid_transitions = {
+        DocumentStatus.pending: [DocumentStatus.awaiting_payment, DocumentStatus.rejected],
+        DocumentStatus.awaiting_payment: [DocumentStatus.paid, DocumentStatus.rejected],
+        DocumentStatus.payment_submitted: [DocumentStatus.paid, DocumentStatus.rejected],
+        DocumentStatus.paid: [DocumentStatus.approved],
     }
+    if new_status not in valid_transitions.get(doc.status, []):
+        raise HTTPException(status_code=400, detail=f"Invalid transition {doc.status.value} → {new_status.value}")
+    if new_status == DocumentStatus.rejected and not remarks:
+        raise HTTPException(status_code=422, detail="Rejection reason required")
+    return await update_document(doc_id, {"status": new_status.value, "remarks": remarks})
 
-    db.collection("documents").document(doc_id).set(doc_data)
-    logger.info("📥 Document request created: %s", doc_id)
+async def confirm_payment(doc_id: str) -> Document:
+    doc = get_and_serialize(doc_id)
+    if doc.status not in (DocumentStatus.awaiting_payment, DocumentStatus.payment_submitted):
+        raise HTTPException(status_code=400, detail="Payment can only be confirmed from awaiting_payment or payment_submitted")
+    return await update_document(doc_id, {"status": DocumentStatus.paid.value, "paymentStatus": "paid"})
 
-    return Document(**doc_data)
+async def issue_document(doc_id: str, issued_by: str, file_url: Optional[str] = None) -> Document:
+    doc = get_and_serialize(doc_id)
 
-# ===============================
-# 🔍 Phase 2: Secretary Validation
-# ===============================
-def validate_document_request(doc_id: str, handled_by: str, remarks: Optional[str] = None) -> Document:
-    """
-    Secretary validates a pending document request.
-    Moves status from 'pending' → 'awaiting_payment'.
-    """
-    db = get_firestore()
-    doc_ref = db.collection("documents").document(doc_id)
-    snapshot = doc_ref.get()
-    if not snapshot.exists:
-        raise HTTPException(status_code=404, detail="Document not found")
+    if doc.amount > 0 and doc.paymentStatus != "paid":
+        raise HTTPException(status_code=400, detail="Payment must be confirmed before issuance")
 
-    data = snapshot.to_dict()
-    if data.get("status") != "pending":
-        raise HTTPException(status_code=400, detail="Only pending requests can be validated")
+    issued_at = datetime.now(timezone.utc)
 
-    now = datetime.utcnow()
-    data.update({
-        "status": "awaiting_payment",
-        "handled_by": handled_by,
-        "remarks": remarks,
-        "updated_at": now,
-    })
-    doc_ref.update(data)
+    if not file_url:
+        generator = DOCUMENT_GENERATORS.get(doc.documentType)
+        if not generator:
+            raise HTTPException(status_code=400, detail=f"Unsupported document type: {doc.documentType}")
 
-    logger.info("🔍 Document %s validated by %s", doc_id, handled_by)
-    return Document(id=doc_id, **data)
+        try:
+            data = prepare_generator_data(doc)
+            pdf_bytes = generator(data, issued_by, issued_at, doc.documentId)
 
-# ===============================
-# 💳 Phase 3: Payment Confirmation
-# ===============================
-def confirm_document_payment(doc_id: str) -> Document:
-    """
-    Treasurer/Webhook confirms payment for a document request.
-    Updates Firestore status to 'paid'.
-    """
-    db = get_firestore()
+            bucket = get_storage_bucket()
+            blob = bucket.blob(f"documents/{doc_id}.pdf")
+            await run_in_threadpool(blob.upload_from_string, pdf_bytes, content_type="application/pdf")
+            file_url = await run_in_threadpool(
+                blob.generate_signed_url, expiration=issued_at + timedelta(days=365*50)
+            )
+        except Exception as e:
+            logger.exception("❌ PDF generation/upload failed: %s", e)
+            raise HTTPException(status_code=500, detail="Failed to generate or upload PDF")
 
-    doc_ref = db.collection("documents").document(doc_id)
-    snapshot = doc_ref.get()
-    if not snapshot.exists:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    data = snapshot.to_dict()
-    current_status = data.get("status")
-
-    # ✅ Guard: only allow payment confirmation from 'awaiting_payment'
-    if current_status != "awaiting_payment":
-        raise HTTPException(
-            status_code=400,
-            detail=f"Payment can only be confirmed from 'awaiting_payment' status (current: {current_status})"
-        )
-
-    now = datetime.utcnow()
-    data.update({
-        "status": "paid",
-        "updated_at": now,
-    })
-    doc_ref.update(data)
-
-    logger.info("💳 Payment confirmed for document %s", doc_id)
-    return Document(id=doc_id, **data)
-
-# ===============================
-# 📜 Phase 4: Secretary Issuance
-# ===============================
-def issue_document(doc_id: str, issued_by: str) -> Document:
-    db = get_firestore()
-    bucket = get_storage_bucket()
-
-    doc_ref = db.collection("documents").document(doc_id)
-    snapshot = doc_ref.get()
-    if not snapshot.exists:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    data = snapshot.to_dict()
-
-    # ✅ Status guard
-    if data.get("status") != DocumentStatus.paid.value:
-        raise HTTPException(status_code=400, detail="Document must be paid before issuance")
-
-    resident_id = data.get("resident_id")
-    resident_ref = db.collection("residents").document(resident_id)
-    resident_doc = resident_ref.get()
-    if not resident_doc.exists:
-        raise HTTPException(status_code=404, detail="Resident not found")
-
-    resident_data = resident_doc.to_dict()
-    issued_at = datetime.utcnow()
-
-    generator = DOCUMENT_GENERATORS.get(data["document_type"])
-    if not generator:
-        raise HTTPException(status_code=400, detail=f"Unsupported document type: {data['document_type']}")
-
-    try:
-        pdf_bytes = generator(resident_data, doc_id, issued_by, issued_at)
-    except Exception as e:
-        logger.error("❌ PDF generation failed: %s", str(e), exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to generate PDF")
-
-    try:
-        blob = bucket.blob(f"documents/{doc_id}.pdf")
-        blob.upload_from_string(pdf_bytes, content_type="application/pdf")
-        file_url = blob.generate_signed_url(expiration=issued_at + timedelta(days=365*50))
-    except Exception as e:
-        logger.error("❌ Firebase upload failed: %s", str(e), exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to upload document")
-
-    data.update({
-        "handled_by": issued_by,
-        "issued_by": issued_by,
-        "issued_at": issued_at,
-        "file_url": file_url,
+    update_data = {
         "status": DocumentStatus.approved.value,
-        "updated_at": issued_at,
-    })
-    doc_ref.update(data)
+        "issuedBy": issued_by,
+        "issuedAt": issued_at,
+        "fileUrl": file_url,
+    }
+    if doc.referenceNumber:
+        update_data["referenceNumber"] = doc.referenceNumber
 
-    logger.info("📜 Document %s issued by %s", doc_id, issued_by)
-    return Document(id=doc_id, **data)
+    return await update_document(doc_id, update_data)

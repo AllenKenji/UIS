@@ -23,7 +23,9 @@ const Complaints = () => {
   const canViewOwn = can("viewOwnComplaints"); // resident
   const canView = canViewAll || canViewOwn;
 
-  const canFile = role === "resident" && can("fileComplaints");
+  const canFile =
+    (role === "resident" && can("fileComplaints")) ||
+    ((role === "staff" || role === "admin") && can("fileComplaintsForResidents"));
   const canEvaluate = can("manageComplaints"); // staff + admin
 
   // ✅ Fetch complaints
@@ -102,9 +104,9 @@ const Complaints = () => {
   const renderDashboard = () => (
     <>
       <div className="header">
-        <h2>Complaints Dashboard</h2>
+        <h2>{canViewAll ? "Complaints Dashboard" : "My Complaints"}</h2>
         {canFile && (
-          <button onClick={() => setMode("form")}>+ File Complaint</button>
+          <button onClick={() => setMode("form")}>+ Report Complaint</button>
         )}
       </div>
 
@@ -118,7 +120,9 @@ const Complaints = () => {
         <table className="complaint-table">
           <thead>
             <tr>
-              {canViewAll && <th>Filed By</th>}
+              {canViewAll && (
+                <th>{role === "resident" ? "Logged By Officer" : "Filed By"}</th>
+              )}
               <th>Category</th>
               <th>Description</th>
               <th>Location</th>
@@ -131,7 +135,13 @@ const Complaints = () => {
           <tbody>
             {complaints.map((complaint) => (
               <tr key={complaint.id}>
-                {canViewAll && <td>{complaint.filed_by_name}</td>}
+                {canViewAll && (
+                  <td>
+                    {role === "resident"
+                      ? complaint.logged_by_officer || "—"
+                      : complaint.filed_by_name}
+                  </td>
+                )}
                 <td>{complaint.category}</td>
                 <td>{complaint.description}</td>
                 <td>{complaint.location}</td>
@@ -142,7 +152,6 @@ const Complaints = () => {
                     : "—"}
                 </td>
                 <td>{complaint.resolution_notes || "—"}</td>
-
                 {canEvaluate && (
                   <td>
                     <button
@@ -165,7 +174,11 @@ const Complaints = () => {
   const renderForm = () => (
     <>
       <div className="header">
-        <h2>File a Complaint</h2>
+        <h2>
+          {role === "staff" || role === "admin"
+            ? "Log / Evaluate Complaint"
+            : "Report Complaint"}
+        </h2>
         <button onClick={() => setMode("dashboard")}>← Back to Dashboard</button>
       </div>
       <ComplaintForm

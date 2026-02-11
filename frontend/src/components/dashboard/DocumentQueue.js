@@ -87,8 +87,8 @@ const DocumentQueue = () => {
           <tbody>
             {requests.map((req) => (
               <tr key={req.id}>
-                <td>{req.name}</td>
-                <td>{req.type}</td>
+                <td>{req.residentName}</td>
+                <td>{req.documentType}</td>
                 <td>
                   <span className={`status-badge ${req.status?.toLowerCase()}`}>
                     {req.status}

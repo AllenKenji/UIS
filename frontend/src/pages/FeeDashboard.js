@@ -23,7 +23,9 @@ export default function FeeDashboard() {
     deleteDocumentFee,
     deleteBusinessFee,
     deleteMiscFee,
-    getTotalFee, // ✅ now available from useResolvedFees
+    getRegistrationTotal,
+    getAnnualTotal,
+    getDocumentTotal,
   } = useResolvedFees();
 
   // 🔧 Column definitions
@@ -44,7 +46,8 @@ export default function FeeDashboard() {
     { key: "enabled", label: "Enabled", editable: true, type: "checkbox" },
     { key: "miscType", label: "Misc Type", editable: false },
     { key: "miscFeeResolved", label: "Misc Fee (₱)", editable: false },
-    { key: "totalFee", label: "Total Fee (₱)", editable: false }, // ✅ new column
+    { key: "registrationTotal", label: "Registration Total (₱)", editable: false },
+    { key: "annualTotal", label: "Annual Total (₱)", editable: false },
   ];
 
   const miscColumns = [
@@ -79,7 +82,7 @@ export default function FeeDashboard() {
         documentColumns,
         documentFees.map(doc => ({
           ...doc,
-          totalFee: getTotalFee(doc, "document"),
+          totalFee: getDocumentTotal(doc, "document"),
         })),
         (id, key, value, item) => updateDocumentFee(id, buildDocumentPayload(item, key, value)),
         deleteDocumentFee
@@ -91,7 +94,8 @@ export default function FeeDashboard() {
         businessColumns,
         businessFees.map(biz => ({
           ...biz,
-          totalFee: getTotalFee(biz, "business"),
+          registrationTotal: getRegistrationTotal(biz, "business"),
+          annualTotal: getAnnualTotal(biz, "business"),
         })),
         (id, key, value, item) => updateBusinessFee(id, buildBusinessPayload(item, key, value)),
         deleteBusinessFee

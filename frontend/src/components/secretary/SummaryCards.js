@@ -2,28 +2,22 @@ import React from "react";
 import "../../styles/secretary/summary-cards.css";
 
 const SummaryCards = ({ stats }) => {
+  const cards = [
+    { key: "total", label: "Total Requests" },
+    { key: "pending", label: "Pending" },
+    { key: "awaiting_payment", label: "Awaiting Payment" },
+    { key: "approved", label: "Approved" },
+    { key: "rejected", label: "Rejected" },
+  ];
+
   return (
     <div className="summary-cards">
-      <div className="card">
-        <h3>{stats.total}</h3>
-        <p>Total Requests</p>
-      </div>
-      <div className="card">
-        <h3>{stats.pending}</h3>
-        <p>Pending</p>
-      </div>
-      <div className="card">
-        <h3>{stats.awaiting_payment}</h3>
-        <p>Awaiting Payment</p>
-      </div>
-      <div className="card">
-        <h3>{stats.approved}</h3>
-        <p>Approved</p>
-      </div>
-      <div className="card">
-        <h3>{stats.rejected}</h3>
-        <p>Rejected</p>
-      </div>
+      {cards.map(({ key, label }) => (
+        <div className="card" key={key}>
+          <h3>{stats[key] ?? 0}</h3>
+          <p>{label}</p>
+        </div>
+      ))}
     </div>
   );
 };

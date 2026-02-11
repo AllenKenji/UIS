@@ -2,9 +2,13 @@
 
 // 🔧 Helper to safely coerce numbers
 const safeNumber = (val) => {
+  if (val === null || val === undefined || val === "") {
+    return null; // explicitly missing
+  }
   const num = Number(val);
-  return Number.isFinite(num) ? num : 0;
+  return Number.isFinite(num) ? num : null;
 };
+
 
 // 📄 Document payload builder
 export const buildDocumentPayload = (item, key, value) => ({

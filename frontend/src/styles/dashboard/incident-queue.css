@@ -36,7 +36,7 @@
 
 .incident-table tr:hover {
   background: var(--color-table-row-hover);
-  color: var(--color-text-strong); /* ✅ ensures readability in light mode */
+  color: var(--color-text-strong);
 }
 
 /* Status badges */
@@ -50,10 +50,22 @@
   color: #fff;
 }
 
+/* Pending = amber */
 .status-badge.pending {
   background: var(--color-warning);
 }
 
+/* Escalated = red, stands out */
+.status-badge.escalated {
+  background: var(--color-danger);
+}
+
+/* Resolved = green */
 .status-badge.resolved {
   background: var(--color-success);
+}
+
+/* Dismissed = gray */
+.status-badge.dismissed {
+  background: var(--color-muted);
 }

@@ -14,24 +14,27 @@ logger = logging.getLogger("uvicorn.error")
 
 INCIDENT_COLLECTION = "incidents"
 
+def _convert_timestamps(data: dict) -> dict:
+    for field in ["createdAt", "updatedAt"]:
+        if field in data and hasattr(data[field], "to_datetime"):
+            data[field] = data[field].to_datetime()
+    return data
 
 # 📝 Create an incident
 def create_incident(data: IncidentCreate) -> Incident:
     db = get_firestore()
     doc_ref = db.collection(INCIDENT_COLLECTION).document()
     payload = data.dict()
-
-    # Normalize fields
     payload["id"] = doc_ref.id
     payload["status"] = IncidentStatus.pending.value
     payload["createdAt"] = firestore.SERVER_TIMESTAMP
     payload["updatedAt"] = firestore.SERVER_TIMESTAMP
-
     doc_ref.set(payload)
-    logger.info("✅ Incident created with ID: %s", doc_ref.id)
 
-    return Incident(**{**payload, "id": doc_ref.id})
-
+    snapshot = doc_ref.get()
+    data = _convert_timestamps(snapshot.to_dict())
+    data["id"] = doc_ref.id
+    return Incident(**data)
 
 # 🔍 Get a specific incident
 def get_incident_by_id(incident_id: str) -> Optional[Incident]:
@@ -47,9 +50,16 @@ def get_incident_by_id(incident_id: str) -> Optional[Incident]:
 # 🔧 Helper: enrich with resident info
 def _enrich_with_resident(data: dict) -> IncidentWithResident:
     db = get_firestore()
-    resident_id = data.get("authUid")
-    reported_by_name = "Unknown"
 
+    # Ensure residentId is present
+    resident_id = data.get("residentId")
+    if not resident_id and "authUid" in data:
+        # fallback: if missing, assume residentId = authUid for self-reports
+        resident_id = data["authUid"]
+    data["residentId"] = resident_id
+
+    # Resident name (always the "Reported By")
+    reported_by_name = "Unknown"
     if resident_id:
         try:
             resident_doc = db.collection("residents").document(resident_id).get()
@@ -58,10 +68,34 @@ def _enrich_with_resident(data: dict) -> IncidentWithResident:
         except Exception as e:
             logger.warning("⚠️ Failed to enrich resident info: %s", e)
 
-    # Ensure required fields for Pydantic
-    data.setdefault("reported_by_name", reported_by_name)
-    return IncidentWithResident(**data)
+    # Officer who logged it
+    logged_by_officer = "Unknown"
+    auth_uid = data.get("authUid")
+    if auth_uid:
+        try:
+            staff_doc = db.collection("users").document(auth_uid).get()
+            if staff_doc.exists:
+                logged_by_officer = staff_doc.to_dict().get("full_name", "Unknown")
+        except Exception as e:
+            logger.warning("⚠️ Failed to enrich staff info: %s", e)
 
+    # Assigned to (staff UID or free-form string like "PNP")
+    assigned_to_name = data.get("assigned_to_name", "—")
+    if assigned_to_name and assigned_to_name != "—":
+        try:
+            staff_doc = db.collection("users").document(assigned_to_name).get()
+            if staff_doc.exists:
+                assigned_to_name = staff_doc.to_dict().get("full_name", assigned_to_name)
+        except Exception:
+            # If not a staff UID, just keep the literal string
+            logger.info("ℹ️ Assigned_to is external or free-form: %s", assigned_to_name)
+
+    # ✅ Ensure required fields exist
+    data.setdefault("reported_by_name", reported_by_name)
+    data.setdefault("logged_by_officer", logged_by_officer)
+    data.setdefault("assigned_to_name", assigned_to_name)
+
+    return IncidentWithResident(**data)
 
 # 📋 List all incidents with resident info (admin view)
 def list_incidents_with_residents(

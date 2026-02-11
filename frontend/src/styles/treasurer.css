@@ -1,74 +1,155 @@
-/* ===============================
-💰 Treasurer Dashboard Layout
-================================ */
 .treasurer-dashboard {
   padding: 2rem;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f9fafb;
+  min-height: 100vh;
 }
 
-.treasurer-dashboard .tool-section {
-  background-color: var(--card-bg);
-  padding: 1rem;
-  border-radius: 6px;
-  border: 1px solid var(--border);
+.treasurer-dashboard h1 {
+  font-size: 2rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  color: #1f2937; /* dark gray */
 }
 
-.treasurer-dashboard .tool-section h3 {
-  margin-bottom: 1rem;
-  font-size: 1.2rem;
-  color: var(--accent);
-}
-
-.treasurer-dashboard .treasurer-tools {
+/* Summary Cards */
+.summary-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 2rem;
-  margin-top: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
 }
 
-/* ===============================
-📊 Fee Tracker & Verification
-================================ */
-.fee-tracker table,
-.payment-verification table {
+.summary-cards .card {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  font-size: 1rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+/* Revenue Chart */
+.revenue-chart {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+
+  /* 👇 Add these */
+  max-width: 600px;   /* limit width */
+  height: 300px;      /* fix height */
+}
+
+.revenue-chart canvas {
+  max-height: 250px;  /* shrink chart inside */
+}
+
+
+.revenue-chart h2 {
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+  color: #111827;
+}
+
+/* Transactions Table */
+.transactions-table {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+.transactions-table h2 {
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.transactions-table table {
   width: 100%;
-  margin-top: 1rem;
   border-collapse: collapse;
 }
 
-.fee-tracker th,
-.fee-tracker td,
-.payment-verification th,
-.payment-verification td {
+.transactions-table th,
+.transactions-table td {
   padding: 0.75rem;
-  border: 1px solid var(--border);
   text-align: left;
+  border-bottom: 1px solid #e5e7eb;
 }
 
-.payment-verification button,
-.ledger-export button {
-  background-color: var(--accent);
-  color: #fff;
+.transactions-table th {
+  background-color: #f3f4f6;
+  font-weight: 600;
+  color: #374151;
+}
+
+.transactions-table tr:hover {
+  background-color: #f9fafb;
+}
+
+/* Disbursement Table */
+.disbursement-table {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+.disbursement-table h2 {
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.disbursement-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.disbursement-table th,
+.disbursement-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.disbursement-table th {
+  background-color: #f3f4f6;
+  font-weight: 600;
+  color: #374151;
+}
+
+.disbursement-table tr:hover {
+  background-color: #f9fafb;
+}
+
+/* Reports Section */
+.reports-section {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+.reports-section h2 {
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.reports-section button {
+  background-color: #2563eb; /* blue */
+  color: #ffffff;
+  padding: 0.6rem 1.2rem;
   border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
+  border-radius: 6px;
+  font-size: 0.95rem;
   cursor: pointer;
+  transition: background-color 0.2s ease;
 }
 
-.payment-verification button:hover,
-.ledger-export button:hover {
-  background-color: var(--accent-hover);
-}
-
-/* ===============================
-📈 Financial Report
-================================ */
-.financial-report ul {
-  list-style: none;
-  padding: 0;
-  margin-top: 1rem;
-}
-
-.financial-report li {
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--border);
+.reports-section button:hover {
+  background-color: #1e40af;
 }

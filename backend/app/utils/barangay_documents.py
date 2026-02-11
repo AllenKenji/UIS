@@ -3,44 +3,63 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
 from reportlab.graphics.barcode import qr
 from reportlab.graphics.shapes import Drawing
+from urllib.request import urlopen 
+from reportlab.lib.utils import ImageReader
 from reportlab.graphics import renderPDF
 from io import BytesIO
-from datetime import datetime
+import base64
+from datetime import timedelta
 import textwrap
-import traceback
+from backend.app.utils.date_utils import parse_date
+import json
+import logging
 
-# 🔐 Utility
+logger = logging.getLogger("uvicorn.error")
+
 def safe_text(value):
-    return str(value).encode("ascii", "ignore").decode("ascii")
+    return str(value) if value is not None else ""
 
 def format_address(address):
-    barangay = safe_text(address.get("barangay", "Unknown"))
-    parts = [
-        address.get("houseNumber", "").strip(),
-        address.get("street", "").strip(),
-        f"Purok {address.get('purok', '').strip()}" if address.get("purok") else "",
-        address.get("city", "").strip(),
-        f"Barangay {barangay}",
-        address.get("province", "").strip()
-    ]
-    return safe_text(", ".join(part for part in parts if part)).title(), barangay
+    if isinstance(address, str):
+        try:
+            parsed = json.loads(address)
+            address = {k.lower(): v for k, v in parsed.items()}
+        except Exception:
+            return safe_text(address), "Unknown"
 
-def draw_header(c, width, height, margin, barangay, title):
-    c.setFont("Helvetica-Bold", 14)
-    c.drawCentredString(width / 2, height - margin, "Republic of the Philippines")
-    c.drawCentredString(width / 2, height - margin - 20, f"Barangay {barangay}")
-    c.drawCentredString(width / 2, height - margin - 40, title)
+    elif isinstance(address, dict):
+        # ✅ normalize dict keys too
+        address = {k.lower(): v for k, v in address.items() if v}
+    else:
+        return "Unknown address", "Unknown"
 
-def draw_footer(c, width, margin, doc_id):
-    c.setFont("Helvetica-Oblique", 8)
-    c.drawString(margin, margin / 2, "This document is system-generated and valid without signature.")
-    draw_qr_code(c, doc_id, margin, width)
+    barangay = safe_text(address.get("barangay", "Unknown")).title()
+    street = safe_text(address.get("street", "")).title()
+    city = safe_text(address.get("city", "")).title()
+    province = safe_text(address.get("province", "")).title()
+    house_number = safe_text(address.get("housenumber", "")).strip()
+    purok = safe_text(address.get("purok", "")).strip()
+
+    parts = []
+    if house_number:
+        parts.append(house_number)
+    if street:
+        parts.append(street)
+    if purok:
+        parts.append(f"Purok {purok}")
+    if barangay and not barangay.lower().startswith("barangay"):
+        parts.append(f"Barangay {barangay}")
+    elif barangay:
+        parts.append(barangay)
+    if city:
+        parts.append(city)
+    if province:
+        parts.append(province)
+
+    full_address = ", ".join(parts)
+    return full_address, barangay
 
 def draw_qr_code(c, doc_id, margin, width):
-    if not doc_id:
-        c.setFont("Helvetica-Oblique", 8)
-        c.drawString(width - margin - 60, margin + 10, "(QR unavailable)")
-        return
     try:
         qr_code = qr.QrCodeWidget(doc_id)
         size = 60
@@ -51,364 +70,68 @@ def draw_qr_code(c, doc_id, margin, width):
         c.setFont("Helvetica-Oblique", 8)
         c.drawString(width - margin - 60, margin + 10, "(QR error)")
 
-def render_pdf_body(c, lines, issued_by, margin, width, height):
-    line_height = 16
-    current_y = height - margin - 80  # leave space for header
-    usable_width = width - 2 * margin
-    max_chars = int(usable_width / 6.5)
-
-    c.setFont("Helvetica", 11)
-    for line in lines:
-        for wrapped in textwrap.wrap(line, width=max_chars):
-            c.drawString(margin, current_y, wrapped)
-            current_y -= line_height
-
-    current_y -= line_height * 2
-    c.drawString(margin, current_y, "Certified by:")
-    current_y -= line_height
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(margin, current_y, safe_text(issued_by))
-
-
-# 📜 Document 1: Barangay Clearance
-def generate_barangay_clearance_pdf(resident, issued_by, issued_at, doc_id):
-    try:
-        buffer = BytesIO()
-        c = canvas.Canvas(buffer, pagesize=LETTER)
-        width, height = LETTER
-        margin = inch
-
-        full_name = safe_text(resident.get("fullName", "Unnamed"))
-        address = resident.get("address", {})
-        full_address, barangay = format_address(address)
-
-        draw_header(c, width, height, margin, barangay, "BARANGAY CLEARANCE")
-
-        body_lines = [
-            f"This is to certify that {full_name}, of legal age, currently residing at {full_address},",
-            f"is of good moral character and has no derogatory record filed in this barangay.",
-            f"This clearance is issued upon request for lawful purposes.",
-            f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.",
-            f"Document ID: {doc_id}"
-        ]
-
-        render_pdf_body(c, body_lines, issued_by, margin, width, height)
-        draw_footer(c, width, margin, doc_id)
-
-        c.showPage()
-        c.save()
-        buffer.seek(0)
-        return buffer.read()
-
-    except Exception as e:
-        print("❌ Error inside generate_barangay_clearance_pdf:", str(e))
-        traceback.print_exc()
-        raise
-
-
-# 📜 Document 2: Certificate of Residency
-def generate_residency_certificate_pdf(resident, issued_by, issued_at, doc_id):
-    try:
-        buffer = BytesIO()
-        c = canvas.Canvas(buffer, pagesize=LETTER)
-        width, height = LETTER
-        margin = inch
-
-        full_name = safe_text(resident.get("fullName", "Unnamed"))
-        address = resident.get("address", {})
-        full_address, barangay = format_address(address)
-
-        draw_header(c, width, height, margin, barangay, "CERTIFICATE OF RESIDENCY")
-    
-
-        body_lines = [
-            f"This is to certify that {full_name}, of legal age, is a bonafide resident of Barangay {barangay},",
-            f"currently residing at {full_address}.",
-            f"This certificate is issued upon request for the purpose of establishing residency.",
-            f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.",
-            f"Document ID: {doc_id}"
-        ]
-        render_pdf_body(c, body_lines, issued_by, margin, width, height)
-        draw_footer(c, width, margin, doc_id)
-
-        c.showPage()
-        c.save()
-        buffer.seek(0)
-        return buffer.read()
-
-    except Exception as e:
-        print("❌ Error inside generate_residency_certificate_pdf:", str(e))
-        traceback.print_exc()
-        raise
-
-# 📜 Document 3: Certificate of Indigency
-def generate_indigency_certificate_pdf(resident, issued_by, issued_at, doc_id):
-    try:
-        buffer = BytesIO()
-        c = canvas.Canvas(buffer, pagesize=LETTER)
-        width, height = LETTER
-        margin = inch
-
-        full_name = safe_text(resident.get("fullName", "Unnamed"))
-        address = resident.get("address", {})
-        full_address, barangay = format_address(address)
-
-        draw_header(c, width, height, margin, barangay, "CERTIFICATE OF INDIGENCY")
-    
-        body_lines = [
-            f"This is to certify that {full_name}, of legal age, currently residing at {full_address},",
-            f"is recognized by Barangay {barangay} as a person of indigent status.",
-            f"This certificate is issued upon request for the purpose of financial assistance or aid.",
-            f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.",
-            f"Document ID: {doc_id}"
-        ]
-        
-        render_pdf_body(c, body_lines, issued_by, margin, width, height)
-        draw_footer(c, width, margin, doc_id)
-
-        c.showPage()
-        c.save()
-        buffer.seek(0)
-        return buffer.read()
-
-    except Exception as e:
-        print("❌ Error inside generate_indigency_certificate_pdf:", str(e))
-        traceback.print_exc()
-        raise
-
-# 📜 Document 4: Certificate of Good Moral Character
-def generate_good_moral_certificate_pdf(resident, issued_by, issued_at, doc_id):
-    try:
-        buffer = BytesIO()
-        c = canvas.Canvas(buffer, pagesize=LETTER)
-        width, height = LETTER
-        margin = inch
-
-        full_name = safe_text(resident.get("fullName", "Unnamed"))
-        address = resident.get("address", {})
-        full_address, barangay = format_address(address)
-
-        draw_header(c, width, height, margin, barangay, "CERTIFICATE OF GOOD MORAL CHARACTER")
-
-        body_lines = [
-            f"This is to certify that {full_name}, of legal age, residing at {full_address},",
-            f"is known to possess good moral character and has no record of misconduct in this barangay.",
-            f"This certificate is issued upon request for school, employment, or legal purposes.",
-            f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.",
-            f"Document ID: {doc_id}"
-        ]
-
-        render_pdf_body(c, body_lines, issued_by, margin, width, height)
-        draw_footer(c, width, margin, doc_id)
-
-        c.showPage()
-        c.save()
-        buffer.seek(0)
-        return buffer.read()
-
-    except Exception as e:
-        print("❌ Error inside generate_good_moral_certificate_pdf:", str(e))
-        traceback.print_exc()
-        raise
-
-# 📜 Document 5: Barangay Business Clearance
-def generate_business_clearance_pdf(business_name, owner, address, issued_by, issued_at, doc_id):
-    try:
-        buffer = BytesIO()
-        c = canvas.Canvas(buffer, pagesize=LETTER)
-        width, height = LETTER
-        margin = inch
-
-        full_address, barangay = format_address(address)
-
-        draw_header(c, width, height, margin, barangay, "BARANGAY BUSINESS CLEARANCE")
-
-        body_lines = [
-            f"This is to certify that the business named '{business_name}', owned by {safe_text(owner)},",
-            f"located at {full_address}, is duly recognized and permitted to operate within Barangay {barangay}.",
-            f"This clearance is issued for registration, renewal, or legal compliance.",
-            f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.",
-            f"Document ID: {doc_id}"
-        ]
-
-        render_pdf_body(c, body_lines, issued_by, margin, width, height)
-        draw_footer(c, width, margin, doc_id)
-
-        c.showPage()
-        c.save()
-        buffer.seek(0)
-        return buffer.read()
-
-    except Exception as e:
-        print("❌ Error inside generate_business_clearance_pdf:", str(e))
-        traceback.print_exc()
-        raise
-
-
-# 📜 Document 6: Permit to Conduct Activity
-def generate_activity_permit_pdf(organizer, activity_name, location, date, issued_by, issued_at, doc_id):
-    try:
-        buffer = BytesIO()
-        c = canvas.Canvas(buffer, pagesize=LETTER)
-        width, height = LETTER
-        margin = inch
-
-        full_address, barangay = format_address(location)
-
-        draw_header(c, width, height, margin, barangay, "PERMIT TO CONDUCT ACTIVITY")
-
-        body_lines = [
-            f"This is to certify that {safe_text(organizer)} is granted permission to conduct the activity titled '{safe_text(activity_name)}',",
-            f"to be held at {full_address} on {date.strftime('%B %d, %Y')}.",
-            f"This permit is issued in accordance with barangay regulations and public safety protocols.",
-            f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.",
-            f"Document ID: {doc_id}"
-        ]
-
-        render_pdf_body(c, body_lines, issued_by, margin, width, height)
-        draw_footer(c, width, margin, doc_id)
-
-        c.showPage()
-        c.save()
-        buffer.seek(0)
-        return buffer.read()
-
-    except Exception as e:
-        print("❌ Error inside generate_activity_permit_pdf:", str(e))
-        traceback.print_exc()
-        raise
-
-# 📜 Document 7: Blotter Report
-def generate_blotter_report_pdf(complainant, respondent, incident, location, date_reported, issued_by, issued_at, doc_id):
-    try:
-        buffer = BytesIO()
-        c = canvas.Canvas(buffer, pagesize=LETTER)
-        width, height = LETTER
-        margin = inch
-
-        full_address, barangay = format_address(location)
-
-        draw_header(c, width, height, margin, barangay, "BLOTTER REPORT")
-
-        body_lines = [
-            f"This is to certify that a blotter report was filed by {safe_text(complainant)} against {safe_text(respondent)},",
-            f"regarding the following incident: {safe_text(incident)}.",
-            f"The incident occurred at {full_address} and was reported on {date_reported.strftime('%B %d, %Y')}.",
-            f"This report is recorded in the official barangay blotter log.",
-            f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.",
-            f"Document ID: {doc_id}"
-        ]
-
-        render_pdf_body(c, body_lines, issued_by, margin, width, height)
-        draw_footer(c, width, margin, doc_id)
-
-        c.showPage()
-        c.save()
-        buffer.seek(0)
-        return buffer.read()
-
-    except Exception as e:
-        print("❌ Error inside generate_blotter_report_pdf:", str(e))
-        traceback.print_exc()
-        raise
-
-# 📜 Document 8: Health Certificate
-def generate_health_certificate_pdf(resident, purpose, issued_by, issued_at, doc_id):
-    try:
-        buffer = BytesIO()
-        c = canvas.Canvas(buffer, pagesize=LETTER)
-        width, height = LETTER
-        margin = inch
-
-        full_name = safe_text(resident.get("fullName", "Unnamed"))
-        address = resident.get("address", {})
-        full_address, barangay = format_address(address)
-
-        draw_header(c, width, height, margin, barangay, "HEALTH CERTIFICATE")
-    
-        body_lines = [
-            f"This is to certify that {full_name}, residing at {full_address},",
-            f"has undergone a medical check-up and is found to be in good health condition.",
-            f"This certificate is issued for the purpose of {safe_text(purpose)}.",
-            f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.",
-            f"Document ID: {doc_id}"
-        ]
-        render_pdf_body(c, body_lines, issued_by, margin, width, height)
-        draw_footer(c, width, margin, doc_id)
-
-        c.showPage()
-        c.save()
-        buffer.seek(0)
-        return buffer.read()
-
-    except Exception as e:
-        print("❌ Error inside generate_health_certificate_pdf:", str(e))
-        traceback.print_exc()
-        raise
-
-# 📜 Document 9: Barangay ID
-def generate_barangay_id_pdf(resident, issued_by, issued_at, doc_id):
+def render_document(title, body_text, issued_by, issued_at, doc_id, barangay):
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=LETTER)
     width, height = LETTER
     margin = inch
 
-    # 🧠 Extract resident info
-    full_name = safe_text(resident.get("fullName", "Unnamed"))
-    gender = safe_text(resident.get("gender", ""))
-    birth_date = safe_text(resident.get("birthDate", ""))
-    contact = safe_text(resident.get("contactNumber", ""))
-    voter_status = safe_text(resident.get("voterStatus", ""))
-    occupation = safe_text(resident.get("occupation", ""))
-    photo_url = resident.get("photoUrl", "")
-    address = resident.get("address", {})
-    barangay = safe_text(address.get("barangay", "Unknown"))
-    full_address = safe_text(", ".join(part for part in [
-        address.get("houseNumber", ""),
-        address.get("street", ""),
-        f"Barangay {barangay}",
-        address.get("city", ""),
-        address.get("province", "")
-    ] if part)).title()
+    # Border frame
+    c.setLineWidth(2)
+    c.rect(margin/2, margin/2, width - margin, height - margin)
 
-    # 🏷️ Header
-    c.setFont("Helvetica-Bold", 14)
-    c.drawCentredString(width / 2, height - margin, "Republic of the Philippines")
-    c.drawCentredString(width / 2, height - margin - 16, f"Barangay {barangay}")
-    c.drawCentredString(width / 2, height - margin - 32, "BARANGAY RESIDENT ID")
+    # Seals (left: Republic, right: Barangay)
+    try:
+        c.drawImage("backend/app/assets/seals/ph_seal.png",
+                    margin, height - margin - 50,
+                    width=60, height=60, preserveAspectRatio=True, mask='auto')
+    except Exception:
+        c.setFont("Helvetica-Oblique", 8)
+        c.drawString(margin, height - margin - 10, "(PH seal missing)")
 
-    # 🖼️ Optional photo block
-    if photo_url:
-        try:
-            c.drawImage(photo_url, width - margin - 80, height - margin - 100, width=60, height=60)
-        except Exception as e:
-            c.setFont("Helvetica-Oblique", 9)
-            c.drawString(width - margin - 80, height - margin - 100, "(Photo unavailable)")
-    else:
-        c.setFont("Helvetica-Oblique", 9)
-        c.drawString(width - margin - 80, height - margin - 100, "(No photo provided)")
+    try:
+        c.drawImage("backend/app/assets/seals/barangay_seal.png",
+                    width - margin - 60, height - margin - 50,
+                    width=60, height=60, preserveAspectRatio=True, mask='auto')
+    except Exception:
+        c.setFont("Helvetica-Oblique", 8)
+        c.drawString(width - margin - 50, height - margin - 10, "(Barangay seal missing)")
 
-    # 📋 Resident details
-    c.setFont("Helvetica", 11)
-    line_height = 16
-    current_y = height - margin - 120
-    fields = [
-        f"Name: {full_name}",
-        f"Birth Date: {birth_date}",
-        f"Gender: {gender}",
-        f"Contact: {contact}",
-        f"Occupation: {occupation}",
-        f"Voter Status: {voter_status}",
-        f"Address: {full_address}",
-        f"Document ID: {doc_id}"
-    ]
-    for field in fields:
-        c.drawString(margin, current_y, field)
-        current_y -= line_height
+    # Header text centered between seals
+    c.setFont("Times-Bold", 16)
+    c.drawCentredString(width/2, height - margin - 10, "Republic of the Philippines")
+    c.setFont("Times-Bold", 14)
+    c.drawCentredString(width/2, height - margin - 35, f"Barangay {barangay}")
+    c.setFont("Times-Bold", 18)
+    c.drawCentredString(width/2, height - margin - 75, title)
 
-    # 🧾 Footer
+    # Body text block
+    text_obj = c.beginText(margin + 40, height - margin - 140)
+    text_obj.setFont("Times-Roman", 12)
+    text_obj.setLeading(18)
+
+    # Calculate usable width (page width minus left/right margins)
+    usable_width = width - 2 * margin
+    # Estimate characters per line (roughly 6 points per character at 12pt font)
+    chars_per_line = int(usable_width / 6)
+
+    for paragraph in body_text.split("\n"):
+        wrapped_lines = textwrap.wrap(paragraph, width=chars_per_line)
+        for line in wrapped_lines:
+            text_obj.textLine(line)
+        text_obj.textLine("")  # add blank line between paragraphs
+
+    c.drawText(text_obj)
+
+    # Certification
+    c.setFont("Times-Roman", 12)
+    c.drawString(margin, margin + 100, "Certified by:")
+    c.setFont("Times-Bold", 12)
+    c.drawString(margin, margin + 80, issued_by)
+
+    # Footer + QR
     c.setFont("Helvetica-Oblique", 8)
-    c.drawString(margin, margin / 2, "This ID is system-generated and valid for barangay transactions.")
+    c.drawString(margin, margin, "This document is system-generated and valid without signature.")
     draw_qr_code(c, doc_id, margin, width)
 
     c.showPage()
@@ -416,8 +139,317 @@ def generate_barangay_id_pdf(resident, issued_by, issued_at, doc_id):
     buffer.seek(0)
     return buffer.read()
 
+def generate_barangay_clearance_pdf(data, issued_by, issued_at, doc_id):
+    resident = data.get("resident", {})
+
+    full_name = safe_text(resident.get("fullName") or resident.get("full_name") or "Unnamed")
+
+    # ✅ Use normalized location from prepare_generator_data
+    location = data.get("location") or resident.get("address", {})
+    # 🔧 Ensure location is a dict 
+    if isinstance(location, str): 
+        try: 
+            location = json.loads(location) 
+        except Exception: 
+            logger.warning("Failed to parse location string: %s", location) 
+            location = {} 
+    elif not isinstance(location, dict): 
+        location = {} 
+        
+    full_address, barangay = format_address(location)
+
+    purpose = safe_text(data.get("purpose", "lawful purposes"))
+
+    body = (
+        f"This is to certify that {full_name}, of legal age, currently residing at {full_address}, "
+        f"is of good moral character and has no derogatory record filed in this barangay.\n\n"
+        f"This clearance is issued upon request for {purpose}. "
+        f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.\n\n"
+        f"Document ID: {doc_id}"
+    )
+    return render_document("BARANGAY CLEARANCE", body, issued_by, issued_at, doc_id, barangay)
 
 
+def generate_residency_certificate_pdf(data, issued_by, issued_at, doc_id):
+    resident = data.get("resident", {})
+    full_name = safe_text(resident.get("fullName", "Unnamed"))
+    full_address, barangay = format_address(resident.get("address", {}))
+    years = safe_text(data.get("years_of_stay", ""))  # ✅ normalized
+
+    body = (
+        f"This is to certify that {full_name}, of legal age, is a bonafide resident of Barangay {barangay}, "
+        f"currently residing at {full_address}.\n\n"
+        + (f"Resident has lived in the barangay for {years} years.\n\n" if years else "")
+        + f"This certificate is issued upon request for the purpose of establishing residency. "
+        f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.\n\n"
+        f"Document ID: {doc_id}"
+    )
+    return render_document("CERTIFICATE OF RESIDENCY", body, issued_by, issued_at, doc_id, barangay)
 
 
+def generate_indigency_certificate_pdf(data, issued_by, issued_at, doc_id):
+    resident = data.get("resident", {})
+    full_name = safe_text(resident.get("fullName", "Unnamed"))
+    full_address, barangay = format_address(resident.get("address", {}))
+    remarks = safe_text(data.get("remarks", "financial assistance"))
 
+    body = (
+        f"This is to certify that {full_name}, of legal age, currently residing at {full_address}, "
+        f"is recognized by Barangay {barangay} as a person of indigent status.\n\n"
+        f"This certificate is issued upon request for the purpose of {remarks}. "
+        f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.\n\n"
+        f"Document ID: {doc_id}"
+    )
+    return render_document("CERTIFICATE OF INDIGENCY", body, issued_by, issued_at, doc_id, barangay)
+
+def generate_good_moral_certificate_pdf(data, issued_by, issued_at, doc_id):
+    resident = data.get("resident", {})
+    full_name = safe_text(resident.get("fullName", "Unnamed"))
+    full_address, barangay = format_address(resident.get("address", {}))
+    purpose = safe_text(data.get("purpose", "school/employment"))
+
+    body = (
+        f"This is to certify that {full_name}, of legal age, residing at {full_address}, "
+        f"is known to possess good moral character and has no record of misconduct in this barangay.\n\n"
+        f"This certificate is issued upon request for {purpose}. "
+        f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.\n\n"
+        f"Document ID: {doc_id}"
+    )
+    return render_document("CERTIFICATE OF GOOD MORAL CHARACTER", body, issued_by, issued_at, doc_id, barangay)
+
+def generate_business_clearance_pdf(data, issued_by, issued_at, doc_id):
+    business_name = safe_text(data.get("business_name", "Unnamed Business"))
+    resident = data.get("resident", {})
+    owner = safe_text(resident.get("fullName", "Unnamed"))
+    full_address, barangay = format_address(data.get("location", {}) or resident.get("address", {}))
+
+    body = (
+        f"This is to certify that the business named '{business_name}', owned by {owner}, "
+        f"located at {full_address}, is duly recognized and permitted to operate within Barangay {barangay}.\n\n"
+        f"This clearance is issued for registration, renewal, or legal compliance. "
+        f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.\n\n"
+        f"Document ID: {doc_id}"
+    )
+    return render_document("BARANGAY BUSINESS CLEARANCE", body, issued_by, issued_at, doc_id, barangay)
+
+def generate_activity_permit_pdf(data, issued_by, issued_at, doc_id):
+    resident = data.get("resident", {})
+    organizer = safe_text(resident.get("fullName", "Unnamed"))
+    activity_name = safe_text(data.get("activity_name", "Unnamed Activity"))
+    location = data.get("location", {})
+    full_address, barangay = format_address(location)
+
+    # ✅ Ensure date is always valid
+    raw_date = data.get("activity_date")
+    date = parse_date(raw_date, issued_at) if raw_date else issued_at
+    if date is None:
+        date = issued_at
+
+    body = (
+        f"This is to certify that {organizer} is granted permission to conduct the activity titled "
+        f"'{activity_name}', to be held at {full_address} on {date.strftime('%B %d, %Y')}.\n\n"
+        f"This permit is issued in accordance with barangay regulations and public safety protocols. "
+        f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.\n\n"
+        f"Document ID: {doc_id}"
+    )
+    return render_document("PERMIT TO CONDUCT ACTIVITY", body, issued_by, issued_at, doc_id, barangay)
+
+def generate_blotter_report_pdf(data, issued_by, issued_at, doc_id):
+    complainant = safe_text(data.get("complainant", "Unnamed"))
+    respondent = safe_text(data.get("respondent", "Unnamed"))
+    incident = safe_text(data.get("incident", "No details"))
+    location = data.get("location", {})
+    full_address, barangay = format_address(location)
+    date_reported = parse_date(data.get("date_reported"), issued_at)
+
+    body = (
+        f"This is to certify that a blotter report was filed by {complainant} against {respondent}, "
+        f"regarding the following incident: {incident}.\n\n"
+        f"The incident occurred at {full_address} and was reported on {date_reported.strftime('%B %d, %Y')}. "
+        f"This report is recorded in the official barangay blotter log. "
+        f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.\n\n"
+        f"Document ID: {doc_id}"
+    )
+    return render_document("BLOTTER REPORT", body, issued_by, issued_at, doc_id, barangay)
+
+
+def generate_health_certificate_pdf(data, issued_by, issued_at, doc_id):
+    resident = data.get("resident", {})
+    full_name = safe_text(resident.get("fullName", "Unnamed"))
+    full_address, barangay = format_address(resident.get("address", {}))
+    purpose = safe_text(data.get("health_purpose", "medical purposes"))  # ✅ normalized
+
+    body = (
+        f"This is to certify that {full_name}, residing at {full_address}, has undergone a medical check-up "
+        f"and is found to be in good health condition.\n\n"
+        f"This certificate is issued for the purpose of {purpose}. "
+        f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.\n\n"
+        f"Document ID: {doc_id}"
+    )
+    return render_document("HEALTH CERTIFICATE", body, issued_by, issued_at, doc_id, barangay)
+
+def generate_barangay_id_pdf(data, issued_by, issued_at, doc_id):
+    # Work at 4x scale for easier layout
+    scale_factor = 4
+    large_width = scale_factor * 3.375 * inch
+    large_height = scale_factor * 2.125 * inch
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=(large_width, large_height))
+
+    resident = data.get("resident", {})
+    full_name = safe_text(resident.get("fullName", "Unnamed"))
+    birth_date = safe_text(resident.get("birthDate", "N/A"))
+    civil_status = safe_text(resident.get("civilStatus", "N/A"))
+    gender = safe_text(resident.get("gender", "N/A"))
+    occupation = safe_text(resident.get("occupation", "N/A"))
+    voter_status = safe_text(resident.get("voterStatus", "N/A"))
+    photo_url = resident.get("photoUrl", "")
+    address_dict = resident.get("address", {}) or {}
+    barangay = safe_text(address_dict.get("barangay", "Unknown"))
+
+
+    # --- Watermark (semi-transparent barangay seal in center) ---
+    try:
+        c.saveState()
+        c.setFillAlpha(0.15)
+        c.drawImage("backend/app/assets/seals/barangay_seal.png",
+                    large_width/2 - 2.4*inch, large_height/2 - 2.4*inch,
+                    width=4.8*inch, height=4.8*inch,
+                    preserveAspectRatio=True, mask='auto')
+        c.restoreState()
+    except Exception as e:
+        logger.warning("Watermark render failed: %s", e)
+
+    # --- Header with logos ---
+    try:
+        c.drawImage("backend/app/assets/seals/ph_seal.png",
+                    0.2*inch, large_height - 1.4*inch,
+                    width=1.2*inch, height=1.2*inch, preserveAspectRatio=True, mask='auto')
+    except Exception:
+        c.setFont("Helvetica-Oblique", 20)
+        c.drawString(0.2*inch, large_height - 1.0*inch, "(PH seal)")
+
+    try:
+        c.drawImage("backend/app/assets/seals/barangay_seal.png",
+                    large_width - 1.4*inch, large_height - 1.4*inch,
+                    width=1.2*inch, height=1.2*inch, preserveAspectRatio=True, mask='auto')
+    except Exception:
+        c.setFont("Helvetica-Oblique", 20)
+        c.drawString(large_width - 1.4*inch, large_height - 1.0*inch, "(Barangay seal)")
+
+    c.setFont("Helvetica-Bold", 28)
+    c.drawCentredString(large_width/2, large_height - 0.8*inch, "Republic of the Philippines")
+    c.drawCentredString(large_width/2, large_height - 1.3*inch, f"Barangay {barangay}")
+    c.line(0.35*inch, large_height - 1.50*inch, large_width - 0.35*inch, large_height - 1.50*inch)
+
+    # --- Barangay ID number above photo ---
+    c.setFont("Helvetica-Bold", 18)
+    c.drawString(0.6*inch, large_height - 2.0*inch, f"ID #: {doc_id}")
+
+    # --- Photo (left side) ---
+    if photo_url:
+        try:
+            if photo_url.startswith("http"):
+                # Fetch from web
+                img_data = urlopen(photo_url).read()
+                img = ImageReader(BytesIO(img_data))
+            elif photo_url.startswith("data:image"): 
+                # Handle base64 encoded images 
+                encoded = photo_url.split(",", 1)[1]
+                img_data = base64.b64decode(encoded) 
+                img = ImageReader(BytesIO(img_data))
+            else:
+                # Local file path
+                img = ImageReader(photo_url)
+
+            c.drawImage(img, 0.6*inch, large_height - 5.0*inch,
+                        width=2.4*inch, height=2.4*inch,
+                        preserveAspectRatio=True, mask='auto')
+        except Exception as e:
+            logger.warning("Photo render failed: %s", e)
+            c.setFont("Helvetica-Oblique", 20)
+            c.drawString(0.6*inch, large_height - 3.6*inch, "(Photo unavailable)")
+
+    # --- Details (middle column, dynamic spacing) ---
+    details_x = 3.6*inch
+
+    fields = [
+        ("Name:", full_name),
+        ("Birth Date:", birth_date),
+        ("Civil Status:", civil_status),
+        ("Gender:", gender),
+        ("Occupation:", occupation),
+        ("Voter Status:", "Registered Voter" if voter_status.lower()=="yes" else voter_status),
+        ("Address:", resident.get("address_str", "")),
+    ]
+
+    # Define margins to keep space for header/footer
+    top_margin = 2.5*inch
+    bottom_margin = 2.0*inch
+
+    # Available vertical space
+    available_height = large_height - (top_margin + bottom_margin)
+
+    # Compute line height dynamically
+    line_height = available_height / len(fields)
+
+    # Compute block height
+    block_height = len(fields) * line_height
+
+    # Center block vertically
+    current_y = (large_height / 2) + (block_height / 2)
+
+    for label, value in fields:
+        c.setFont("Helvetica", 28)  # label normal
+        c.drawString(details_x, current_y, label)
+        label_width = c.stringWidth(label, "Helvetica", 28)
+        c.setFont("Helvetica-Bold", 32)  # value bold
+        c.drawString(details_x + label_width + 12, current_y, value)
+        current_y -= line_height
+
+    # --- QR code (right side) ---
+    # --- QR code (right side, scaled up) ---
+    try:
+        qr_code = qr.QrCodeWidget(doc_id)
+
+        # Desired target size (make it bigger)
+        target_size = 3.0*inch   # increase from 2.4 to 3.6 inches
+
+        # Get natural bounds of the QR widget
+        bounds = qr_code.getBounds()
+        width = bounds[2] - bounds[0]
+        height = bounds[3] - bounds[1]
+
+        # Compute scale factors
+        scale_x = target_size / width
+        scale_y = target_size / height
+
+        # Apply scaling transform
+        d = Drawing(target_size, target_size, transform=[scale_x, 0, 0, scale_y, 0, 0])
+        d.add(qr_code)
+
+        # Position QR on the right side
+        qr_x = large_width - target_size - 0.6*inch
+        qr_y = large_height - 5.0*inch
+        renderPDF.draw(d, c, qr_x, qr_y)
+
+    except Exception as e:
+        logger.warning("QR render failed: %s", e)
+        c.setFont("Helvetica-Oblique", 20)
+        c.drawString(large_width - 2.0*inch, large_height - 3.6*inch, "(QR error)")
+
+    # --- Validity under QR code ---
+    valid_until = issued_at + timedelta(days=365)
+    c.setFont("Helvetica-Bold", 20)
+    c.drawRightString(large_width - 0.6*inch, large_height - 5.4*inch,
+                      f"Valid until: {valid_until.month} / {valid_until.day} / {valid_until.strftime('%y')}")
+
+    # --- Scale down to ID size ---
+    scale_x = (3.375 * inch) / large_width
+    scale_y = (2.125 * inch) / large_height
+    c.scale(scale_x, scale_y)
+
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer.read()

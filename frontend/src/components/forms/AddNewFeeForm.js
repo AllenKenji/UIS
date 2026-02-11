@@ -7,7 +7,7 @@ import modesConfig from "../../config/modesConfig"; // 🔑 import config
 
 export default function AddNewFeeForm({ onAdded, miscFees = [] }) {
   const [mode, setMode] = useState("document");
-  const [formData, setFormData] = useState({});
+  const [formData, setFormData] = useState({ fee: 0, enabled: true });
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));

@@ -1,113 +1,200 @@
+import base64
 import logging
-import hmac
-import hashlib
 import os
-from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
-from backend.app.services.payment_service import (
-    update_payment_status,             # business updater
-    update_document_payment_status     # document updater
+import requests
+from fastapi import APIRouter, HTTPException
+from fastapi.concurrency import run_in_threadpool
+from backend.app.services.paymongo_service import create_payment_link, create_payment_intent
+from backend.app.models.paymongo import DocumentPaymentRequest, BusinessPaymentRequest, AttachPaymentRequest
+from backend.app.core.firebase import get_firestore
+from backend.app.routes.fee_routes import (
+    compute_document_fee,
+    compute_business_registration_fee,
+    compute_business_annual_fee,
 )
 
+db = get_firestore()
 logger = logging.getLogger("uvicorn.error")
-router = APIRouter(prefix="/paymongo", tags=["Payments"])
+router = APIRouter(tags=["Payments"])
 
-PAYMONGO_WEBHOOK_SECRET = os.getenv("PAYMONGO_WEBHOOK_SECRET", "")
+# -----------------------------
+# Firestore helpers
+# -----------------------------
+def _get_document_doc(document_id: str):
+    docs = db.collection("documents").where("documentId", "==", document_id).limit(1).get()
+    return docs[0] if docs else None
 
+def _get_business_doc(business_id: str):
+    docs = db.collection("businesses").where("businessId", "==", business_id).limit(1).get()
+    return docs[0] if docs else None
 
-def verify_signature(raw_body: bytes, header_signature: str, test_mode: bool = True) -> bool:
-    """Verify PayMongo webhook signature using HMAC SHA256."""
-    if not PAYMONGO_WEBHOOK_SECRET:
-        logger.error("❌ PAYMONGO_WEBHOOK_SECRET not set")
-        return False
+# -----------------------------
+# Shared payment creation logic
+# -----------------------------
+def _create_payment(fee: int, description: str, remarks: str, metadata: dict,
+                    success_url: str, cancel_url: str):
+    """Create either a Payment Intent (< ₱100) or Payment Link (≥ ₱100)."""
+    if fee < 100:
+        result = create_payment_intent(
+            amount=fee, description=description, remarks=remarks,
+            metadata=metadata
+        )
+        return {
+            "checkoutUrl": result.get("checkoutUrl"),
+            "referenceNumber": result.get("referenceNumber"),
+            "paymentStatus": result.get("paymentStatus") or "awaiting_payment",
+            "paymentIntentId": result.get("paymentIntentId"),
+            "paymongoClientKey": result.get("paymongoClientKey"),
+            "type": "intent"
+        }
+    else:
+        result = create_payment_link(
+            amount=fee, description=description, remarks=remarks,
+            metadata=metadata, success_url=success_url, cancel_url=cancel_url
+        )
+        return {
+            "checkoutUrl": result.get("checkoutUrl"),
+            "referenceNumber": result.get("referenceNumber"),
+            "paymentStatus": result.get("paymentStatus") or "awaiting_payment",
+            "paymongoLinkId": result.get("paymongoLinkId"),
+            "type": "link"
+        }
 
-    parts = {}
-    for item in header_signature.split(","):
-        if "=" in item:
-            k, v = item.split("=", 1)
-            parts[k.strip()] = v.strip()
-
-    timestamp = parts.get("t")
-    provided = parts.get("te") if test_mode else parts.get("li")
-
-    if not timestamp or not provided:
-        logger.error("❌ Missing timestamp or signature field in header")
-        return False
-
-    signed_payload = f"{timestamp}.{raw_body.decode('utf-8')}".encode("utf-8")
-    computed = hmac.new(
-        PAYMONGO_WEBHOOK_SECRET.encode("utf-8"),
-        signed_payload,
-        hashlib.sha256
-    ).hexdigest()
-
-    return hmac.compare_digest(computed, provided)
-
-
-@router.post("/webhook")
-async def paymongo_webhook(request: Request):
+# -----------------------------
+# Document Payment Route
+# -----------------------------
+@router.post("/create-document-link")
+async def create_document_payment_link(payload: DocumentPaymentRequest) -> dict:
     try:
-        raw_body = await request.body()
-        header_signature = request.headers.get("Paymongo-Signature", "")
+        fee = compute_document_fee(payload.documentType)
+        if fee <= 0:
+            raise HTTPException(status_code=400, detail=f"Invalid fee for document type: {payload.documentType}")
 
-        if not header_signature or not verify_signature(raw_body, header_signature, test_mode=True):
-            logger.warning("⚠️ Invalid webhook signature")
-            return JSONResponse(status_code=400, content={"success": False, "message": "Invalid signature"})
+        description = f"{payload.documentType} Request {payload.documentId}"
+        metadata = {"documentId": payload.documentId, "documentType": payload.documentType}
 
-        payload = await request.json()
-        logger.info("📦 Verified webhook payload: %s", payload)
+        result = _create_payment(
+            fee, description, payload.remarks, metadata,
+            success_url="http://localhost:3000/payment-success?type=document",
+            cancel_url="http://localhost:3000/documents/payment-cancel"
+        )
 
-        attributes = payload.get("data", {}).get("attributes", {})
-        event_type = attributes.get("type")
-
-        allowed_events = {"link.payment.paid", "payment.failed", "payment.cancelled", "payment.refunded"}
-        if event_type not in allowed_events:
-            logger.info("ℹ️ Ignoring event type %s", event_type)
-            return JSONResponse(status_code=200, content={"success": True, "message": f"Ignored event {event_type}"})
-
-        inner_data = attributes.get("data", {})
-        inner_attrs = inner_data.get("attributes", {})
-
-        status = inner_attrs.get("status")
-        transaction_id = inner_data.get("id")  # PayMongo link id
-        payment_intent_id = inner_attrs.get("payment_intent_id")
-        metadata = inner_attrs.get("metadata", {})
-
-        if not status or not transaction_id:
-            logger.error("❌ Missing status or transaction_id in webhook payload")
-            return JSONResponse(status_code=400, content={"success": False, "message": "Invalid payload"})
-
-        # 🔎 Route based on metadata
-        if "businessId" in metadata:
-            result = update_payment_status(
-                business_id=metadata["businessId"],
-                event_type=event_type,
-                status=status,
-                transaction_id=transaction_id,
-                payment_intent_id=payment_intent_id,
-                paid_at=inner_attrs.get("paid_at")
-            )
-            logger.info("🏢 Business payment updated: businessId=%s feeType=%s status=%s",
-                        metadata.get("businessId"), metadata.get("feeType"), status)
-
-        elif "documentId" in metadata:
-            result = update_document_payment_status(
-                paymongo_link_id=transaction_id,
-                event_type=event_type,
-                status=status,
-                transaction_id=transaction_id,
-                payment_intent_id=payment_intent_id,
-                paid_at=inner_attrs.get("paid_at")
-            )
-            logger.info("📄 Document payment updated: documentId=%s documentType=%s status=%s",
-                        metadata.get("documentId"), metadata.get("documentType"), status)
-
+        doc = _get_document_doc(payload.documentId)
+        if doc:
+            update_data = {
+                "checkoutUrl": result["checkoutUrl"],
+                "paymentStatus": result["paymentStatus"],
+                "status": "awaiting_payment",
+                "fee": fee,
+                "referenceNumber": result.get("referenceNumber"),
+                "paymentIntentId": result.get("paymentIntentId"),
+                "paymongoClientKey": result.get("paymongoClientKey"),
+                "paymongoLinkId": result.get("paymongoLinkId")
+            }
+            await run_in_threadpool(doc.reference.update, update_data)
         else:
-            logger.warning("⚠️ No businessId or documentId in metadata")
-            return JSONResponse(status_code=400, content={"success": False, "message": "Missing metadata"})
+            logger.warning("⚠️ No Firestore document found for %s", payload.documentId)
 
-        return {"success": True, "result": result}
+        return {"success": True, "fee": fee, **result}
 
-    except Exception:
-        logger.exception("❌ Webhook processing failed")
-        return JSONResponse(status_code=500, content={"success": False, "message": "Webhook error"})
+    except Exception as e:
+        logger.exception("❌ Failed to create document payment: %s", e)
+        raise HTTPException(status_code=500, detail="Document payment creation failed")
+
+# -----------------------------
+# Business Payment Route
+# -----------------------------
+@router.post("/create-business-link")
+async def create_business_payment_link(payload: BusinessPaymentRequest) -> dict:
+    try:
+        fee = compute_business_annual_fee(payload.businessType) if payload.feeType == "annual" \
+              else compute_business_registration_fee(payload.businessType)
+        if fee <= 0:
+            raise HTTPException(status_code=400, detail=f"Invalid fee for {payload.feeType} of {payload.businessType}")
+
+        description = f"{payload.feeType} for {payload.businessType} ({payload.businessId})"
+        metadata = {"businessId": payload.businessId, "businessType": payload.businessType, "feeType": payload.feeType}
+
+        result = _create_payment(
+            fee, description, payload.remarks, metadata,
+            success_url="http://localhost:3000/payment-success?type=business",
+            cancel_url="http://localhost:3000/business/payment-cancel"
+        )
+
+        doc = _get_business_doc(payload.businessId)
+        if doc:
+            update_data = {
+                "fee": fee,
+                "feeType": payload.feeType,
+                "status": "awaiting_payment",
+                "paymentStatus": result["paymentStatus"],
+                "checkoutUrl": result["checkoutUrl"],
+                "referenceNumber": result.get("referenceNumber"),
+                "paymentIntentId": result.get("paymentIntentId"),
+                "paymongoClientKey": result.get("paymongoClientKey"),
+                "paymongoLinkId": result.get("paymongoLinkId")
+            }
+            await run_in_threadpool(doc.reference.update, update_data)
+        else:
+            logger.warning("⚠️ No Firestore business found for %s", payload.businessId)
+
+        return {"success": True, "fee": fee, **result}
+
+    except Exception as e:
+        logger.exception("❌ Failed to create business payment: %s", e)
+        raise HTTPException(status_code=500, detail="Business payment creation failed")
+
+# -----------------------------
+# Attach Payment Method Route
+# -----------------------------
+@router.post("/attach-payment-method")
+async def attach_payment_method(payload: AttachPaymentRequest) -> dict:
+    try:
+        PAYMONGO_SECRET_KEY = os.getenv("PAYMONGO_SECRET_KEY")
+        if not PAYMONGO_SECRET_KEY:
+            raise HTTPException(status_code=500, detail="PayMongo secret key not configured")
+
+        headers = {
+            "Authorization": f"Basic {base64.b64encode(PAYMONGO_SECRET_KEY.encode()).decode()}",
+            "Content-Type": "application/json"
+        }
+
+        # Step 1: Create payment method
+        pm_payload = {
+            "data": {
+                "attributes": {
+                    "type": payload.method, 
+                    "billing": payload.billing.dict()
+                }
+            }
+        }
+        pm_res = requests.post("https://api.paymongo.com/v1/payment_methods", json=pm_payload, headers=headers)
+        pm_data = pm_res.json()
+        if "errors" in pm_data:
+            logger.error("❌ Payment method creation failed: %s", pm_data)
+            raise HTTPException(status_code=400, detail="Payment method creation failed")
+
+        payment_method_id = pm_data["data"]["id"]
+
+        # Step 2: Attach to intent
+        return_url = payload.return_url or "http://localhost:3000/payment-success?type=document"
+        attach_payload = {"data": {"attributes": {"payment_method": payment_method_id, "client_key": payload.paymongoClientKey, "return_url": return_url}}}
+        intent_res = requests.post(
+            f"https://api.paymongo.com/v1/payment_intents/{payload.paymentIntentId}/attach",
+            json=attach_payload, headers=headers
+        )
+        intent_data = intent_res.json()
+        if "errors" in intent_data:
+            logger.error("❌ Payment intent attach failed: %s", intent_data)
+            raise HTTPException(status_code=400, detail="Payment intent attach failed")
+
+        redirect_url = intent_data["data"]["attributes"].get("next_action", {}).get("redirect", {}).get("url")
+        if not redirect_url:
+            logger.error("⚠️ No redirect URL in intent attach response: %s", intent_data)
+            raise HTTPException(status_code=500, detail="No redirect URL returned from PayMongo")
+
+        return {"redirectUrl": redirect_url}
+
+    except Exception as e:
+        logger.exception("❌ Failed to attach payment method: %s", e)
+        raise HTTPException(status_code=500, detail="Attach payment method failed")

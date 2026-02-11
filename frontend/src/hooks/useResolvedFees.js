@@ -3,9 +3,8 @@ import { useFees } from "./useFees";
 import { resolveMiscFees } from "../utils/fees";
 
 /**
- * Wraps useFees and resolves misc fees for documents,
- * while leaving businesses unresolved (miscFeeResolved = null).
- * Also provides a getTotalFee() helper.
+ * Wraps useFees and resolves misc fees for documents and businesses.
+ * Provides registrationTotal and annualTotal for businesses.
  */
 export function useResolvedFees() {
   const {
@@ -23,35 +22,48 @@ export function useResolvedFees() {
     deleteMiscFee,
   } = useFees();
 
-  // ✅ Resolve misc fees only for documents
   const resolvedDocuments = resolveMiscFees(documentFees, miscFees, true);
-
-  // ❌ Leave businesses unresolved (miscFeeResolved = null)
   const resolvedBusinesses = resolveMiscFees(businessFees, miscFees, true);
 
   /**
-   * Compute total fee for a given item.
-   * - Always includes base fee
-   * - Includes miscFeeResolved only if both item.enabled and miscFeeResolved are truthy
+   * Compute totals for a given item.
+   * - Document: base fee + misc (if enabled)
+   * - Business: registrationTotal and annualTotal
    */
-  const getTotalFee = (item, type = "document") => {
-    let total = item.fee || 0;
-
-    if (type === "business") {
-      total += (item.registrationFee || 0) + (item.annualFee || 0);
-    }
-
-    // Only include misc fee if both toggles are on
+  const getRegistrationTotal = (item) => {
+    let total = (item.fee || 0) + (item.registrationFee || 0);
     if (item.enabled && item.miscFeeResolved) {
       total += item.miscFeeResolved;
     }
+    return total;
+  };
 
+  const getAnnualTotal = (item) => {
+    let total = (item.fee || 0) + (item.annualFee || 0);
+    if (item.enabled && item.miscFeeResolved) {
+      total += item.miscFeeResolved;
+    }
+    return total;
+  };
+
+  const getDocumentTotal = (item) => {
+    let total = item.fee || 0;
+    if (item.enabled && item.miscFeeResolved) {
+      total += item.miscFeeResolved;
+    }
     return total;
   };
 
   return {
-    documentFees: resolvedDocuments,
-    businessFees: resolvedBusinesses,
+    documentFees: resolvedDocuments.map(doc => ({
+      ...doc,
+      totalFee: getDocumentTotal(doc),
+    })),
+    businessFees: resolvedBusinesses.map(biz => ({
+      ...biz,
+      registrationTotal: getRegistrationTotal(biz),
+      annualTotal: getAnnualTotal(biz),
+    })),
     miscFees,
     loading,
     error,
@@ -62,6 +74,8 @@ export function useResolvedFees() {
     deleteDocumentFee,
     deleteBusinessFee,
     deleteMiscFee,
-    getTotalFee, // ✅ expose helper
+    getRegistrationTotal,
+    getAnnualTotal,
+    getDocumentTotal,
   };
 }

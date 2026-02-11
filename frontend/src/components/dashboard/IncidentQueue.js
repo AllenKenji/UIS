@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "../../services/firebase";
+import { api, endpoints } from "../../services/api"; // ✅ use API layer
 import { useUser } from "../../context/UserContext";
 import "../../styles/dashboard/incident-queue.css";
 
 const IncidentQueue = () => {
-  const { can } = useUser(); // ✅ centralized permission check
+  const { can } = useUser();
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -13,18 +12,17 @@ const IncidentQueue = () => {
   useEffect(() => {
     const fetchIncidents = async () => {
       try {
-        // 🔐 Permission check via ROLE_PERMISSIONS
         if (!can("viewIncidents")) {
           setIncidents([]);
           setLoading(false);
           return;
         }
 
-        const snapshot = await getDocs(collection(db, "incidents"));
-        const data = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
+        // ✅ Fetch incidents via API (already enriched)
+        const { data } = await api.get(endpoints.incidents, {
+          params: { status: "pending" }, // only pending cases
+        });
+
         setIncidents(data);
       } catch (err) {
         console.error("❌ Failed to load incidents:", err);
@@ -39,7 +37,7 @@ const IncidentQueue = () => {
 
   return (
     <div className="incident-queue" aria-busy={loading} aria-live="polite">
-      <h3>🚨 Incident Queue</h3>
+      <h3>🚨 Incident Queue ({incidents.length} pending)</h3>
       {loading ? (
         <p>Loading incidents…</p>
       ) : error ? (
@@ -51,18 +49,32 @@ const IncidentQueue = () => {
           <thead>
             <tr>
               <th>Type</th>
+              <th>Description</th>
+              <th>Location</th>
+              <th>Reported By</th>
               <th>Status</th>
+              <th>Timestamp</th>
             </tr>
           </thead>
           <tbody>
-            {incidents.map(({ id, type, status }) => (
+            {incidents.map(({ id, type, description, location, reported_by_name, status, createdAt }) => (
               <tr key={id}>
                 <td>{type}</td>
+                <td>{description}</td>
+                <td>{location}</td>
+                <td>{reported_by_name || "—"}</td>
                 <td>
-                  <span className={`status-badge ${status?.toLowerCase()}`}>
-                    {status}
+                  <span
+                    className={`status-badge ${
+                      status?.toLowerCase() === "escalated"
+                        ? "escalated"
+                        : status?.toLowerCase()
+                    }`}
+                  >
+                    {status === "escalated" ? "Escalated" : status}
                   </span>
                 </td>
+                <td>{createdAt ? new Date(createdAt).toLocaleString() : "—"}</td>
               </tr>
             ))}
           </tbody>

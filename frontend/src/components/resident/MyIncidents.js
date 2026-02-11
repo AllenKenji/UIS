@@ -17,19 +17,22 @@ const MyIncidents = () => {
           return;
         }
 
-        const q = query(
-            collection(db, "incidents"),
-            where("authUid", "==", user.uid) // ✅ corrected field
-        );
+        const q1 = query(collection(db, "incidents"), where("residentId", "==", user.uid));
+        const q2 = query(collection(db, "incidents"), where("authUid", "==", user.uid));
 
-        const snapshot = await getDocs(q);
+        const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
 
-        const data = snapshot.docs.map((doc) => ({
+        const data = [...snap1.docs, ...snap2.docs].map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
 
-        setIncidents(data);
+        // remove duplicates if any
+        const unique = data.reduce((acc, curr) => {
+          acc[curr.id] = curr;
+          return acc;
+        }, {});
+        setIncidents(Object.values(unique));
       } catch (err) {
         console.error("Error fetching incidents:", err);
       } finally {
@@ -49,14 +52,42 @@ const MyIncidents = () => {
       {incidents.length === 0 ? (
         <p>No incidents reported yet.</p>
       ) : (
-        <ul>
-          {incidents.map((i) => (
-            <li key={i.id}>
-                <strong>{i.type}</strong> — {i.status}
-                <div>{i.description}</div>
-            </li>
+        <table className="incident-table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Description</th>
+              <th>Status</th>
+              <th>Assigned To</th>
+              <th>Location</th>
+              <th>Reported Date/Time</th>
+              <th>Last Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {incidents.map((i) => (
+              <tr key={i.id}>
+                <td>{i.type}</td>
+                <td>{i.description}</td>
+                <td>{i.status}</td>
+                <td>{i.assigned_to_name || "—"}</td>
+                <td>{i.location}</td>
+                <td>
+                  {i.date && i.time
+                    ? `${i.date} ${i.time}`
+                    : i.createdAt
+                      ? new Date(i.createdAt.seconds * 1000).toLocaleString()
+                      : "—"}
+                </td>
+                <td>
+                  {i.updatedAt
+                    ? new Date(i.updatedAt.seconds * 1000).toLocaleString()
+                    : "—"}
+                </td>
+              </tr>
             ))}
-        </ul>
+          </tbody>
+        </table>
       )}
     </div>
   );

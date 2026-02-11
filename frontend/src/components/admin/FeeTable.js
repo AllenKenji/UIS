@@ -1,3 +1,4 @@
+// src/components/admin/FeeTable.jsx
 import "../../styles/fee-dashboard.css";
 
 export default function FeeTable({ title, columns, data, onUpdate, onDelete }) {
@@ -10,7 +11,17 @@ export default function FeeTable({ title, columns, data, onUpdate, onDelete }) {
     } else {
       value = e.target.value;
     }
+    // Update the specific field immediately
     onUpdate(item.id, col.key, value, item);
+  };
+
+  const handleSave = (item) => {
+    // Save the entire item with its current values
+    columns.forEach(col => {
+      if (col.editable) {
+        onUpdate(item.id, col.key, item[col.key], item);
+      }
+    });
   };
 
   return (
@@ -50,7 +61,7 @@ export default function FeeTable({ title, columns, data, onUpdate, onDelete }) {
                 </td>
               ))}
               <td>
-                <button onClick={() => onUpdate(item.id, null, null, item)}>Save</button>
+                <button onClick={() => handleSave(item)}>Save</button>
                 <button onClick={() => onDelete(item.id)}>Delete</button>
               </td>
             </tr>

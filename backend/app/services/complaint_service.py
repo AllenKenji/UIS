@@ -38,31 +38,57 @@ def _normalize_complaint(doc) -> dict:
     return data
 
 
-# ✅ Enrich complaint with resident info (admin view)
+# ✅ Enrich complaint with resident info (admin/staff view)
 def _enrich_with_resident(data: dict) -> ComplaintWithResident:
     db = get_firestore()
-    resident_id = data.get("filed_by")
-    filed_by_name = "Unknown"
 
+    # Resident info (complaint subject)
+    resident_id = data.get("filed_for") or data.get("filed_by")
+    filed_for_name = "Unknown"
     if resident_id:
         try:
-            resident_doc = db.collection(RESIDENT_COLLECTION).document(resident_id).get()
-            if resident_doc.exists:
-                filed_by_name = resident_doc.to_dict().get("fullName", "Unknown")
+            doc = db.collection(RESIDENT_COLLECTION).document(resident_id).get()
+            if doc.exists:
+                filed_for_name = doc.to_dict().get("fullName", "Unknown")
         except Exception as e:
             logger.warning("⚠️ Failed to fetch resident %s: %s", resident_id, e)
 
-    return ComplaintWithResident(**{**data, "filed_by_name": filed_by_name})
+    # Filer info (always resolve, even if same as filed_for)
+    filed_by_name = "Unknown"
+    filer_id = data.get("filed_by")
+    if filer_id:
+        try:
+            doc = db.collection(RESIDENT_COLLECTION).document(filer_id).get()
+            if doc.exists:
+                filed_by_name = doc.to_dict().get("fullName", "Unknown")
+        except Exception as e:
+            logger.warning("⚠️ Failed to fetch filer %s: %s", filer_id, e)
 
+    return ComplaintWithResident(
+        **{
+            **data,
+            "filed_for_name": filed_for_name,
+            "filed_by_name": filed_by_name,
+        }
+    )
 
-# 📝 File a complaint (resident)
+# 📝 File a complaint (resident or staff on behalf of resident)
 def file_complaint(data: ComplaintCreate) -> Optional[Complaint]:
+    """
+    Create a complaint record.
+    - filed_by: the ID of the user who entered the complaint (resident or staff/admin)
+    - filed_for: the resident ID the complaint is about (required if staff/admin files)
+    """
     db = get_firestore()
     doc_ref = db.collection(COMPLAINT_COLLECTION).document()
 
+    # Ensure filed_for is set: if not provided, default to filed_by (resident self-filing)
+    filed_for = data.filed_for or data.filed_by
+
     payload = {
         **data.dict(),
-        "filed_by": data.filed_by,
+        "filed_by": data.filed_by,       # who entered the complaint
+        "filed_for": filed_for,          # resident the complaint is about
         "timestamp": firestore.SERVER_TIMESTAMP,
         "updated_at": None,
         "status": ComplaintStatus.open.value,
@@ -71,27 +97,32 @@ def file_complaint(data: ComplaintCreate) -> Optional[Complaint]:
     try:
         doc_ref.set(payload)
         snapshot = doc_ref.get()
-        logger.info("✅ Complaint filed with ID: %s", doc_ref.id)
+        logger.info(
+            "✅ Complaint filed with ID: %s (filed_by=%s, filed_for=%s)",
+            doc_ref.id,
+            data.filed_by,
+            filed_for,
+        )
         return Complaint.from_firestore(snapshot)
     except Exception as e:
         logger.error("❌ Failed to file complaint: %s", e)
         return None
 
-
-# 🔍 Get a specific complaint
-def get_complaint_by_id(complaint_id: str) -> Optional[Complaint]:
+# 🔍 Get a specific complaint (enriched with resident + filer info)
+def get_complaint_by_id(complaint_id: str) -> Optional[ComplaintWithResident]:
     db = get_firestore()
     try:
         doc = db.collection(COMPLAINT_COLLECTION).document(complaint_id).get()
         if doc.exists:
-            return Complaint.from_firestore(doc)
+            normalized = _normalize_complaint(doc)
+            enriched = _enrich_with_resident(normalized)  # ✅ add resident + filer names
+            return enriched
         logger.warning("⚠️ Complaint %s not found", complaint_id)
     except Exception as e:
         logger.error("❌ Failed to fetch complaint %s: %s", complaint_id, e)
     return None
 
-
-# 👤 Resident: list only their own complaints
+# 👤 Resident: list complaints filed for them (self or by staff)
 def list_complaints_by_resident_id(
     resident_id: str,
     limit: Optional[int] = None,
@@ -102,7 +133,7 @@ def list_complaints_by_resident_id(
     try:
         query = (
             db.collection(COMPLAINT_COLLECTION)
-            .where("filed_by", "==", resident_id)
+            .where("filed_for", "==", resident_id)   # ✅ use filed_for
             .order_by("timestamp", direction=firestore.Query.DESCENDING)
         )
 
@@ -120,7 +151,8 @@ def list_complaints_by_resident_id(
     return results
 
 
-# 🗂️ Admin: list all complaints with resident info
+
+# 🗂️ Admin/Staff: list all complaints with resident + filer info
 def list_complaints_with_residents(
     limit: Optional[int] = None,
     status: Optional[ComplaintStatus] = None,
@@ -140,7 +172,7 @@ def list_complaints_with_residents(
 
         for doc in query.stream():
             normalized = _normalize_complaint(doc)
-            enriched = _enrich_with_resident(normalized)
+            enriched = _enrich_with_resident(normalized)  # ✅ directly enrich
             results.append(enriched)
 
         logger.info("📋 Admin listed %d complaints", len(results))
@@ -148,7 +180,6 @@ def list_complaints_with_residents(
         logger.error("❌ Failed to list complaints: %s", e)
 
     return results
-
 
 # 🔧 Update complaint status (admin)
 def update_complaint_status(

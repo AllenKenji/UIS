@@ -2,18 +2,13 @@
 import firebase_admin
 from firebase_admin import auth, firestore
 from fastapi import Depends, HTTPException, Header, status
+from backend.app.core.roles import get_permissions
+from backend.app.core.firebase import ensure_firebase_initialized  # ✅ centralized init
 
-
-from backend.app.core.roles import get_permissions  # 🔗 role-based fallback
-
-# Ensure Firebase Admin is initialized once
-try:
-    firebase_admin.get_app()
-except ValueError:
-    firebase_admin.initialize_app()
-
-# Firestore client
-db = firestore.client()
+def get_db() -> firestore.Client:
+    """Return Firestore client, ensuring Firebase is initialized."""
+    ensure_firebase_initialized()
+    return firestore.client()
 
 
 def _verify_token(authorization: str) -> dict:
@@ -47,6 +42,7 @@ async def get_current_user(authorization: str = Header(...)) -> dict:
 
     # 🔎 Derive role if not present in claims
     if not role:
+        db = get_db()  # ✅ ensure Firebase is initialized before using Firestore
         user_doc = db.collection("users").document(uid).get()
         if user_doc.exists:
             role = user_doc.to_dict().get("role")
@@ -66,10 +62,10 @@ async def get_admin_uid(user: dict = Depends(get_current_user)) -> str:
     return uid
 
 
-def require_permission(permission: str):
+def require_permission(permission: str | list[str]):
     """
-    Factory that returns a dependency requiring a specific permission.
-    Checks explicit token claims first, then falls back to role-based permissions.
+    Factory that returns a dependency requiring one or more permissions.
+    Accepts either a single permission string or a list of permission strings.
     """
     async def dependency(user: dict = Depends(get_current_user)) -> str:
         uid = user.get("uid")
@@ -78,20 +74,28 @@ def require_permission(permission: str):
         # Prefer explicit claims if present
         permissions = user.get("permissions")
 
-        # ✅ Force admin/staff to always use JSON permissions
-        if role in ("admin", "staff"):
+        # Force certain staff roles to always use JSON permissions
+        if role in ("admin", "staff", "secretary", "treasurer", "sk", "dilg"):
             permissions = get_permissions(role)
 
-        # ✅ Residents fallback to JSON if token has no permissions
+        # Residents fallback to JSON if token has no permissions
         elif permissions is None:
             permissions = get_permissions(role)
 
+        # Handle single vs. multiple permissions
+        if isinstance(permission, list):
+            if not any(permissions.get(p, False) for p in permission):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"One of {permission} required"
+                )
+        else:
+            if not permissions.get(permission, False):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Permission '{permission}' required"
+                )
 
-        if not permissions.get(permission, False):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Permission '{permission}' required"
-            )
         return uid
 
     return dependency

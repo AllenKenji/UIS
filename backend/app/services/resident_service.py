@@ -58,11 +58,10 @@ class ResidentError(Exception):
 
 def _get_resident_doc(id: str):
     db = get_firestore()
-    doc_ref = db.collection("residents").document(id)
-    snapshot = doc_ref.get()
+    snapshot = db.collection("residents").document(id).get()
     if not snapshot.exists:
         raise ResidentError(f"Resident {id} not found")
-    return doc_ref, snapshot
+    return snapshot
 
 def to_resident_out(doc: Dict[str, Any], id: Optional[str] = None) -> ResidentOut:
     data = {**doc}
@@ -176,7 +175,8 @@ def add_residents_bulk(residents: List[dict], householdId: Optional[str] = None)
 
 # 📤 Read single resident by ID
 def get_resident_by_id(id: str) -> ResidentOut:
-    doc_ref, snapshot = _get_resident_doc(id)
+    snapshot = _get_resident_doc(id)
+    logger.info("Resident snapshot data for %s: %s", id, snapshot.to_dict())
     return to_resident_out(snapshot.to_dict(), id=id)
 
 # 📤 Read all residents
@@ -195,28 +195,40 @@ def get_all_residents(limit: int = 50, start_after_id: Optional[str] = None) -> 
 
 # 🔄 Update (PUT)
 def update_resident(id: str, data: dict) -> ResidentOut:
-    doc_ref, _ = _get_resident_doc(id)
+    db = get_firestore()
+    doc_ref = db.collection("residents").document(id)
+    snapshot = _get_resident_doc(id)  # returns snapshot
+
     payload = sanitize_resident_payload(data, is_update=True)
     payload = encode_for_firestore(payload)
+
     doc_ref.update(payload)
     snapshot = doc_ref.get()
     return to_resident_out(snapshot.to_dict(), id=id)
 
 # ✂️ Patch (PATCH)
 def patch_resident(id: str, data: dict) -> ResidentOut:
-    doc_ref, _ = _get_resident_doc(id)
+    db = get_firestore()
+    doc_ref = db.collection("residents").document(id)
+    snapshot = _get_resident_doc(id)
+
     payload = sanitize_resident_payload(
         {k: v for k, v in data.items() if v is not None},
         is_update=True
     )
     payload = encode_for_firestore(payload)
+
     doc_ref.update(payload)
     snapshot = doc_ref.get()
     return to_resident_out(snapshot.to_dict(), id=id)
 
 # 🗑️ Delete single resident
 def delete_resident(id: str) -> Dict[str, str]:
-    doc_ref, _ = _get_resident_doc(id)
+    db = get_firestore()
+    doc_ref = db.collection("residents").document(id)
+    snapshot = _get_resident_doc(id)
+
+    logger.info("Deleting resident: %s", snapshot.to_dict())
     doc_ref.delete()
     return {"id": id, "message": "Resident deleted successfully"}
 

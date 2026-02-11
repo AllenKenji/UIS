@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getAuth } from "firebase/auth";
 
 // 🌐 Base URL for Cloud Run backend
 const API_BASE_URL =
@@ -39,7 +40,7 @@ export const endpoints = {
 export const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { "Content-Type": "application/json" },
-  timeout: 10000,
+  timeout: 30000,
 });
 
 // 🔐 Token injection via interceptor
@@ -54,14 +55,29 @@ export const setAuthToken = (token) => {
   }
 };
 
-api.interceptors.request.use((config) => {
-  const token = authToken || sessionStorage.getItem("authToken");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  } else {
-    delete config.headers.Authorization;
-  }
-  return config;
+// 🔐 Always inject a fresh token 
+api.interceptors.request.use(async (config) => { 
+  const auth = getAuth(); 
+  const user = auth.currentUser; 
+
+  try { 
+    if (user) { 
+      const token = await user.getIdToken(); 
+      config.headers.Authorization = `Bearer ${token}`; 
+      if (process.env.NODE_ENV !== "production") { 
+        console.debug("🔐 Using Firebase ID token"); 
+      } 
+    } else if (authToken) { 
+      config.headers.Authorization = `Bearer ${authToken}`; 
+      if (process.env.NODE_ENV !== "production") { 
+        console.debug("🔐 Using fallback authToken"); 
+      } 
+    } 
+  } catch (err) { 
+    console.warn("⚠️ Failed to refresh Firebase token", err); 
+  } 
+  
+  return config; 
 });
 
 // ⚠️ Unified error handler
@@ -76,15 +92,16 @@ class APIError extends Error {
 
 const extractErrorDetail = (data) => {
   if (!data) return "Unknown error";
-  if (typeof data === "string") return data;
   if (Array.isArray(data)) {
-    return data
-      .map((d) => `${d.loc?.join(".") || "field"}: ${d.msg || "error"}`)
-      .join("; ");
+    return data.map(d => `${d.loc?.join(".")}: ${d.msg}`).join("; ");
   }
   if (typeof data === "object") {
+    if (Array.isArray(data.detail)) {
+      return data.detail.map(d => `${d.loc?.join(".")}: ${d.msg}`).join("; ");
+    }
     return data.detail || data.message || data.error || JSON.stringify(data);
   }
+  if (typeof data === "string") return data;
   return "Unexpected error format";
 };
 
@@ -177,12 +194,41 @@ export const ComplaintsAPI = {
 // 📄 Document APIs
 export const DocumentsAPI = new BaseAPI(endpoints.documents);
 
+// 🔄 Update document status
+DocumentsAPI.patchStatus = (id, payload) =>
+  api.patch(`${endpoints.documents}/${id}/status`, payload)
+    .then((res) => res.data)
+    .catch((err) => handleError(err, "PATCH document status"));
+
+// 💳 Confirm payment
+DocumentsAPI.confirmPayment = (id, payload = {}) =>
+  api.patch(`${endpoints.documents}/${id}/payment`, payload)
+    .then((res) => res.data)
+    .catch((err) => handleError(err, "Confirm payment"));
+
+// 📜 Issue document
+DocumentsAPI.issue = (id, payload) =>
+  api.patch(`${endpoints.documents}/${id}/issue`, payload)
+    .then((res) => res.data)
+    .catch((err) => handleError(err, "Issue document"));
+
+// 🔄 Mark resubmitted
+DocumentsAPI.markResubmitted = (id) =>
+  api.patch(`${endpoints.documents}/${id}/resubmission`, { resubmitted: true })
+    .then((res) => res.data)
+    .catch((err) => handleError(err, "Mark resubmitted"));
+
+
 // 📝 Audit APIs
 export const AuditAPI = {
   list: () =>
     api.get(endpoints.audit)
       .then((res) => res.data)
       .catch((err) => handleError(err, "Audit log fetch")),
+  listByDoc: (docId) =>
+    api.get(`${endpoints.audit}?documentId=${docId}`) 
+      .then((res) => res.data) 
+      .catch((err) => handleError(err, "Audit log fetch by doc")),
 };
 
 // 🧑‍💼 Account APIs
@@ -247,8 +293,8 @@ export const FeesAPI = {
 
   updateBusiness: (id, payload) =>
     api.put(`${endpoints.fees.businesses}/${id}`, payload)
-      .then((res) => res.data)
-      .catch((err) => handleError(err, "Update business fee")),
+      .then(res => res.data)
+      .catch(err => handleError(err, "Update business fee")),
 
   deleteBusiness: (id) =>
     api.delete(`${endpoints.fees.businesses}/${id}`)

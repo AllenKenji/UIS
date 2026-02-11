@@ -103,7 +103,11 @@ const ComplaintList = () => {
               <td>{c.category}</td>
               <td>{c.description}</td>
               <td>{c.location}</td>
-              <td>{c.status}</td>
+              <td>
+                <span className={`status-badge ${c.status?.replace(/[_\s]+/g, '').toLowerCase()}`}>
+                  {c.status.replace(/_/g, ' ')} {/* display nicely */}
+                </span>
+              </td>
               <td>{c.timestamp ? c.timestamp.toLocaleString() : "—"}</td>
               <td>{c.resolution_notes || "—"}</td>
             </tr>

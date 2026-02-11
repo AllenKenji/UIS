@@ -68,17 +68,17 @@ const DocumentsAdmin = () => {
           <tbody>
             {documents.map((doc) => (
               <tr key={doc.id}>
-                <td>{doc.type}</td>
-                <td>{doc.resident_name || doc.resident_id}</td>
-                <td>{doc.issued_by}</td>
+                <td>{doc.documentType}</td>
+                <td>{doc.residentName || doc.residentId}</td>
+                <td>{doc.issuedBy}</td>
                 <td>
-                  {doc.issued_at
-                    ? new Date(doc.issued_at).toLocaleDateString()
+                  {doc.issuedAt
+                    ? new Date(doc.issuedAt).toLocaleDateString()
                     : "N/A"}
                 </td>
                 <td>{doc.purpose || "—"}</td>
                 <td>
-                  <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
+                  <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer">
                     📎 View
                   </a>{" "}
                   |{" "}

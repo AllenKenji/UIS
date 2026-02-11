@@ -1,54 +1,62 @@
-from pydantic import BaseModel, Field, model_validator
-from typing import Optional, Dict
+from pydantic import BaseModel, Field
+from typing import Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
-
 
 class DocumentStatus(str, Enum):
     pending = "pending"
     awaiting_payment = "awaiting_payment"
+    payment_submitted = "payment_submitted"
     paid = "paid"
     approved = "approved"
     rejected = "rejected"
 
-
 class Document(BaseModel):
-    id: Optional[str] = None
-    resident_id: str = Field(..., min_length=1)
-    resident_name: Optional[str] = Field(None, alias="residentName")
-    auth_uid: Optional[str] = None
+    # 🔑 Firestore document ID
+    id: str = Field(..., description="Firestore auto-generated document ID")
 
-    document_type: str = Field(..., min_length=1)
-    purpose: Optional[str] = None
-    remarks: Optional[str] = None
-    attachments: Dict[str, str] = Field(default_factory=dict)
+    # 🆔 Human-readable sequential ID
+    documentId: str = Field(..., description="Type-based sequential identifier, e.g. Barangay_Clearance-0001")
 
-    status: DocumentStatus = Field(default=DocumentStatus.pending)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    # 👤 Resident info
+    residentId: str = Field(..., description="Resident ID who requested the document")
+    residentName: Optional[str] = Field(None, description="Full name of the resident")
+    authUid: Optional[str] = Field(None, description="Auth UID if available")
 
-    handled_by: Optional[str] = None
-    issued_by: Optional[str] = None
-    issued_at: Optional[datetime] = None
-    rejection_reason: Optional[str] = None
-    resubmitted: bool = Field(default=False)
+    # 📄 Document details
+    documentType: str = Field(..., description="Type of document requested")
+    purpose: Optional[str] = Field(None, description="Purpose of the document")
+    remarks: Optional[str] = Field(None, description="Remarks from secretary/admin")
 
-    paymongoLinkId: Optional[str] = None
-    checkoutUrl: Optional[str] = None
-    paymentStatus: Optional[str] = None
+    # 🔄 Status lifecycle
+    status: DocumentStatus = Field(..., description="Current status of the document")
+    resubmitted: Optional[bool] = Field(False, description="Whether a rejected document was resubmitted")
 
-    file_url: Optional[str] = None
-    document_code: Optional[str] = None
-    qr_code_url: Optional[str] = None
-    verified: bool = False
+    # 🕒 Timestamps
+    createdAt: datetime = Field(..., description="When the document was created")
+    updatedAt: datetime = Field(..., description="When the document was last updated")
+    issuedAt: Optional[datetime] = Field(None, description="When the document was issued")
 
-    @model_validator(mode="after") 
-    def check_rejection_reason(self) -> "Document": 
-        # ✅ self is the model instance here 
-        if self.status == DocumentStatus.rejected and not self.rejection_reason: 
-            raise ValueError("Rejection reason is required when status is 'rejected'") 
-        return self
+    # 📎 Attachments
+    attachments: Optional[Dict[str, str]] = Field(None, description="Uploaded file URLs")
+
+    # 💳 Payment info
+    amount: Optional[int] = Field(None, description="Payment amount if required")
+    paymentStatus: Optional[str] = Field(None, description="Payment status string")
+    referenceNumber: Optional[str] = Field(None, description="Payment reference number")
+    paymentIntentId: Optional[str] = Field(None, description="PayMongo Payment Intent ID")
+    transactionId: Optional[str] = Field(None, description="PayMongo Transaction ID")
+
+    # 📜 Issuance info
+    issuedBy: Optional[str] = Field(None, description="Secretary/Admin who issued the document")
+    fileUrl: Optional[str] = Field(None, description="URL to the issued document file")
+
+    # 🧩 Flexible extra fields for type-specific data
+    extraFields: Optional[Dict[str, Any]] = Field( 
+        None, 
+        description="Additional fields depending on document type" 
+    )
     
-    class Config:
-        from_attributes = True
-        json_encoders = {datetime: lambda v: v.isoformat()}
+    # Common extras (still explicit for convenience)
+    occupation: Optional[str] = Field(None, description="Resident occupation")
+    voterStatus: Optional[str] = Field(None, description="Resident voter status")

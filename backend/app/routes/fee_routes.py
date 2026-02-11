@@ -1,38 +1,57 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 from backend.app.core.firebase import get_firestore
 from backend.app.core.auth import get_admin_uid
+from backend.app.services.paymongo_service import ( 
+    create_payment_link, 
+    create_payment_intent # ✅ new helper for e-wallets 
+)
 from backend.app.models.fee import (
     DocumentFee, BusinessFee, MiscFee,
     NewDocumentFee, NewBusinessFee, NewMiscFee
 )
+from backend.app.utils.firestore_utils import (
+    create_document,
+    update_document,
+    delete_document
+)
+import re
+import logging
+from typing import List, Dict, Optional, Type
+from pydantic import BaseModel
 
 db = get_firestore()
 router = APIRouter(prefix="/fees", tags=["Fees"])
+logger = logging.getLogger("uvicorn.error")
+
+
+
+# -----------------------------
+# 🔧 Utility: Normalize IDs
+# -----------------------------
+def normalize_id(value: str) -> str:
+    return re.sub(r"[^a-z0-9_]", "_", value.strip().lower())
 
 # -----------------------------
 # 🔧 Shared Firestore Helpers
 # -----------------------------
-def list_collection(collection: str):
-    """Return all documents in a Firestore collection as dicts with id."""
+def list_collection(collection: str) -> List[Dict]:
     docs = db.collection(collection).get()
     return [doc.to_dict() | {"id": doc.id} for doc in docs]
 
-def list_with_misc(collection: str):
+def list_with_misc(collection: str) -> List[Dict]:
     docs = db.collection(collection).get()
     misc_map = {
-        m.id.strip().lower().replace(" ", "_"): m.to_dict()
+        normalize_id(m.id): m.to_dict()
         for m in db.collection("misc_fees").get()
     }
-
     result = []
     for doc in docs:
         data = doc.to_dict()
         misc_type_raw = data.get("miscType")
         if misc_type_raw:
-            misc_type_key = misc_type_raw.strip().lower().replace(" ", "_")
+            misc_type_key = normalize_id(misc_type_raw)
             misc_entry = misc_map.get(misc_type_key)
             if misc_entry and misc_entry.get("enabled") and data.get("enabled"):
-                # ✅ resolve only if both misc fee and the record itself are enabled
                 data["miscFeeResolved"] = misc_entry["fee"]
             else:
                 data["miscFeeResolved"] = None
@@ -41,26 +60,25 @@ def list_with_misc(collection: str):
         result.append(data | {"id": doc.id})
     return result
 
-def create_document(collection: str, doc_id: str, data: dict):
-    ref = db.collection(collection).document(doc_id)
+def get_business_ref(identifier: str):
+    # Try Firestore doc ID
+    ref = db.collection("businesses").document(identifier)
     if ref.get().exists:
-        raise HTTPException(status_code=400, detail=f"{collection} {doc_id} already exists")
-    ref.set(data)
-    return {"success": True, "id": doc_id, **data}
+        return ref
+    # Try custom businessId field
+    docs = db.collection("businesses").where("businessId", "==", identifier).limit(1).get()
+    if docs:
+        return docs[0].reference
+    raise HTTPException(status_code=404, detail=f"Business {identifier} not found")
 
-def update_document(collection: str, doc_id: str, data: dict):
-    ref = db.collection(collection).document(doc_id)
-    if not ref.get().exists:
-        raise HTTPException(status_code=404, detail=f"{collection} {doc_id} not found")
-    ref.update(data)
-    return {"success": True, "id": doc_id, "updated": data}
-
-def delete_document(collection: str, doc_id: str):
-    ref = db.collection(collection).document(doc_id)
-    if not ref.get().exists:
-        raise HTTPException(status_code=404, detail=f"{collection} {doc_id} not found")
-    ref.delete()
-    return {"success": True, "message": f"{collection} {doc_id} deleted"}
+def get_document_ref(identifier: str):
+    ref = db.collection("documents").document(identifier)
+    if ref.get().exists:
+        return ref
+    docs = db.collection("documents").where("documentId", "==", identifier).limit(1).get()
+    if docs:
+        return docs[0].reference
+    raise HTTPException(status_code=404, detail=f"Document {identifier} not found")
 
 # -----------------------------
 # 🔨 Router Factory
@@ -68,13 +86,12 @@ def delete_document(collection: str, doc_id: str):
 def make_fee_routes(
     collection: str,
     prefix: str,
-    new_model,
-    update_model,
+    new_model: Type[BaseModel],
+    update_model: Type[BaseModel],
     id_field: str,
-    extra_fields: list[str] = None,
+    extra_fields: Optional[List[str]] = None,
     resolve_misc: bool = False,
 ):
-    """Generate CRUD endpoints for a fee type."""
     if extra_fields is None:
         extra_fields = []
 
@@ -83,25 +100,38 @@ def make_fee_routes(
         return list_with_misc(collection) if resolve_misc else list_collection(collection)
 
     @router.post(f"/{prefix}")
-    def create_fee(payload: new_model, admin=Depends(get_admin_uid)):
-        fee_id = getattr(payload, id_field).strip().lower().replace(" ", "_")
+    def create_fee(payload: new_model = Body(...), admin=Depends(get_admin_uid)):  # type: ignore
+        """
+        Create a new fee entry in Firestore.
+        FastAPI will validate `payload` against the `new_model` schema.
+        """
+        logger.info("Creating fee with payload=%s", payload.dict())
+
+        fee_id = normalize_id(getattr(payload, id_field))
         data = {id_field: getattr(payload, id_field).strip(), "fee": payload.fee}
         for field in extra_fields:
-            data[field] = getattr(payload, field)
+            data[field] = getattr(payload, field, None)
         return create_document(collection, fee_id, data)
 
     @router.put(f"/{prefix}/{{fee_id}}")
-    def update_fee(fee_id: str, payload: update_model, admin=Depends(get_admin_uid)):
+    def update_fee(fee_id: str, payload: update_model = Body(...), admin=Depends(get_admin_uid)):  # type: ignore
+        """
+        Update an existing fee entry in Firestore.
+        FastAPI will validate `payload` against the `update_model` schema.
+        """
         update_data = {"fee": payload.fee}
         for field in extra_fields:
             value = getattr(payload, field, None)
             if value is not None:
                 update_data[field] = value
-        return update_document(collection, fee_id, update_data)
+        return update_document(collection, normalize_id(fee_id), update_data)
 
     @router.delete(f"/{prefix}/{{fee_id}}")
     def delete_fee(fee_id: str, admin=Depends(get_admin_uid)):
-        return delete_document(collection, fee_id)
+        """
+        Delete a fee entry from Firestore.
+        """
+        return delete_document(collection, normalize_id(fee_id))
 
 # -----------------------------
 # 📄 Document Fee Routes
@@ -113,7 +143,7 @@ make_fee_routes(
     update_model=DocumentFee,
     id_field="documentType",
     extra_fields=["miscType", "enabled"],
-    resolve_misc=True, 
+    resolve_misc=True,
 )
 
 # -----------------------------
@@ -126,7 +156,7 @@ make_fee_routes(
     update_model=BusinessFee,
     id_field="businessType",
     extra_fields=["registrationFee", "annualFee", "miscType", "enabled"],
-    resolve_misc=True,  
+    resolve_misc=True,
 )
 
 # -----------------------------
@@ -140,3 +170,198 @@ make_fee_routes(
     id_field="miscType",
     extra_fields=["enabled"],
 )
+
+# -----------------------------
+# 🌐 Public Business Fee View
+# -----------------------------
+@router.get("/public/businesses")
+def list_public_business_types():
+    all_types = list_with_misc("business_types")
+    result = []
+    for bt in all_types:
+            total = (bt.get("fee", 0) +
+                     bt.get("registrationFee", 0) +
+                     (bt.get("miscFeeResolved") or 0))
+            bt["totalFee"] = total
+            result.append(bt)
+    return result
+
+# 🌐 Public Document Fee View
+@router.get("/public/documents")
+def list_public_document_types():
+    all_docs = list_with_misc("document_types")
+    result = []
+    for doc in all_docs:
+            total = (doc.get("fee", 0) +
+                     (doc.get("miscFeeResolved") or 0))
+            doc["totalFee"] = total
+            result.append(doc)
+    return result
+
+
+# -----------------------------
+# 💰 Fee Computation Helpers
+# -----------------------------
+def resolve_misc_fee(bt: dict) -> int:
+    misc_type_raw = bt.get("miscType") 
+    if misc_type_raw: 
+        misc_type_key = normalize_id(misc_type_raw) 
+        misc_entry = db.collection("misc_fees").document(misc_type_key).get() 
+        if misc_entry.exists: 
+            misc = misc_entry.to_dict() 
+            if misc.get("enabled") and bt.get("enabled"): 
+                return misc.get("fee", 0) 
+    return 0
+
+def compute_document_fee(document_type: str) -> int:
+    docs = db.collection("document_types").where("documentType", "==", document_type).limit(1).get()
+    if not docs:
+        raise HTTPException(status_code=404, detail=f"No fee configured for document type: {document_type}")
+    doc = docs[0].to_dict()
+
+    # ✅ Align with frontend: base + misc if enabled
+    total = doc.get("fee", 0)
+    total += resolve_misc_fee(doc)
+    return total
+
+
+def compute_business_registration_fee(business_type: str) -> int:
+    docs = db.collection("business_types").where("businessType", "==", business_type).limit(1).get()
+    if not docs:
+        raise HTTPException(status_code=404, detail=f"No fee configured for business type: {business_type}")
+    bt = docs[0].to_dict()
+
+    # ✅ Align with frontend: base + registration + misc if enabled
+    total = (bt.get("fee", 0) + bt.get("registrationFee", 0))
+    total += resolve_misc_fee(bt)
+    return total
+
+
+def compute_business_annual_fee(business_type: str) -> int:
+    docs = db.collection("business_types").where("businessType", "==", business_type).limit(1).get()
+    if not docs:
+        raise HTTPException(status_code=404, detail=f"No fee configured for business type: {business_type}")
+    bt = docs[0].to_dict()
+
+    # ✅ Align with frontend: base + annual + misc if enabled
+    total = (bt.get("fee", 0) + bt.get("annualFee", 0))
+    total += resolve_misc_fee(bt)
+    return total
+
+
+@router.post("/businesses/{business_id}/payment")
+def create_business_payment(business_id: str, payload: dict = Body(...)):
+    """
+    Create a PayMongo payment for a business.
+    Decides between registration vs annual renewal based on payload["paymentType"].
+    """
+    payment_type = payload.get("paymentType", "registration")  # default to registration
+    remarks = payload.get("remarks", f"Business {payment_type} fee")
+    ref = get_business_ref(business_id)
+    business = ref.get().to_dict()
+
+    # ✅ Decide which fee to compute
+    if payment_type == "annual":
+        fee = compute_business_annual_fee(business.get("businessType"))
+        description = f"Annual Business Fee for {business_id}"
+    else:
+        fee = compute_business_registration_fee(business.get("businessType"))
+        description = f"Registration Business Fee for {business_id}"
+
+    if fee <= 0:
+        raise HTTPException(status_code=400, detail="Invalid fee amount")
+
+    # ✅ Decide API based on fee amount
+    if fee < 100:
+        result = create_payment_intent(
+            amount=fee,
+            description=description,
+            remarks=remarks,
+            metadata={
+                "businessId": business_id,
+                "businessType": business.get("businessType"),
+                "paymentType": payment_type,
+            },
+            success_url="https://your-app.com/business/payment-success",
+            cancel_url="https://your-app.com/business/payment-cancel"
+        )
+    else:
+        result = create_payment_link(
+            amount=fee,
+            description=description,
+            remarks=remarks,
+            metadata={
+                "businessId": business_id,
+                "businessType": business.get("businessType"),
+                "paymentType": payment_type,
+            },
+            success_url="https://your-app.com/business/payment-success",
+            cancel_url="https://your-app.com/business/payment-cancel"
+        )
+
+    # ✅ Update Firestore with checkout details
+    ref.update({
+        "checkoutUrl": result["checkout_url"],
+        "paymongoLinkId": result.get("link_id"),
+        "paymentIntentId": result.get("intent_id"),
+        "status": "for_payment",
+        "fee": fee,
+        "paymentType": payment_type,  # store type for audit clarity
+    })
+
+    return result
+
+
+@router.post("/documents/{document_id}/payment")
+def create_document_payment(document_id: str, payload: dict = Body(...)):
+    remarks = payload.get("remarks", "Document fee")
+    ref = get_document_ref(document_id)
+    document = ref.get().to_dict()
+
+    doc_type = document.get("documentType")
+    fee = compute_document_fee(doc_type)
+    if fee < 0:
+        raise HTTPException(status_code=400, detail="Invalid fee amount")
+    
+    if fee == 0:
+        ref.update({
+            "status": "paid",
+            "fee": 0,
+            "paymentType": "free"
+        })
+        return {"message": f"{doc_type} is free, no payment required"}
+
+
+    description = f"{doc_type} Request {document_id}"
+
+    # ✅ Decide API based on fee
+    if fee < 100:
+        result = create_payment_intent(
+            amount=fee,
+            description=description,
+            remarks=remarks,
+            metadata={"documentId": document_id, "documentType": doc_type},
+            success_url="https://your-app.com/documents/payment-success",
+            cancel_url="https://your-app.com/documents/payment-cancel"
+        )
+    else:
+        result = create_payment_link(
+            amount=fee,
+            description=description,
+            remarks=remarks,
+            metadata={"documentId": document_id, "documentType": doc_type},
+            success_url="https://your-app.com/documents/payment-success",
+            cancel_url="https://your-app.com/documents/payment-cancel"
+        )
+
+    ref.update({
+        "checkoutUrl": result["checkout_url"],
+        "paymongoLinkId": result.get("link_id"),
+        "paymentIntentId": result.get("intent_id"),
+        "status": "awaiting_payment",
+        "fee": fee
+    })
+
+    logger.info("Updated Firestore with new checkoutUrl=%s fee=%s", result["checkout_url"], fee)
+
+    return result

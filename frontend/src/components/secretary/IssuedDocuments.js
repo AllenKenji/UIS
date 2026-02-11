@@ -1,35 +1,68 @@
-import React, { useEffect, useState } from "react";
-import { api } from "../../services/api";
+import React, { useState } from "react";
+import { useEnrichedRequests } from "../../hooks/useEnrichedRequests";
+import "../../styles/secretary/issued-documents.css";
 
 const IssuedDocuments = () => {
-  const [issued, setIssued] = useState([]);
+  const { approved, loading } = useEnrichedRequests(); // hook extended to include approved
+  const [selectedDoc, setSelectedDoc] = useState(null);
 
-  useEffect(() => {
-    const fetchIssued = async () => {
-      try {
-        const { data } = await api.get("/api/documents", { params: { status: "approved" } });
-        setIssued(data);
-      } catch (err) {
-        console.error("❌ Error fetching issued documents:", err.message);
-      }
-    };
-    fetchIssued();
-  }, []);
+  const renderDocumentCard = (doc) => (
+    <li key={doc.id} className="request-card">
+      <div className="request-info">
+        <strong>{doc.residentName || doc.residentId}</strong>
+        <span>{doc.documentType}</span>
+        <small className="doc-id">({doc.documentId})</small>
+      </div>
+      <button className="btn-view" onClick={() => setSelectedDoc(doc)}>👁️ View</button>
+    </li>
+  );
 
   return (
-    <div className="sidebar-section">
-      <h3>✅ Issued Documents</h3>
-      {issued.length === 0 ? (
-        <p>No issued documents.</p>
+    <div className="issued-documents">
+      <h3>📜 Issued Documents</h3>
+      {loading && <p className="status-message">Loading…</p>}
+
+      {approved.length === 0 ? (
+        <p className="status-message">No issued documents yet.</p>
       ) : (
-        <ul>
-          {issued.map(doc => (
-            <li key={doc.id}>
-              {doc.resident_name || doc.resident_id} — {doc.document_type}
-              <a href={doc.file_url} target="_blank" rel="noopener noreferrer">📎 View</a>
-            </li>
-          ))}
-        </ul>
+        <ul className="request-list">{approved.map(renderDocumentCard)}</ul>
+      )}
+
+      {selectedDoc && (
+        <div className="modal-overlay" onClick={() => setSelectedDoc(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <header>
+              <h4>{selectedDoc.residentName || selectedDoc.residentId}</h4>
+              <p className="doc-type">{selectedDoc.documentType}</p>
+              <p className="doc-id">Document ID: {selectedDoc.documentId}</p>
+            </header>
+
+            <section className="doc-meta">
+              <p><strong>Purpose:</strong> {selectedDoc.purpose || "—"}</p>
+              <p><strong>Issued By:</strong> {selectedDoc.issuedBy || "—"}</p>
+              <p><strong>Issued At:</strong> {selectedDoc.issuedAt || "—"}</p>
+              <p><strong>Status:</strong> {selectedDoc.status}</p>
+            </section>
+
+            <section className="doc-file">
+              <h5>Issued File</h5>
+              {selectedDoc.fileUrl ? (
+                <a
+                  href={selectedDoc.fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-download"
+                >
+                  📄 Download Document
+                </a>
+              ) : (
+                <p>No file uploaded yet.</p>
+              )}
+            </section>
+
+            <button className="btn-close" onClick={() => setSelectedDoc(null)}>⬅️ Close</button>
+          </div>
+        </div>
       )}
     </div>
   );

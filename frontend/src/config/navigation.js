@@ -6,8 +6,10 @@ const links = {
   businesses: { path: "/businesses", label: "💼 Businesses", action: "viewBusinesses" },
   ownBusinesses: { path: "/businesses/my", label: "💼 My Businesses", action: "viewOwnBusinesses" },
   registerBusiness: { path: "/businesses/new", label: "➕ Register Business", action: "registerBusinesses" },
+  registerResidentBusiness: { path: "/residentBusinesses", label: "➕ Register Resident Businesses", action: "registerResidentBusinesses" },
   documents: { path: "/documents", label: "📄 Documents", action: "viewDocuments" },
   ownDocuments: { path: "/ownDocuments", label: "📄 My Documents", action: "viewOwnDocuments" },
+  
   requestDocument: { path: "/documents/request", label: "📝 Request Document", action: "requestDocuments" },
   incidents: { path: "/incidents", label: "⚠️ Incidents", action: "viewIncidents" },
   reportIncident: { path: "/incidents/new", label: "⚠️ Report Incident", action: "reportIncidents" },
@@ -23,8 +25,9 @@ const links = {
   home: { path: "/", label: "🏠 Home", action: "viewDashboard" },
 
   // Secretary-specific links
+  requestForDocuments: { path: "/secretary/documents", label: "📝 Document Request", action: "documentRequest" },
   pendingRequests: { path: "/secretary/pending", label: "📋 Pending Requests", action: "pendingRequests" },
-  paymentQueue: { path: "/secretary/payments", label: "💳 Payment Queue", action: "paymentQueue" },
+  paidRequests: { path: "/secretary/payments", label: "💳 Paid Requests", action: "paidRequests" },
   issuedDocuments: { path: "/secretary/issued", label: "✅ Issued Documents", action: "issuedDocuments" },
   rejectedRequests: { path: "/secretary/rejected", label: "❌ Rejected Requests", action: "rejectedRequests" },
 };
@@ -37,6 +40,7 @@ const sidebarLinks = {
     links.documents,
     links.incidents,
     links.viewAllComplaints,   // 👀 Admin oversight
+    links.fileComplaint,
     links.createAccount,
     links.finance,
     links.audit,
@@ -46,16 +50,16 @@ const sidebarLinks = {
     links.residents,
     links.addResident,
     links.businesses,
-    links.registerBusiness,
-    links.documents,
+    links.registerResidentBusiness,
     links.incidents,
     links.viewAllComplaints,
-    links.evaluateComplaints, // 📝 Staff evaluation
+    links.fileComplaint,
   ],
   secretary: [
     links.dashboard("/secretary"),
+    links.requestForDocuments,
     links.pendingRequests,
-    links.paymentQueue,
+    links.paidRequests,
     links.issuedDocuments,
     links.documents,
     links.rejectedRequests,

@@ -5,15 +5,20 @@ html {
   font-size: 100%; /* baseline: 16px */
 }
 
-body {
-  background-color: var(--color-bg);
-  color: var(--color-text);
-  font-family: var(--font-family-base);
-  margin: 0;
-  padding: 0;
-  line-height: clamp(1.5, 2vw + 1.2, 1.8); /* ~1.5 → ~1.8 */
-  scroll-behavior: smooth;
-  transition: background-color 0.3s ease, color 0.3s ease;
+body { 
+  background-color: var(--color-bg); 
+  color: var(--color-text); 
+  font-family: var(--font-family-base); 
+  margin: 0; padding: 0; 
+  line-height: clamp(1.5, 2vw + 1.2, 1.8); 
+  transition: background-color 0.3s ease, color 0.3s ease; 
+} 
+
+/* Progressive enhancement: smooth scrolling */ 
+@supports (scroll-behavior: smooth) { 
+  body { 
+    scroll-behavior: smooth; 
+  } 
 }
 
 /* Headings with responsive clamp() for font-size + line-height */

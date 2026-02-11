@@ -19,7 +19,7 @@ const MyComplaints = () => {
 
         const q = query(
           collection(db, "complaints"),
-          where("residentUid", "==", user.uid)
+          where("filed_for", "==", user.uid)
         );
 
         const snapshot = await getDocs(q);
@@ -52,7 +52,9 @@ const MyComplaints = () => {
         <ul>
           {complaints.map((c) => (
             <li key={c.id}>
-              <strong>{c.issue}</strong> — {c.status}
+              <strong>{c.category}</strong>: {c.description} — {c.status}
+              <br />
+              <small>{c.timestamp?.toDate().toLocaleString()}</small>
             </li>
           ))}
         </ul>

@@ -25,6 +25,9 @@
   --color-info: #9b59b6;
   --color-info-hover: #8e44ad;
 
+  --color-review: #3498db; /* light mode: blue */ 
+  --color-review-hover: #2980b9; /* darker blue for hover */
+
   --color-neutral: #bdc3c7;
 
   --color-link: #0066cc;
@@ -137,6 +140,9 @@
 
   --color-info: #8e44ad;
   --color-info-hover: #6c3483;
+
+  --color-review: #4aa8ff; /* bright blue for dark mode */ 
+  --color-review-hover: #007acc; /* darker blue for hover */
 
   --color-neutral: #95a5a6;
 

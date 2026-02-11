@@ -8,9 +8,11 @@
     "manageFinancialRecords",
     "youthRegistryAccess",
     "auditBarangayData",
+    "documentRequest",
     "viewDocuments",
     "viewBusinesses",
     "viewAllComplaints",
+    "fileComplaintsForResidents",
     "viewIncidents",
     "manageSettings",
     "manageAnnouncements",
@@ -21,11 +23,13 @@
   "staff": [
     "viewDashboard",
     "manageBusinesses",
+    "registerResidentBusinesses",
     "manageComplaints",
     "manageResidents",
     "viewBusinesses",
     "viewIncidents",
-    "viewAllComplaints"   
+    "viewAllComplaints",
+    "fileComplaintsForResidents"   
   ],
   "resident": [
     "viewDashboard",
@@ -40,17 +44,20 @@
     "submitFeedback"
   ],
   "secretary": [ 
-    "viewDashboard", 
+    "viewDashboard",
+    "documentRequest",
     "viewDocuments", 
     "pendingRequests", 
-    "paymentQueue", 
+    "paidRequests", 
     "issuedDocuments", 
     "rejectedRequests" 
   ],
   "treasurer": [
     "viewDashboard",
-    "viewFinancialRecords",
-    "manageFinancialRecords"
+    "incomingPayments",
+    "barangayExpenses",
+    "financialReports",
+    "settings"
   ],
   "sk": [
     "viewDashboard",

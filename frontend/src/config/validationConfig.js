@@ -10,7 +10,7 @@ const validationConfig = {
       },
       {
         field: "fee",
-        validate: (val) => typeof val === "number" && val >= 0,
+        validate: (val) => val !== null && val !== undefined && Number.isFinite(val) && val >= 0,
         message: "⚠️ Fee must be a non-negative number",
       },
     ],

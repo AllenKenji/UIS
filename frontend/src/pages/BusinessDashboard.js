@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import './business-dashboard.css';
 import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { QRCodeCanvas } from 'qrcode.react';
 import BusinessEvaluationModal from '../components/staff/BusinessEvaluationModal';
 
 const BusinessDashboard = () => {
@@ -11,7 +10,7 @@ const BusinessDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   const [selectedBusiness, setSelectedBusiness] = useState(null);
-  const [showModal, setShowModal] = useState(false);
+  const [activeTab, setActiveTab] = useState("needsEvaluation"); // 🔧 tab state
 
   // 🔄 Fetch businesses
   const fetchBusinesses = async () => {
@@ -30,11 +29,6 @@ const BusinessDashboard = () => {
     fetchBusinesses();
   }, []);
 
-  const openModal = (business) => {
-    setSelectedBusiness(business);
-    setShowModal(true);
-  };
-
   const handleEvaluationSubmit = async ({ status, notes }) => {
     try {
       const refDoc = doc(db, "businesses", selectedBusiness.id);
@@ -43,8 +37,6 @@ const BusinessDashboard = () => {
         notes,
         evaluatedAt: new Date().toISOString(),
       });
-
-      setShowModal(false);
       setSelectedBusiness(null);
       fetchBusinesses();
     } catch (err) {
@@ -53,13 +45,23 @@ const BusinessDashboard = () => {
     }
   };
 
-  const filtered = filter
-    ? businesses.filter(b => b.barangay === filter)
-    : businesses;
+  // 🔎 Separate approved from others
+  const approvedBusinesses = businesses.filter(b => b.status === "approved");
+  const otherBusinesses = businesses.filter(b => b.status !== "approved");
+
+  // 🔎 Apply barangay filter
+  const applyFilter = (list) =>
+    filter ? list.filter(b => b.barangay === filter) : list;
 
   const barangayOptions = Array.from(
     new Set(businesses.map(b => b.barangay).filter(Boolean))
   ).sort();
+
+  // 🔧 Choose which list to show based on activeTab
+  const listToRender =
+    activeTab === "needsEvaluation"
+      ? applyFilter(otherBusinesses)
+      : applyFilter(approvedBusinesses);
 
   return (
     <div className="business-dashboard">
@@ -79,50 +81,54 @@ const BusinessDashboard = () => {
         </select>
       </div>
 
+      {/* Tabs */}
+      <div className="tabs">
+        <button
+          className={activeTab === "needsEvaluation" ? "active" : ""}
+          onClick={() => setActiveTab("needsEvaluation")}
+        >
+          🕑 Needs Evaluation
+        </button>
+        <button
+          className={activeTab === "approved" ? "active" : ""}
+          onClick={() => setActiveTab("approved")}
+        >
+          ✅ Approved Businesses
+        </button>
+      </div>
+
       {loading ? (
         <p>Loading businesses...</p>
-      ) : filtered.length === 0 ? (
-        <p>No businesses found.</p>
+      ) : listToRender.length === 0 ? (
+        <p>No businesses found in this tab.</p>
       ) : (
-        <div className="business-grid">
-          {filtered.map(b => (
-            <div key={b.businessId} className="business-card">
-              <h3>{b.businessName}</h3>
-              <p><strong>Owner:</strong> {b.ownerName}</p>
-              <p><strong>Type:</strong> {b.businessType}</p>
-              <p><strong>Barangay:</strong> {b.barangay}</p>
-              <p><strong>Address:</strong> {b.address}</p>
-              <p><strong>Contact:</strong> {b.contactNumber}</p>
-              <p><strong>Status:</strong> {b.status || "pending_evaluation"}</p>
-
-              {b.fileUrl && (
-                <p>
-                  <a href={b.fileUrl} target="_blank" rel="noopener noreferrer">
-                    📎 View Document
-                  </a>
-                </p>
-              )}
-
-              <p className="business-id">ID: {b.businessId}</p>
-
-              <div className="qr-wrapper">
-                <QRCodeCanvas value={b.businessId} size={96} />
-              </div>
-
-              {/* ✅ Staff Action */}
-              <button className="evaluate-btn" onClick={() => openModal(b)}>
-                Evaluate
-              </button>
-            </div>
-          ))}
-        </div>
+        <table className="business-table">
+          <thead>
+            <tr>
+              <th>Business Owner</th>
+              <th>Business Name</th>
+            </tr>
+          </thead>
+          <tbody>
+            {listToRender.map(b => (
+              <tr
+                key={b.id}
+                className="clickable-row"
+                onClick={() => setSelectedBusiness(b)}
+              >
+                <td>{b.ownerName}</td>
+                <td>{b.businessName}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
 
       {/* ✅ Evaluation Modal */}
-      {showModal && selectedBusiness && (
+      {selectedBusiness && (
         <BusinessEvaluationModal
           business={selectedBusiness}
-          onClose={() => setShowModal(false)}
+          onClose={() => setSelectedBusiness(null)}
           onSubmit={handleEvaluationSubmit}
         />
       )}

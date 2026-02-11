@@ -50,7 +50,7 @@ const ComplaintEvaluationModal = ({ complaint, onClose, onSubmit }) => {
             onChange={(e) => setStatus(e.target.value)}
           >
             <option value="open">Open</option>
-            <option value="in_progress">In Progress</option>
+            <option value="in_review">In Review</option>
             <option value="resolved">Resolved</option>
           </select>
 

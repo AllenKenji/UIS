@@ -22,8 +22,55 @@
   border-radius: 4px;
 }
 
-
 .qr-wrapper {
   margin-top: 1rem;
   text-align: center;
+}
+
+/* Wrapper for each uploaded file */
+.file-preview-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  margin: 4px 0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #fafafa;
+}
+
+/* File name text */
+.file-name {
+  font-size: 0.95rem;
+  color: #333;
+  font-weight: 500;
+  margin: 0;
+}
+
+/* Status badge */
+.status-badge {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+/* Variants */
+.status-required {
+  background-color: #e0f7e9;
+  color: #2e7d32;   /* green */
+  border: 1px solid #2e7d32;
+}
+
+.status-optional {
+  background-color: #fff3e0;
+  color: #ef6c00;   /* orange */
+  border: 1px solid #ef6c00;
+}
+
+.status-missing {
+  background-color: #ffebee;
+  color: #c62828;   /* red */
+  border: 1px solid #c62828;
 }

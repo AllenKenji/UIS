@@ -2,21 +2,15 @@ import os
 import logging
 from dotenv import load_dotenv
 
-# ✅ Load .env explicitly from project root
 load_dotenv("C:/Projects/BIS/.env")
 
-# Debug check to confirm values are loaded
-print("DEBUG PAYMONGO_SECRET_KEY:", os.getenv("PAYMONGO_SECRET_KEY"))
-print("DEBUG PAYMONGO_WEBHOOK_SECRET:", os.getenv("PAYMONGO_WEBHOOK_SECRET"))
+from contextlib import asynccontextmanager
 
-import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-import firebase_admin
-from firebase_admin import credentials, get_app, initialize_app
 from fastapi.encoders import ENCODERS_BY_TYPE
 
-# 🔧 Local imports (after env is loaded)
+from backend.app.core.firebase import ensure_firebase_initialized
 from backend.app.routes import (
     resident_routes,
     dashboard,
@@ -27,37 +21,34 @@ from backend.app.routes import (
     incident_routes,
     complaint_routes,
     account_routes,
-    settings_routes,
     audit_routes,
     fee_routes,
 )
 
-logger = logging.getLogger("uvicorn.error")
+logger = logging.getLogger("barangay")
 
-# 🔐 Firebase Admin SDK Initialization
-def ensure_firebase_initialized():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup logic
     try:
-        firebase_admin.get_app()
-        logger.info("ℹ️ Firebase already initialized.")
-    except ValueError:
-        cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "serviceAccountKey.json")
-        if not os.path.exists(cred_path):
-            raise FileNotFoundError(f"❌ Firebase credential not found at: {cred_path}")
+        logger.info("🚀 Initializing Firebase...")
+        ensure_firebase_initialized()
+    except Exception as e:
+        logger.error(f"❌ Firebase initialization failed: {e}")
+        raise
 
-        cred = credentials.Certificate(cred_path)
-        bucket = os.environ.get("FIREBASE_STORAGE_BUCKET")
-        options = {"storageBucket": bucket} if bucket else {}
-        initialize_app(cred, options)
-        logger.info("✅ Firebase initialized successfully with %s", cred_path)
+    yield  # <-- app runs here
 
+    # Shutdown logic
+    logger.info("🛑 Shutting down Barangay API")
 
-# 🚀 FastAPI App Factory
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Barangay Information System API",
         version="1.0.0",
         docs_url="/docs",
-        redoc_url="/redoc"
+        redoc_url="/redoc",
+        lifespan=lifespan,   # ✅ attach lifespan handler
     )
 
     # 🌐 CORS Configuration
@@ -82,7 +73,6 @@ def create_app() -> FastAPI:
     app.include_router(incident_routes.router, prefix=f"{api_prefix}/incidents", tags=["Incidents"])
     app.include_router(complaint_routes.router, prefix=f"{api_prefix}/complaints", tags=["Complaints"])
     app.include_router(account_routes.router, prefix=f"{api_prefix}", tags=["Accounts"])
-    app.include_router(settings_routes.router, prefix=f"{api_prefix}/settings", tags=["Settings"])
     app.include_router(audit_routes.router, prefix=f"{api_prefix}/document_audit", tags=["Audit"])
     app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
     app.include_router(business_routes.router, prefix=api_prefix, tags=["Business"])
@@ -110,23 +100,7 @@ def create_app() -> FastAPI:
             logger.info("📦 %s %s → %s", request.method, request.url.path, body_text or "<empty>")
         return await call_next(request)
 
-    # 🔄 Startup Hook
-    @app.on_event("startup")
-    async def on_startup():
-        try:
-            logger.info("🚀 Initializing Firebase...")
-            ensure_firebase_initialized()
-        except Exception as e:
-            logger.error(f"❌ Firebase initialization failed: {e}")
-            raise
-
-    # 🔄 Shutdown Hook
-    @app.on_event("shutdown")
-    async def on_shutdown():
-        logger.info("🛑 Shutting down Barangay API")
-
     return app
-
 
 # 🧩 Entrypoint for Uvicorn
 app = create_app()
@@ -137,4 +111,5 @@ ENCODERS_BY_TYPE[bytes] = lambda o: "<binary data>"
 if __name__ == "__main__":
     logger.info("🚀 Starting FastAPI app...")
     port = int(os.environ.get("PORT", 8000))
+    import uvicorn
     uvicorn.run("backend.app.main:app", host="0.0.0.0", port=port, reload=True)

@@ -45,21 +45,44 @@ class StatusUpdateRequest(BaseModel):
     "/",
     response_model=Complaint,
     status_code=status.HTTP_201_CREATED,
-    summary="Resident files a new complaint",
+    summary="File a new complaint (resident or staff on behalf of resident)",
 )
 def submit_complaint(
     complaint: ComplaintCreate,
-    _: None = Depends(require_permission("fileComplaints")),
+    current_user=Depends(require_permission(["fileComplaints", "fileComplaintsForResidents"])),
 ):
+    """
+    Submit a complaint.
+    - Residents: filed_by == filed_for (self-filing)
+    - Staff/Admin: filed_by = staff/admin UID, filed_for = resident UID
+    """
     try:
+        # Ensure filed_for is set: if not provided, default to self-filing
+        if not complaint.filed_for:
+            complaint.filed_for = complaint.filed_by
+
         created = file_complaint(complaint)
-        logger.info("📝 Complaint submitted: %s", created.id)
+        if not created:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to file complaint",
+            )
+
+        logger.info(
+            "📝 Complaint submitted: %s (filed_by=%s, filed_for=%s)",
+            created.id,
+            complaint.filed_by,
+            complaint.filed_for,
+        )
         return created
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("❌ Failed to file complaint: %s", e)
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Failed to file complaint",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected error while filing complaint",
         )
 
 
@@ -76,23 +99,13 @@ def get_my_complaints(
     current_user=Depends(require_permission("viewOwnComplaints")),
     limit: Optional[int] = Query(None, ge=0, le=100),
 ):
-    try:
-        resident_id = getattr(current_user, "id", None)
-        if not resident_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid user session",
-            )
-
-        complaints = list_complaints_by_resident_id(resident_id, limit)
-        return complaints
-    except Exception as e:
-        logger.error("❌ Failed to list resident complaints: %s", e)
+    resident_id = getattr(current_user, "id", None)
+    if not resident_id:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to fetch complaints",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid user session",
         )
-
+    return list_complaints_by_resident_id(resident_id, limit)
 
 # ---------------------------------------------------------
 # ✅ 3. Admin/staff lists ALL complaints
@@ -102,22 +115,14 @@ def get_my_complaints(
 @router.get(
     "/all",
     response_model=List[ComplaintWithResident],
-    summary="Admin lists all complaints with resident info",
+    summary="Admin/staff lists all complaints with resident + filer info",
 )
 def get_all_complaints(
     _: None = Depends(require_permission("viewAllComplaints")),
     limit: Optional[int] = Query(None, ge=0, le=100),
+    status: Optional[ComplaintStatus] = Query(None),
 ):
-    try:
-        complaints = list_complaints_with_residents(limit)
-        return complaints
-    except Exception as e:
-        logger.error("❌ Failed to list all complaints: %s", e)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to fetch complaints",
-        )
-
+    return list_complaints_with_residents(limit, status)
 
 # ---------------------------------------------------------
 # ✅ 4. Get a specific complaint by ID
@@ -125,22 +130,25 @@ def get_all_complaints(
 
 @router.get(
     "/{complaint_id}",
-    response_model=Complaint,
     summary="Get a specific complaint by ID",
 )
 def get_complaint(
     complaint_id: str,
-    _: None = Depends(require_permission("viewAllComplaints")),
+    current_user=Depends(require_permission(["viewOwnComplaints", "viewAllComplaints"])),
 ):
     complaint = get_complaint_by_id(complaint_id)
     if complaint is None:
-        logger.warning("❌ Complaint not found: %s", complaint_id)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Complaint not found",
         )
-    return complaint
 
+    # Residents → plain Complaint
+    if getattr(current_user, "role", None) == "resident":
+        return Complaint(**complaint.dict())
+
+    # Staff/Admin → enriched ComplaintWithResident
+    return complaint
 
 # ---------------------------------------------------------
 # ✅ 5. Update complaint status (admin/staff)
@@ -148,7 +156,7 @@ def get_complaint(
 
 @router.patch(
     "/{complaint_id}/status",
-    response_model=ActionResponse,
+    response_model=ComplaintWithResident,
     summary="Admin updates complaint status",
 )
 def update_status(
@@ -156,17 +164,10 @@ def update_status(
     payload: StatusUpdateRequest,
     _: None = Depends(require_permission("manageComplaints")),
 ):
-    updated = update_complaint_status(
-        complaint_id,
-        payload.status,
-        payload.notes,
-    )
-
+    updated = update_complaint_status(complaint_id, payload.status, payload.notes)
     if updated is None:
-        logger.warning("❌ Complaint not found for status update: %s", complaint_id)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Complaint not found",
         )
-
-    return ActionResponse(message="Status updated")
+    return updated
