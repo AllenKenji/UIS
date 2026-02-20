@@ -24,5 +24,6 @@ def load_role_permissions(path: Path = CONFIG_PATH) -> Dict[str, Dict[str, bool]
 ROLE_PERMISSIONS, ALL_PERMISSIONS = load_role_permissions()
 
 def get_permissions(role: str) -> Dict[str, bool]:
-    """Return the permission map for a role. Unknown roles get all False."""
+    role = role.lower().strip()
     return ROLE_PERMISSIONS.get(role, {perm: False for perm in ALL_PERMISSIONS})
+

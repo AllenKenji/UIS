@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { auth, db } from "../../services/firebase";
-import { AccountsAPI, setAuthToken } from "../../services/api";
+import { AccountsAPI } from "../../services/api";
 import { useUser } from "../../context/UserContext";
 import { ROLE_OPTIONS } from "../../config/roles";
 import "../../styles/dashboard/role-manager.css";
@@ -15,7 +15,7 @@ const RoleManager = () => {
   const [error, setError] = useState(null);
   const [pendingUserId, setPendingUserId] = useState(null);
 
-  const { userInfo, isAdmin, can, getToken } = useUser();
+  const { userInfo, isAdmin, can } = useUser();
   const hasManagePermission = isAdmin || can("manageUsers"); // ✅ aligned with role_permissions.json
 
   // 🔍 Fetch users (only if allowed)
@@ -66,8 +66,8 @@ const RoleManager = () => {
     async (context, apiFunc, rollback, ...args) => {
       try {
         setPendingUserId(args[0]); // assume first arg is userId
-        const token = await getToken();
-        setAuthToken(token);
+        
+      
         const result = await apiFunc(...args);
         setFeedback(`✅ ${context} succeeded`);
         return result;
@@ -80,7 +80,7 @@ const RoleManager = () => {
         setPendingUserId(null);
       }
     },
-    [getToken]
+    []
   );
 
   // 🔧 Handle role change

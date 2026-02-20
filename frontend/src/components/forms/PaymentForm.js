@@ -2,24 +2,26 @@ import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import { auth, db } from "../../services/firebase";
-import { doc, updateDoc, getDoc, collection, addDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import ReceiptPreview from "../staff/ReceiptPreview";
+import "../../styles/staff/payment_form.css";
 
-const PaymentForm = ({ 
-  docId, 
+const PaymentForm = ({
+  docId,
   entityId,        // businessId or documentId
   entityType,      // "business" or "document"
-  resident, 
-  description,     // businessType or documentType
-  fee, 
+  resident,
+  entityCategory,
+  fee,
   onCancel,
   onPaymentCompleted,
-  customEntityId
+  businessName
 }) => {
   const { register, handleSubmit } = useForm();
   const [receiptData, setReceiptData] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStaff, setCurrentStaff] = useState(null);
+  const [generatePDF, setGeneratePDF] = useState(null);
 
   useEffect(() => {
     const fetchStaffProfile = async () => {
@@ -33,70 +35,74 @@ const PaymentForm = ({
     fetchStaffProfile();
   }, []);
 
-  const generatePaymentId = () => `PAY-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
-  const generateReceiptId = () => `REC-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
-
   const onSubmit = async (data) => {
-    if (!resident || !currentStaff || !docId || !entityId) {
+    if (!resident || !currentStaff || !entityId) {
       toast.error("⚠️ Missing required data.");
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const customPaymentId = generatePaymentId();
-      const customReceiptId = generateReceiptId();
+      // 🔹 Choose endpoint dynamically
+      const url =
+        entityType === "business"
+          ? "/api/paymongo/payments/business"
+          : "/api/paymongo/payments/document";
 
-      // ✅ Save payment record
-      const paymentPayload = {
-        customPaymentId,
-        entityId,
-        entityType,
-        residentId: resident.id,          // ✅ consistent with backend
-        residentName: resident.fullName,  // ✅ consistent with backend
-        description,
-        amount: Number(fee) || 0,
-        method: data.method,
-        status: "approved",
-        paymentStatus: "paid",
-        receiptNumber: customReceiptId,
-        createdAt: new Date().toISOString(),
-        processedBy: currentStaff.full_name,
-        barangay: resident?.address?.barangay || "Barangay",
-      };
-      const paymentRef = await addDoc(collection(db, "payments"), paymentPayload);
+      const payload =
+        entityType === "business"
+          ? {
+              businessId: entityId,
+              businessName: data.businessName || businessName,
+              amount: fee,
+              method: data.method,
+              processedBy: currentStaff.full_name,
+            }
+          : {
+              documentId: entityId,
+              docType: entityCategory,
+              amount: fee,
+              method: data.method,
+              processedBy: currentStaff.full_name,
+              residentName: resident.fullName,
+            };
 
-      // ✅ Save receipt record
-      const receiptPayload = {
-        customReceiptId,
-        receiptNumber: customReceiptId,
-        paymentId: paymentRef.id,
-        entityId,
-        entityType,
-        residentId: resident.id,          // ✅ consistent
-        residentName: resident.fullName,  // ✅ consistent
-        description,
-        amount: Number(fee) || 0,
-        method: data.method,
-        issuedAt: new Date().toISOString(),
-        verified: true,
-        processedBy: currentStaff.full_name,
-        barangay: resident?.address?.barangay || "Barangay",
-        customEntityId: customEntityId || null,
-      };
-      const receiptRef = await addDoc(collection(db, "receipts"), receiptPayload);
-
-      // ✅ Update parent entity (document or business)
-      await updateDoc(doc(db, entityType === "business" ? "businesses" : "documents", docId), {
-        status: entityType === "business" ? "approved" : "paid",
-        paymentStatus: "paid",
-        updatedAt: new Date().toISOString(),
-        approvedAt: entityType === "business" ? new Date().toISOString() : null,
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
 
-      toast.success(`💵 Payment recorded. Receipt #: ${customReceiptId}`);
-      setReceiptData({ ...receiptPayload, firestoreId: receiptRef.id });
+      let result;
+      try {
+        result = await response.json();
+      } catch {
+        const text = await response.text();
+        throw new Error(text);
+      }
 
+      console.log("Backend result:", result);
+
+      if (result.success) {
+        toast.success(`💵 Payment recorded. Receipt #: ${result.receiptNumber}`);
+        setReceiptData({
+          receiptNumber: result.receiptNumber,
+          businessId: result.businessId,
+          documentId: result.documentId,
+          businessName: result.businessName,
+          ownerName: result.ownerName,
+          businessType: result.businessType,
+          documentType: result.documentType,
+          barangay: result.barangay,
+          residentName: resident.fullName,
+          amount: fee,
+          method: data.method,
+          processedBy: currentStaff.full_name,
+          issuedAt: new Date().toISOString(),
+        });
+      } else {
+        toast.error(`❌ Failed to record payment: ${result.message || "Unknown error"}`);
+      }
     } catch (error) {
       console.error("❌ Error recording payment:", error);
       toast.error("❌ Failed to record payment.");
@@ -105,12 +111,11 @@ const PaymentForm = ({
     }
   };
 
-
   return (
     <div className="form-step">
       <h2>💵 Record Payment</h2>
       <p>Resident: {resident?.fullName}</p>
-      <p>{entityType === "business" ? "Business Type" : "Document Type"}: {description}</p>
+      <p>{entityType === "business" ? "Business Type" : "Document Type"}: {entityCategory}</p>
       <p>Fee: ₱{fee}</p>
 
       {!receiptData ? (
@@ -130,38 +135,34 @@ const PaymentForm = ({
         </>
       ) : (
         <>
-          <ReceiptPreview receiptData={receiptData} />
+          <ReceiptPreview receiptData={receiptData} onGeneratePDF={setGeneratePDF} />
 
-          <button 
-            type="button" 
-            className="print-btn"
-            onClick={() => {
-              const printWindow = window.open("", "_blank");
-              if (printWindow) {
-                printWindow.document.write(`
-                  <html>
-                    <head><title>Receipt</title></head>
-                    <body>
-                      <pre>${JSON.stringify(receiptData, null, 2)}</pre>
-                    </body>
-                  </html>
-                `);
-                printWindow.document.close();
-                printWindow.focus();
-                printWindow.print();
-              }
-            }}
-          >
-            🖨️ Print Receipt
-          </button>
+          <div className="action-buttons">
+            <button
+              type="button"
+              className="print-btn"
+              onClick={() => {
+                if (generatePDF) generatePDF();
+              }}
+            >
+              🖨️ Print Receipt
+            </button>
 
-          <button 
-            type="button" 
-            className="proceed-btn"
-            onClick={onPaymentCompleted}
-          >
-            ➡️ Proceed to Issue Document
-          </button>
+            {entityType === "document" ? (
+              <>
+                <button type="button" className="proceed-btn" onClick={onPaymentCompleted}>
+                  ➡️ Proceed to Issue Document
+                </button>
+                <button type="button" className="close-btn" onClick={onCancel}>
+                  ✖️ Close
+                </button>
+              </>
+            ) : (
+              <button type="button" className="close-btn" onClick={onCancel}>
+                ✖️ Close
+              </button>
+            )}
+          </div>
         </>
       )}
     </div>

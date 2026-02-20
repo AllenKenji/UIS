@@ -16,6 +16,7 @@ from backend.app.services.complaint_service import (
     list_complaints_with_residents,
     list_complaints_by_resident_id,
     update_complaint_status,
+    delete_complaint,
 )
 from backend.app.core.auth import require_permission
 
@@ -96,16 +97,10 @@ def submit_complaint(
     summary="Resident lists their own complaints",
 )
 def get_my_complaints(
-    current_user=Depends(require_permission("viewOwnComplaints")),
+    resident_uid: str = Depends(require_permission("viewOwnComplaints")),
     limit: Optional[int] = Query(None, ge=0, le=100),
 ):
-    resident_id = getattr(current_user, "id", None)
-    if not resident_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid user session",
-        )
-    return list_complaints_by_resident_id(resident_id, limit)
+    return list_complaints_by_resident_id(resident_uid, limit)
 
 # ---------------------------------------------------------
 # ✅ 3. Admin/staff lists ALL complaints
@@ -171,3 +166,25 @@ def update_status(
             detail="Complaint not found",
         )
     return updated
+
+# ---------------------------------------------------------
+# ✅ 6. Delete a complaint (admin only)
+# ---------------------------------------------------------
+
+@router.delete(
+    "/{complaint_id}",
+    response_model=ActionResponse,
+    summary="Admin deletes a complaint",
+    status_code=status.HTTP_200_OK,
+)
+def delete_complaint_route(
+    complaint_id: str,
+    _: None = Depends(require_permission("manageComplaints")),
+):
+    deleted = delete_complaint(complaint_id)
+    if deleted is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Complaint not found",
+        )
+    return ActionResponse(message=f"Complaint {complaint_id} deleted successfully")

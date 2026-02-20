@@ -11,7 +11,7 @@ export function usePublicFees() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // 🔧 Helper to compute totals conditionally
+  // 🔧 Helper to compute totals for businesses
   const computeBusinessTotals = (bt) => {
     const baseFee = bt.fee || 0;
     const registrationFee = bt.registrationFee || 0;
@@ -26,6 +26,7 @@ export function usePublicFees() {
     };
   };
 
+  // 🔧 Helper to compute totals for documents
   const computeDocumentTotals = (doc) => {
     const baseFee = doc.fee || 0;
     const miscFee = doc.miscFeeResolved || 0;
@@ -41,25 +42,40 @@ export function usePublicFees() {
     const fetchPublicFees = async () => {
       setLoading(true);
       setError(null);
+
       try {
-        // Resident‑safe endpoints
-        const [bizRes, docRes] = await Promise.all([
+        const [bizRes, docRes] = await Promise.allSettled([
           fetch("/api/fees/public/businesses"),
           fetch("/api/fees/public/documents"),
         ]);
 
-        if (!bizRes.ok || !docRes.ok) {
-          throw new Error("Failed to fetch public fees");
+        // ✅ Handle businesses
+        if (bizRes.status === "fulfilled" && bizRes.value.ok) {
+          const bizData = await bizRes.value.json();
+          const rawBusinesses = Array.isArray(bizData?.data)
+            ? bizData.data
+            : Array.isArray(bizData)
+            ? bizData
+            : [];
+          setBusinessTypes(rawBusinesses.map(computeBusinessTotals));
+        } else {
+          console.warn("⚠️ Failed to fetch business fees");
+          setBusinessTypes([]);
         }
 
-        const bizData = await bizRes.json();
-        const docData = await docRes.json();
-
-        const rawBusinesses = Array.isArray(bizData) ? bizData : bizData?.data || [];
-        const rawDocuments = Array.isArray(docData) ? docData : docData?.data || [];
-
-        setBusinessTypes(rawBusinesses.map(computeBusinessTotals));
-        setDocumentTypes(rawDocuments.map(computeDocumentTotals));
+        // ✅ Handle documents
+        if (docRes.status === "fulfilled" && docRes.value.ok) {
+          const docData = await docRes.value.json();
+          const rawDocuments = Array.isArray(docData?.data)
+            ? docData.data
+            : Array.isArray(docData)
+            ? docData
+            : [];
+          setDocumentTypes(rawDocuments.map(computeDocumentTotals));
+        } else {
+          console.warn("⚠️ Failed to fetch document fees");
+          setDocumentTypes([]);
+        }
       } catch (err) {
         console.error("❌ Error fetching public fees:", err);
         setError(err.message || "Failed to load public fees");
@@ -73,9 +89,17 @@ export function usePublicFees() {
     fetchPublicFees();
   }, []);
 
+  // 🔎 Lookup helpers
+  const getBusinessFee = (type) =>
+    businessTypes.find((b) => b.type === type) || null;
+  const getDocumentFee = (type) =>
+    documentTypes.find((d) => d.type === type) || null;
+
   return {
     businessTypes,
     documentTypes,
+    getBusinessFee,
+    getDocumentFee,
     loading,
     error,
   };

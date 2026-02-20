@@ -1,0 +1,81 @@
+bindings:
+- members:
+  - serviceAccount:service-397499309217@gcp-gae-service.iam.gserviceaccount.com
+  role: roles/appengine.serviceAgent
+- members:
+  - serviceAccount:service-397499309217@gcp-sa-artifactregistry.iam.gserviceaccount.com
+  role: roles/artifactregistry.serviceAgent
+- members:
+  - serviceAccount:service-397499309217@gcp-sa-cloudaicompanion.iam.gserviceaccount.com
+  role: roles/cloudaicompanion.serviceAgent
+- members:
+  - serviceAccount:397499309217@cloudbuild.gserviceaccount.com
+  role: roles/cloudbuild.builds.builder
+- members:
+  - serviceAccount:service-397499309217@gcp-sa-cloudbuild.iam.gserviceaccount.com
+  role: roles/cloudbuild.serviceAgent
+- members:
+  - serviceAccount:service-397499309217@containerregistry.iam.gserviceaccount.com
+  role: roles/containerregistry.ServiceAgent
+- members:
+  - serviceAccount:firebase-app-hosting-compute@barangay-1721d.iam.gserviceaccount.com
+  role: roles/developerconnect.readTokenAccessor
+- members:
+  - serviceAccount:service-397499309217@gcp-sa-devconnect.iam.gserviceaccount.com
+  role: roles/developerconnect.serviceAgent
+- members:
+  - serviceAccount:397499309217-compute@developer.gserviceaccount.com
+  - serviceAccount:barangay-1721d@appspot.gserviceaccount.com
+  - serviceAccount:firebase-adminsdk-fbsvc@barangay-1721d.iam.gserviceaccount.com
+  role: roles/editor
+- members:
+  - serviceAccount:service-397499309217@gcp-sa-firebase.iam.gserviceaccount.com
+  role: roles/firebase.managementServiceAgent
+- members:
+  - serviceAccount:firebase-adminsdk-fbsvc@barangay-1721d.iam.gserviceaccount.com
+  - serviceAccount:firebase-app-hosting-compute@barangay-1721d.iam.gserviceaccount.com
+  role: roles/firebase.sdkAdminServiceAgent
+- members:
+  - serviceAccount:firebase-adminsdk-fbsvc@barangay-1721d.iam.gserviceaccount.com
+  role: roles/firebaseappcheck.admin
+- members:
+  - serviceAccount:firebase-app-hosting-compute@barangay-1721d.iam.gserviceaccount.com
+  role: roles/firebaseapphosting.computeRunner
+- members:
+  - serviceAccount:service-397499309217@gcp-sa-firebaseapphosting.iam.gserviceaccount.com
+  role: roles/firebaseapphosting.serviceAgent
+- members:
+  - serviceAccount:firebase-adminsdk-fbsvc@barangay-1721d.iam.gserviceaccount.com
+  role: roles/firebaseauth.admin
+- members:
+  - serviceAccount:service-397499309217@firebase-rules.iam.gserviceaccount.com
+  role: roles/firebaserules.system
+- members:
+  - serviceAccount:service-397499309217@gcp-sa-firebasestorage.iam.gserviceaccount.com
+  role: roles/firebasestorage.serviceAgent
+- members:
+  - serviceAccount:service-397499309217@gcp-sa-firestore.iam.gserviceaccount.com
+  role: roles/firestore.serviceAgent
+- members:
+  - serviceAccount:firebase-adminsdk-fbsvc@barangay-1721d.iam.gserviceaccount.com
+  role: roles/iam.serviceAccountTokenCreator
+- members:
+  - user:jonladyong@gmail.com
+  role: roles/owner
+- members:
+  - serviceAccount:service-397499309217@serverless-robot-prod.iam.gserviceaccount.com
+  role: roles/run.serviceAgent
+- condition:
+    expression: request.time < timestamp("2025-10-17T03:31:48.458Z")
+    title: developer-connect-connection-setup
+  members:
+  - serviceAccount:service-397499309217@gcp-sa-devconnect.iam.gserviceaccount.com
+  role: roles/secretmanager.admin
+- members:
+  - serviceAccount:firebase-adminsdk-fbsvc@barangay-1721d.iam.gserviceaccount.com
+  role: roles/storage.admin
+- members:
+  - serviceAccount:firebase-adminsdk-fbsvc@barangay-1721d.iam.gserviceaccount.com
+  role: roles/storage.objectCreator
+etag: BwZFB3fZHuM=
+version: 3

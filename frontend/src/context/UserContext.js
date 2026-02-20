@@ -79,13 +79,18 @@ export const UserProvider = ({ children }) => {
   }, []);
 
   // ✅ Token helpers
-  const getToken = useCallback(async (forceRefresh = false) => {
+  const getToken = useCallback(async (forceRefresh = true) => {
     if (!auth.currentUser) return null;
     try {
-      return await getIdToken(auth.currentUser, forceRefresh);
+      const token = await getIdToken(auth.currentUser, forceRefresh);
+      sessionStorage.setItem("authToken", token);
+      return token;
     } catch (err) {
       console.error("❌ Failed to get ID token:", err);
       setError("Token retrieval failed");
+      // fallback to cached token
+      const cached = sessionStorage.getItem("authToken");
+      if (cached) return cached;
       return null;
     }
   }, []);
@@ -184,6 +189,7 @@ export const UserProvider = ({ children }) => {
           console.debug("🔍 Token claims:", tokenResult.claims);
           console.debug("👤 Firestore profile:", profile);
           console.debug("🎭 Effective role:", effectiveRole);
+          console.debug("Auth currentUser:", user);
         }
 
         const enriched = { ...(profile || {}), uid: user.uid, role: effectiveRole };

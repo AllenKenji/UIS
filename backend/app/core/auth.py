@@ -12,7 +12,6 @@ def get_db() -> firestore.Client:
 
 
 def _verify_token(authorization: str) -> dict:
-    """Decode and validate Firebase ID token from Authorization header."""
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -22,14 +21,19 @@ def _verify_token(authorization: str) -> dict:
     token = authorization.removeprefix("Bearer ").strip()
 
     try:
-        return auth.verify_id_token(token)
+        decoded = auth.verify_id_token(token)
+        # Debug: log claims
+        import logging
+        logging.getLogger("uvicorn.error").info("✅ Token verified: %s", decoded)
+        return decoded
     except auth.InvalidIdTokenError:
         raise HTTPException(status_code=401, detail="Invalid ID token")
     except auth.ExpiredIdTokenError:
         raise HTTPException(status_code=401, detail="Token expired")
     except Exception as e:
+        import logging
+        logging.getLogger("uvicorn.error").error("❌ Token verification failed: %s", e)
         raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
-
 
 async def get_current_user(authorization: str = Header(...)) -> dict:
     """Return decoded token payload for the current user, resolving role from Firestore if missing."""

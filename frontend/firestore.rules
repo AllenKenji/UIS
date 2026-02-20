@@ -1,95 +1,183 @@
 rules_version = '2';
 service cloud.firestore {
-  
   function isAuthenticated() {
     return request.auth != null;
   }
 
+  // 🔑 Resolve role from /users or /residents
   function userRole() {
-    return get(/databases/(default)/documents/users/$(request.auth.uid)).data.role;
+    return exists(/databases/(default)/documents/users/$(request.auth.uid))
+      ? get(/databases/(default)/documents/users/$(request.auth.uid)).data.role
+      : "resident"; // ✅ default to resident if not in /users
   }
 
-  function isAdmin() {
-    return isAuthenticated() && userRole() == "admin";
-  }
+  // 🎭 Role helpers
+  function isAdmin()       { return isAuthenticated() && userRole() == "admin"; }
+  function isSecretary()   { return isAuthenticated() && userRole() == "secretary"; }
+  function isStaff()       { return isAuthenticated() && userRole() == "staff"; }
+  function isTreasurer()   { return isAuthenticated() && userRole() == "treasurer"; }
+  function isSK()          { return isAuthenticated() && userRole() == "sk"; }
+  function isDILG()        { return isAuthenticated() && userRole() == "dilg"; }
+  function isResident()    { return isAuthenticated() && userRole() == "resident"; }
 
-  function isSecretary() {
-    return isAuthenticated() && userRole() == "secretary";
-  }
-
-  function isStaff() {
-    return isAuthenticated() && userRole() == "staff";
-  }
-
-  function isSK() {
-    return isAuthenticated() && userRole() == "sk";
-  }
-
-  function isResident() {
-    return isAuthenticated() && userRole() == "resident";
-  }
-
-  function isAdminOrSecretary() {
-    return isAuthenticated() && userRole() in ["admin", "secretary"];
-  }
-
-  function isAdminOrStaff() {
-    return isAuthenticated() && userRole() in ["admin", "staff"];
-  }
-
-  function isAdminStaffResident() {
-    return isAuthenticated() && userRole() in ["admin", "staff", "resident"];
-  }
+  function isAdminOrSecretary() { return isAuthenticated() && userRole() in ["admin","secretary"]; }
+  function isAdminOrStaff()     { return isAuthenticated() && userRole() in ["admin","staff"]; }
 
   match /databases/{database}/documents {
 
-    // 🔐 User profiles
+    // 🔐 User profiles (admin/staff/etc.)
     match /users/{uid} {
       allow read: if isAuthenticated() && (request.auth.uid == uid || isAdmin());
       allow write, delete: if isAdmin();
     }
 
-    // 👥 Residents
-    match /residents/{docId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdminOrStaff();
+    // 👥 Residents (residentId = auth.uid)
+    match /residents/{residentId} {
+      // Resident can read/update their own record
+      allow read, update: if isResident() && request.auth.uid == residentId;
+
+      // Staff/Admin can manage residents
+      allow read, create, delete: if isAdminOrStaff();
+      
+      // Secretaries can read all residents 
+      allow read: if isSecretary();
     }
 
-    // 💼 Businesses
-    match /businesses/{docId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdminOrStaff();
+    // 💼 Businesses 
+    match /businesses/{docId} { 
+    	// Residents can create their own business record 
+    	allow create: if isResident(); 
+      
+      // Staff/Admin can also create (manual intervention), update, delete 
+      allow create, update, delete: if isAdminOrStaff(); 
+      
+      // Any authenticated user can read businesses 
+      allow read: if isAuthenticated(); 
+      
+      // Residents can update their own business record 
+      allow update: if isResident() && request.auth.uid == resource.data.authUid; 
     }
 
-    // 🧒 Youth Registry (SK)
+    // 🧒 Youth Registry
     match /youth/{docId} {
       allow read: if isAdmin() || isSK();
     }
 
-    // 📄 Documents (Admin + Secretary)
+    // 📄 Documents
     match /documents/{docId} {
-      allow read: if isAdminOrSecretary() || isResident();
-      allow write: if isAdminOrSecretary();
+
+      // Residents can only read their own documents
+      allow read: if isResident() && request.auth.uid == resource.data.authUid;
+
+      // Residents can create new document requests
+      allow create: if isResident();
+
+      // Residents can update their own documents (but not workflow/status fields)
+      allow update: if isResident() && request.auth.uid == resource.data.authUid
+                    && !(request.resource.data.status in ["approved","rejected","issued"]);
+
+      // Admins and secretaries have full access
+      allow read, create, update, delete: if isAdminOrSecretary();
+    }
+    
+    // 📄 Document Types
+    match /document_types/{docId} {
+
+      // Residents can read available document types (name, fee, etc.)
+      allow read: if isResident();
+
+      // Prevent residents from creating/updating/deleting document types
+      allow create, update, delete: if false;
+
+      // Admins and secretaries can manage document types
+      allow read, create, update, delete: if isAdminOrSecretary();
+    }
+    
+    match /counters/{docType} {
+      allow read: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ["admin", "secretary"];
+      allow write: if false; // prevent client writes
     }
 
-    // 🗣️ Complaints (Admin + Staff + Resident)
+    // 🗣️ Complaints
     match /complaints/{docId} {
-      allow read, write: if isAdminStaffResident();
+      // Resident, Staff and Admin can file complaints
+      allow create: if isResident() || isStaff() || isAdmin();
+
+      // Resident can read/update ONLY their own complaints
+      allow read, update: if isResident()
+                    && (request.auth.uid == resource.data.filed_for
+                        || request.auth.uid == resource.data.filed_by);
+
+      // Staff can read/update ALL complaints
+      allow read, update: if isStaff();
+
+      // Admin can read/update/delete ALL complaints
+      allow read, update, delete: if isAdmin();
     }
 
-    // ⚠️ Incidents (Admin + Staff)
+    // ⚠️ Incidents
     match /incidents/{docId} {
-      allow read, write: if isAdminOrStaff();
+      // Residents, staff, and admin can file incidents
+      allow create: if isResident() || isStaff() || isAdmin();
+
+      // Residents can read incidents they reported themselves OR those logged on their behalf
+      allow read: if isResident() && (
+        request.auth.uid == resource.data.authUid ||
+        request.auth.uid == resource.data.residentId
+      );
+
+      // Residents can update their own incident details, but not workflow fields
+      allow update: if isResident()
+                    && (request.auth.uid == resource.data.authUid || request.auth.uid == resource.data.residentId)
+                    && !(request.resource.data.status in ["resolved","dismissed","assigned"]);
+
+      // Staff can read and update all incidents
+      allow read, update: if isStaff();
+
+      // Admin can read, update, and delete all incidents
+      allow read, update, delete: if isAdmin();
     }
 
-    // 📊 Logins (Admin only)
+    // 📊 Logins
     match /logins/{docId} {
-      allow read: if isAdmin();
+      allow read: if isAdminOrStaff();
     }
 
+    // 💰 Fees
     match /fees/{docId} {
-      allow read: if isAdminOrStaff();
-      allow write: if isAdmin();
+      allow read: if isAdminOrStaff() || isTreasurer();
+      allow write: if isAdmin() || isTreasurer();
     }
+
+    // 🔔 Notifications
+    match /notifications/{docId} {
+      // Residents, staff, and admin can create notifications
+      allow create: if isResident() || isStaff() || isAdmin();
+
+      // Any authenticated user can read notifications if they are in notifyRoles
+      allow read: if isAuthenticated() && request.auth.uid in resource.data.notifyRoles;
+    }
+
+   	// 💵 Payments 
+    match /payments/{docId} {
+      // Resident can create payment for their own business
+      allow create: if isResident() && request.auth.uid == request.resource.data.residentId;
+
+      // Resident can read their own payments
+      allow read: if isResident() && request.auth.uid == resource.data.residentId;
+
+      // Staff/Admin/Treasurer/Secretary can manage all payments
+      allow read, create, update, delete: if isAdminOrStaff() || isTreasurer() || isSecretary();
+    }
+    
+		// Receipts
+    match /receipts/{docId} {
+      // Staff/Admin/Treasurer/Secretary can create receipts
+      allow create: if isAdminOrStaff() || isTreasurer() || isSecretary();
+
+      // Any authenticated user can read receipts
+      allow read: if isAuthenticated();
+    }
+
   }
 }

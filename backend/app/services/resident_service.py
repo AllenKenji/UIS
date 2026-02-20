@@ -176,7 +176,6 @@ def add_residents_bulk(residents: List[dict], householdId: Optional[str] = None)
 # 📤 Read single resident by ID
 def get_resident_by_id(id: str) -> ResidentOut:
     snapshot = _get_resident_doc(id)
-    logger.info("Resident snapshot data for %s: %s", id, snapshot.to_dict())
     return to_resident_out(snapshot.to_dict(), id=id)
 
 # 📤 Read all residents

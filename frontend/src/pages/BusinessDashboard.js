@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import './business-dashboard.css';
-import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { getStorage, ref, deleteObject } from "firebase/storage";
 import { db } from '../services/firebase';
 import BusinessEvaluationModal from '../components/staff/BusinessEvaluationModal';
 
@@ -10,9 +11,8 @@ const BusinessDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   const [selectedBusiness, setSelectedBusiness] = useState(null);
-  const [activeTab, setActiveTab] = useState("needsEvaluation"); // 🔧 tab state
+  const [activeTab, setActiveTab] = useState("needsEvaluation");
 
-  // 🔄 Fetch businesses
   const fetchBusinesses = async () => {
     try {
       const snapshot = await getDocs(collection(db, 'businesses'));
@@ -45,11 +45,9 @@ const BusinessDashboard = () => {
     }
   };
 
-  // 🔎 Separate approved from others
   const approvedBusinesses = businesses.filter(b => b.status === "approved");
   const otherBusinesses = businesses.filter(b => b.status !== "approved");
 
-  // 🔎 Apply barangay filter
   const applyFilter = (list) =>
     filter ? list.filter(b => b.barangay === filter) : list;
 
@@ -57,11 +55,57 @@ const BusinessDashboard = () => {
     new Set(businesses.map(b => b.barangay).filter(Boolean))
   ).sort();
 
-  // 🔧 Choose which list to show based on activeTab
   const listToRender =
     activeTab === "needsEvaluation"
       ? applyFilter(otherBusinesses)
       : applyFilter(approvedBusinesses);
+
+  const storage = getStorage();
+
+  const deleteCollectionDocs = async (colName, field, value) => {
+    const q = query(collection(db, colName), where(field, "==", value));
+    const snapshot = await getDocs(q);
+    for (const d of snapshot.docs) {
+      await deleteDoc(doc(db, colName, d.id));
+    }
+  };
+
+  // helper to delete storage files using stored paths
+  const deleteStorageFiles = async (docs = {}) => {
+    for (const [key, docInfo] of Object.entries(docs)) {
+      if (docInfo?.path) {
+        try {
+          const fileRef = ref(storage, docInfo.path);
+          await deleteObject(fileRef);
+          console.log(`🗑️ Deleted file: ${docInfo.path}`);
+        } catch (err) {
+          console.error(`⚠️ Failed to delete file: ${docInfo.path}`, err);
+        }
+      } else {
+        console.warn(`⚠️ Document ${key} has no path, skipping storage deletion.`);
+      }
+    }
+  };
+
+  const handleDeleteBusiness = async (business) => {
+    if (window.confirm(`Delete ${business.businessName}?`)) {
+      try {
+        await deleteDoc(doc(db, "businesses", business.id));
+        await deleteCollectionDocs("payments", "businessId", business.businessId);
+        await deleteCollectionDocs("receipts", "businessId", business.businessId);
+
+        // delete attachments from storage using stored paths
+        if (business.documents) {
+          await deleteStorageFiles(business.documents);
+        }
+
+        fetchBusinesses();
+      } catch (err) {
+        console.error("❌ Failed to delete:", err);
+        alert("Failed to delete business.");
+      }
+    }
+  };
 
   return (
     <div className="business-dashboard">
@@ -81,7 +125,6 @@ const BusinessDashboard = () => {
         </select>
       </div>
 
-      {/* Tabs */}
       <div className="tabs">
         <button
           className={activeTab === "needsEvaluation" ? "active" : ""}
@@ -107,24 +150,33 @@ const BusinessDashboard = () => {
             <tr>
               <th>Business Owner</th>
               <th>Business Name</th>
+              <th>Status</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {listToRender.map(b => (
-              <tr
-                key={b.id}
-                className="clickable-row"
-                onClick={() => setSelectedBusiness(b)}
-              >
-                <td>{b.ownerName}</td>
-                <td>{b.businessName}</td>
+              <tr key={b.id} className="clickable-row">
+                <td onClick={() => setSelectedBusiness(b)}>{b.ownerName}</td>
+                <td onClick={() => setSelectedBusiness(b)}>{b.businessName}</td>
+                <td>{b.status}</td>
+                <td>
+                  <button
+                    className="delete-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteBusiness(b);
+                    }}
+                  >
+                    🗑️ Delete
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
 
-      {/* ✅ Evaluation Modal */}
       {selectedBusiness && (
         <BusinessEvaluationModal
           business={selectedBusiness}

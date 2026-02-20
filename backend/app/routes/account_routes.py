@@ -7,6 +7,7 @@ from backend.app.services.account_service import (
     create_barangay_account,
     delete_barangay_account,
     update_user_role,
+    list_barangay_accounts,
 )
 from backend.app.core.auth import get_admin_uid, require_permission
 
@@ -43,10 +44,14 @@ async def safe_service_call(service_func, *args, **kwargs):
         raise he
     except Exception as e:
         logger.exception("❌ Unexpected error")
+        msg = str(e)
+        if isinstance(msg, (dict, list)):
+            msg = "; ".join(map(str, msg))
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Operation failed: {str(e)}",
+            detail=f"Operation failed: {msg}",
         )
+
 
 
 # ===============================
@@ -62,6 +67,7 @@ async def safe_service_call(service_func, *args, **kwargs):
 async def create_account_handler(
     payload: AccountCreate,
     admin_uid: str = Depends(get_admin_uid),
+    _: None = Depends(require_permission("createAccount")),
 ) -> AccountResponse:
     logger.info("📥 Account creation requested by admin: %s", admin_uid)
     account = await safe_service_call(create_barangay_account, payload, created_by=admin_uid)
@@ -79,6 +85,7 @@ async def create_account_handler(
 async def delete_account_handler(
     uid: str,
     admin_uid: str = Depends(get_admin_uid),
+    _: None = Depends(require_permission("deleteAccount")),
 ) -> ActionResponse:
     logger.info("🗑️ Account deletion requested by admin: %s for user: %s", admin_uid, uid)
     await safe_service_call(delete_barangay_account, uid, deleted_by=admin_uid)
@@ -97,8 +104,27 @@ async def update_role_handler(
     uid: str,
     payload: RoleUpdatePayload,
     admin_uid: str = Depends(get_admin_uid),
+    _: None = Depends(require_permission("updateRole")),
 ) -> AccountResponse:
     logger.info("🔄 Role update requested by admin: %s for user: %s", admin_uid, uid)
     account = await safe_service_call(update_user_role, uid, payload.role, changed_by=admin_uid)
     logger.info("✅ Role updated to %s for UID: %s", payload.role, uid)
     return account
+
+@router.get(
+    "/admin/accounts",
+    response_model=list[AccountResponse],
+    status_code=status.HTTP_200_OK,
+    summary="List all barangay accounts",
+    description="Accessible only to admins. Returns all accounts with optional filters."
+)
+async def list_accounts_handler(
+    admin_uid: str = Depends(get_admin_uid),
+    role: RoleEnum | None = None,
+    limit: int = 20,
+    offset: int = 0,
+):
+    logger.info("📋 Account list requested by admin: %s", admin_uid)
+    # You’d implement a service function to query Firestore
+    accounts = await safe_service_call(list_barangay_accounts, role=role, limit=limit, offset=offset) 
+    return accounts

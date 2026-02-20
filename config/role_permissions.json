@@ -1,7 +1,9 @@
 {
   "admin": [
     "viewDashboard",
-    "createAccounts",
+    "createAccount",
+    "deleteAccount",
+    "updateRole",
     "manageResidents",
     "generateCertificates",
     "viewFinancialRecords",
@@ -9,9 +11,11 @@
     "youthRegistryAccess",
     "auditBarangayData",
     "documentRequest",
+    "manageDocuments",
     "viewDocuments",
     "viewBusinesses",
     "viewAllComplaints",
+    "manageComplaints",
     "fileComplaintsForResidents",
     "viewIncidents",
     "manageSettings",
@@ -50,7 +54,8 @@
     "pendingRequests", 
     "paidRequests", 
     "issuedDocuments", 
-    "rejectedRequests" 
+    "rejectedRequests",
+    "manageDocuments"
   ],
   "treasurer": [
     "viewDashboard",

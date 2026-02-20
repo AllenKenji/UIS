@@ -45,6 +45,38 @@ const BusinessEvaluationModal = ({ business, onClose, onUpdated }) => {
           <p><strong>Submitted:</strong> {business.registrationDate}</p>
         </div>
 
+        <div className="modal-section">
+          <h4>Submitted Documents</h4>
+          {business.documents?.validId && (
+            <p>
+              <a href={business.documents.validId} target="_blank" rel="noopener noreferrer">
+                📄 View Valid ID
+              </a>
+            </p>
+          )}
+          {business.documents?.proofOfAddress && (
+            <p>
+              <a href={business.documents.proofOfAddress} target="_blank" rel="noopener noreferrer">
+                📄 View Proof of Address
+              </a>
+            </p>
+          )}
+          {business.documents?.dtiCert && (
+            <p>
+              <a href={business.documents.dtiCert} target="_blank" rel="noopener noreferrer">
+                📄 View DTI Certificate
+              </a>
+            </p>
+          )}
+          {business.documents?.businessLogo && (
+            <p>
+              <a href={business.documents.businessLogo} target="_blank" rel="noopener noreferrer">
+                🖼️ View Business Logo
+              </a>
+            </p>
+          )}
+        </div>
+
         {isApproved ? (
           <div className="approved-section">
             <p><strong>Status:</strong> ✅ Approved</p>

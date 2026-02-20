@@ -23,6 +23,8 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
   const [newDoc, setNewDoc] = useState(null);
   const [issuedDocUrl, setIssuedDocUrl] = useState(null);
   const [registeredBusinesses, setRegisteredBusinesses] = useState([]);
+  const [issueRemarks, setIssueRemarks] = useState("");
+
 
   // Load secretary profile
   useEffect(() => {
@@ -71,6 +73,7 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
 
   const handleChange = e => {
     const { name, value } = e.target;
+
     if (name === "document_type") {
       const selected = documentTypes.find(dt => dt.documentType === value);
       setFormData(prev => ({
@@ -78,10 +81,32 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
         document_type: value,
         fee: selected?.totalFee || 0,
       }));
+    } else if (name === "businessName") {
+      // 🔹 Find the selected resident
+      const resident = residents.find(r => r.id === formData.resident_id);
+
+      // 🔹 Find the business owned by that resident
+      const business = registeredBusinesses.find(
+        b => b.businessName === value && b.ownerName === resident?.fullName
+      );
+
+      if (business) {
+        setFormData(prev => ({
+          ...prev,
+          businessName: value,
+          "location.street": business.street || "",
+          "location.barangay": business.barangay || "",
+          "location.city": business.city || "",
+          "location.province": business.province || ""
+        }));
+      } else {
+        setFormData(prev => ({ ...prev, businessName: value }));
+      }
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
   };
+
 
   const handleFileChange = (e, field) => {
     const file = e.target.files[0];
@@ -113,6 +138,11 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
       if (att.required && !file) {
         return `${att.label} is required.`;
       }
+    }
+
+    if (formData.document_type === "Business Clearance") {
+      const loc = resolveLocation(formData.document_type, formData, residents, registeredBusinesses);
+      if (!loc.address) return "Business address is required.";
     }
 
     return null;
@@ -148,6 +178,15 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
         if (loc.street) payload.append("locationStreet", loc.street); 
         if (loc.city) payload.append("locationCity", loc.city); 
         if (loc.province) payload.append("locationProvince", loc.province); 
+      }
+
+      if (formData.document_type === "Business Clearance") { 
+        if (loc.barangay) payload.append("locationBarangay", loc.barangay); 
+        if (loc.street) payload.append("locationStreet", loc.street); 
+        if (loc.city) payload.append("locationCity", loc.city);
+        if (loc.province) payload.append("locationProvince", loc.province); 
+        // ✅ Add normalized full address 
+        payload.append("address", loc.address); 
       }
 
       fields.forEach(field => {
@@ -201,7 +240,7 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
       const refreshedDoc = await fetch(`http://localhost:8000/api/documents/${newDoc.id}`);
       const docData = await refreshedDoc.json();
 
-      if (docData.paymentStatus !== "paid") {
+      if (docData.status !== "paid" && docData.status !== "payment_submitted") {
         setStatus({ message: "❌ Payment not yet confirmed. Try again.", type: "error" });
         return;
       }
@@ -209,7 +248,10 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
       const issueResponse = await fetch(`http://localhost:8000/api/documents/${newDoc.id}/issue`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ issuedBy: currentSecretary.full_name }),
+        body: JSON.stringify({ 
+          issuedBy: currentSecretary.full_name, 
+          remarks: issueRemarks || `Issued by ${currentSecretary.full_name}`, 
+        }),
       });
 
       if (!issueResponse.ok) {
@@ -299,14 +341,30 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
                   {field.fields.map(sub => (
                     <div className="form-group" key={sub.name}>
                       <label htmlFor={sub.name}>{sub.label}</label>
-                      <input
-                        id={sub.name}
-                        type={sub.type}
-                        name={sub.name}
-                        value={formData[sub.name] || ""}
-                        onChange={handleChange}
-                        required={sub.required}
-                      />
+
+                      {sub.type === "select" ? (
+                        <select
+                          id={sub.name}
+                          name={sub.name}
+                          value={formData[sub.name] || ""}
+                          onChange={handleChange}
+                          required={sub.required}
+                        >
+                          <option value="">-- Select --</option>
+                          {sub.options?.map(opt => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          id={sub.name}
+                          type={sub.type}
+                          name={sub.name}
+                          value={formData[sub.name] || sub.default || ""}
+                          onChange={handleChange}
+                          required={sub.required}
+                        />
+                      )}
                     </div>
                   ))}
                 </fieldset>
@@ -314,6 +372,12 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
             }
 
             if (field.type === "select" && field.name === "businessName") {
+              // 🔹 Only show businesses for the selected resident
+              const resident = residents.find(r => r.id === formData.resident_id);
+              const residentBusinesses = resident
+                ? registeredBusinesses.filter(b => b.ownerName === resident.fullName)
+                : [];
+
               return (
                 <div className="form-group" key={field.name}>
                   <label htmlFor={field.name}>{field.label}</label>
@@ -324,21 +388,58 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
                     onChange={handleChange}
                     required={field.required}
                   >
-                    <option value=""> 
-                      {registeredBusinesses.length === 0 
-                        ? "No businesses available" 
-                        : "Select Business"} 
-                    </option> 
-                    {registeredBusinesses.map(b => ( 
-                      <option key={b.id} value=
-                        {b.businessName}> {b.businessName} — {b.address?.barangay} 
-                      </option> 
-                    ))} 
-                  </select> 
-                </div> 
-              )
+                    <option value="">
+                      {residentBusinesses.length === 0
+                        ? "No businesses available for this resident"
+                        : "Select Business"}
+                    </option>
+                    {residentBusinesses.map(b => (
+                      <option key={b.businessId} value={b.businessName}>
+                        {b.businessName} — {b.barangay}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* 🔹 Show auto-filled business address when selected */}
+                  {formData.document_type === "Business Clearance" && formData.businessName && (
+                    <fieldset>
+                      <legend>Business Address</legend>
+                      <div className="form-group">
+                        <label>Street</label>
+                        <input type="text" value={formData["location.street"]} readOnly />
+                      </div>
+                      <div className="form-group">
+                        <label>Barangay</label>
+                        <input type="text" value={formData["location.barangay"]} readOnly />
+                      </div>
+                      <div className="form-group">
+                        <label>City</label>
+                        <input type="text" value={formData["location.city"]} readOnly />
+                      </div>
+                      <div className="form-group">
+                        <label>Province</label>
+                        <input type="text" value={formData["location.province"]} readOnly />
+                      </div>
+
+                      {/* Hidden full address for backend */}
+                      <input
+                        type="hidden"
+                        name="address"
+                        value={[
+                          formData["location.street"],
+                          `Brgy. ${formData["location.barangay"]}`,
+                          formData["location.city"],
+                          formData["location.province"]
+                        ].filter(Boolean).join(", ")}
+                      />
+                    </fieldset>
+                  )}
+                </div>
+              );
             }
-            
+
+
+
             return (
               <div className="form-group" key={field.name}>
                 <label htmlFor={field.name}>{field.label}</label>
@@ -395,6 +496,7 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
       {/* ✅ After payment, issue document */}
       {issuedDocUrl && (
         <div className="download-section">
+          
           <a
             href={issuedDocUrl}
             target="_blank"
@@ -430,6 +532,7 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
                 fee: documentTypes.length > 0 ? documentTypes[0].totalFee : 0,
               });
               setAttachments({});
+              setIssueRemarks("");
             }}
           >
             ⬅️ Back to Form

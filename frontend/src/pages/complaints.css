@@ -11,24 +11,54 @@
 
 button {
   background-color: #007bff;
-  color: white;
+  color: #fff;
   padding: 0.5rem 1rem;
   border: none;
   cursor: pointer;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease;
+}
+
+button:hover {
+  background-color: #0056b3;
 }
 
 .complaint-table {
   width: 100%;
   border-collapse: collapse;
+  margin-top: 1rem;
 }
 
 .complaint-table th,
 .complaint-table td {
-  border: 1px solid #ccc;
+  border: 1px solid #ddd;
   padding: 0.75rem;
   text-align: left;
 }
 
 .complaint-table th {
-  background-color: #f5f5f5;
+  background-color: #f9f9f9;
+  font-weight: 600;
+}
+
+.actions-cell {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.evaluate-btn {
+  background-color: #28a745;
+}
+
+.evaluate-btn:hover {
+  background-color: #218838;
+}
+
+.delete-btn {
+  background-color: #dc3545;
+}
+
+.delete-btn:hover {
+  background-color: #c82333;
 }

@@ -4,7 +4,7 @@ import os
 import requests
 from fastapi import APIRouter, HTTPException
 from fastapi.concurrency import run_in_threadpool
-from backend.app.services.paymongo_service import create_payment_link, create_payment_intent
+from backend.app.services.paymongo_service import create_payment_link, create_payment_intent, attach_payment_method
 from backend.app.models.paymongo import DocumentPaymentRequest, BusinessPaymentRequest, AttachPaymentRequest
 from backend.app.core.firebase import get_firestore
 from backend.app.routes.fee_routes import (
@@ -42,7 +42,7 @@ def _create_payment(fee: int, description: str, remarks: str, metadata: dict,
         return {
             "checkoutUrl": result.get("checkoutUrl"),
             "referenceNumber": result.get("referenceNumber"),
-            "paymentStatus": result.get("paymentStatus") or "awaiting_payment",
+            "paymentStatus": result.get("paymentStatus") or "awaiting_payment" or "for_payment",
             "paymentIntentId": result.get("paymentIntentId"),
             "paymongoClientKey": result.get("paymongoClientKey"),
             "type": "intent"
@@ -55,7 +55,7 @@ def _create_payment(fee: int, description: str, remarks: str, metadata: dict,
         return {
             "checkoutUrl": result.get("checkoutUrl"),
             "referenceNumber": result.get("referenceNumber"),
-            "paymentStatus": result.get("paymentStatus") or "awaiting_payment",
+            "paymentStatus": result.get("paymentStatus") or "awaiting_payment" or "for_payment",
             "paymongoLinkId": result.get("paymongoLinkId"),
             "type": "link"
         }
@@ -84,7 +84,7 @@ async def create_document_payment_link(payload: DocumentPaymentRequest) -> dict:
             update_data = {
                 "checkoutUrl": result["checkoutUrl"],
                 "paymentStatus": result["paymentStatus"],
-                "status": "awaiting_payment",
+                "status": "for_payment",
                 "fee": fee,
                 "referenceNumber": result.get("referenceNumber"),
                 "paymentIntentId": result.get("paymentIntentId"),
@@ -149,6 +149,10 @@ async def create_business_payment_link(payload: BusinessPaymentRequest) -> dict:
 # -----------------------------
 @router.post("/attach-payment-method")
 async def attach_payment_method(payload: AttachPaymentRequest) -> dict:
+    """
+    Attach a payment method (GCash/GrabPay) to a PayMongo Payment Intent.
+    Supports both business and document flows by setting the correct return_url.
+    """
     try:
         PAYMONGO_SECRET_KEY = os.getenv("PAYMONGO_SECRET_KEY")
         if not PAYMONGO_SECRET_KEY:
@@ -163,13 +167,15 @@ async def attach_payment_method(payload: AttachPaymentRequest) -> dict:
         pm_payload = {
             "data": {
                 "attributes": {
-                    "type": payload.method, 
-                    "billing": payload.billing.dict()
+                    "type": payload.method,  # "gcash" or "grab_pay"
+                    "billing": payload.billing.model_dump()
                 }
             }
         }
         pm_res = requests.post("https://api.paymongo.com/v1/payment_methods", json=pm_payload, headers=headers)
         pm_data = pm_res.json()
+        # logger.info("📥 Payment method response: %s", pm_data)
+
         if "errors" in pm_data:
             logger.error("❌ Payment method creation failed: %s", pm_data)
             raise HTTPException(status_code=400, detail="Payment method creation failed")
@@ -177,23 +183,43 @@ async def attach_payment_method(payload: AttachPaymentRequest) -> dict:
         payment_method_id = pm_data["data"]["id"]
 
         # Step 2: Attach to intent
-        return_url = payload.return_url or "http://localhost:3000/payment-success?type=document"
-        attach_payload = {"data": {"attributes": {"payment_method": payment_method_id, "client_key": payload.paymongoClientKey, "return_url": return_url}}}
+        if payload.type == "business":
+            return_url = "http://localhost:3000/payment-success?type=business"
+        else:
+            return_url = "http://localhost:3000/payment-success?type=document"
+
+        attach_payload = {
+            "data": {
+                "attributes": {
+                    "payment_method": payment_method_id,
+                    "client_key": payload.paymongoClientKey,
+                    "return_url": return_url
+                }
+            }
+        }
         intent_res = requests.post(
             f"https://api.paymongo.com/v1/payment_intents/{payload.paymentIntentId}/attach",
             json=attach_payload, headers=headers
         )
         intent_data = intent_res.json()
+        # logger.info("📥 Attach response: %s", intent_data)
+
         if "errors" in intent_data:
             logger.error("❌ Payment intent attach failed: %s", intent_data)
             raise HTTPException(status_code=400, detail="Payment intent attach failed")
 
-        redirect_url = intent_data["data"]["attributes"].get("next_action", {}).get("redirect", {}).get("url")
+        attrs = intent_data["data"]["attributes"]
+        redirect_url = attrs.get("next_action", {}).get("redirect", {}).get("url")
         if not redirect_url:
             logger.error("⚠️ No redirect URL in intent attach response: %s", intent_data)
             raise HTTPException(status_code=500, detail="No redirect URL returned from PayMongo")
 
-        return {"redirectUrl": redirect_url}
+        return {
+            "redirectUrl": redirect_url,
+            "status": attrs.get("status"),
+            "referenceNumber": attrs.get("reference_number"),
+            "paymentIntentId": payload.paymentIntentId
+        }
 
     except Exception as e:
         logger.exception("❌ Failed to attach payment method: %s", e)

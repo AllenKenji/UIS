@@ -8,7 +8,6 @@ import { auth, db } from "../services/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { useNavigate, Link } from "react-router-dom";
 import { toast } from "react-toastify";
-import { setAuthToken } from "../services/api";
 import "./login.css";
 
 const roleRedirects = {
@@ -16,7 +15,7 @@ const roleRedirects = {
   staff: "/staff",
   resident: "/resident",
   secretary: "/secretary",
-  treasurer: "/finance",
+  treasurer: "/treasurer",
   sk: "/youth",
   dilg: "/audit",
 };
@@ -70,9 +69,7 @@ const Login = () => {
       await setPersistence(auth, browserSessionPersistence);
       const { user } = await signInWithEmailAndPassword(auth, email, password);
 
-      // 🔐 Get token and inject immediately
-      const token = await user.getIdToken(true);
-      setAuthToken(token);
+      await user.getIdToken(true);
 
       const tokenResult = await user.getIdTokenResult();
       let role = normalizeRole(tokenResult.claims.role);

@@ -2,23 +2,26 @@ import axios from "axios";
 import { getAuth } from "firebase/auth";
 
 // 🌐 Base URL for Cloud Run backend
-const API_BASE_URL =
-  process.env.REACT_APP_API_BASE_URL ||
-  (process.env.NODE_ENV === "development"
-    ? "http://localhost:8000"
-    : "https://civic-backend-397499309217.asia-southeast1.run.app");
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+
+console.log("🌐 API Base URL:", process.env.REACT_APP_API_BASE_URL);
+
+if (process.env.NODE_ENV === "production" && API_BASE_URL.startsWith("http://")) { 
+  throw new Error("❌ Production API_BASE_URL must use HTTPS"); 
+}
 
 // 📦 Centralized endpoint registry
 export const endpoints = {
   residents: "/api/residents",
   incidents: "/api/incidents",
-  staffIncidents: "/api/staffIncidents",
   complaints: {
     base: "/api/complaints",
     mine: "/api/complaints/mine",
     all: "/api/complaints/all",
+    delete: (id) => `/api/complaints/${id}`,
   },
   documents: "/api/documents",
+  businesses: "/api/businesses",
   audit: "/api/document_audit",
   dashboard: "/dashboard-summary",
   accounts: {
@@ -43,42 +46,27 @@ export const api = axios.create({
   timeout: 30000,
 });
 
-// 🔐 Token injection via interceptor
-let authToken = sessionStorage.getItem("authToken") || null;
-
-export const setAuthToken = (token) => {
-  authToken = token;
-  if (token) {
-    sessionStorage.setItem("authToken", token);
-  } else {
-    sessionStorage.removeItem("authToken");
-  }
-};
-
 // 🔐 Always inject a fresh token 
-api.interceptors.request.use(async (config) => { 
-  const auth = getAuth(); 
-  const user = auth.currentUser; 
+api.interceptors.request.use(async (config) => {
+  const auth = getAuth();
+  const user = auth.currentUser;
 
-  try { 
-    if (user) { 
-      const token = await user.getIdToken(); 
-      config.headers.Authorization = `Bearer ${token}`; 
-      if (process.env.NODE_ENV !== "production") { 
-        console.debug("🔐 Using Firebase ID token"); 
-      } 
-    } else if (authToken) { 
-      config.headers.Authorization = `Bearer ${authToken}`; 
-      if (process.env.NODE_ENV !== "production") { 
-        console.debug("🔐 Using fallback authToken"); 
-      } 
-    } 
-  } catch (err) { 
-    console.warn("⚠️ Failed to refresh Firebase token", err); 
-  } 
-  
-  return config; 
+  if (user) {
+    try {
+      const token = await user.getIdToken(true);
+      console.log("🔐 Attaching token:", token.substring(0, 20) + "...");
+      config.headers.Authorization = `Bearer ${token}`;
+      
+    } catch (err) {
+      console.warn("⚠️ Failed to refresh Firebase token", err);
+    }
+  } else {
+    console.warn("⚠️ No Firebase user, skipping Authorization header");
+  }
+
+  return config;
 });
+
 
 // ⚠️ Unified error handler
 class APIError extends Error {
@@ -189,6 +177,10 @@ export const ComplaintsAPI = {
     api.patch(`${endpoints.complaints.base}/${id}/status`, payload)
       .then((res) => res.data)
       .catch((err) => handleError(err, "PATCH complaint status")),
+  deleteComplaint: (id) =>
+    api.delete(`${endpoints.complaints.base}/${id}`)
+      .then((res) => res.data)
+      .catch((err) => handleError(err, "DELETE complaint")),
 };
 
 // 📄 Document APIs
@@ -218,6 +210,20 @@ DocumentsAPI.markResubmitted = (id) =>
     .then((res) => res.data)
     .catch((err) => handleError(err, "Mark resubmitted"));
 
+// 🏢 Business APIs
+export const BusinessesAPI = new BaseAPI(endpoints.businesses);
+
+// 🔎 List all businesses
+BusinessesAPI.listAll = () =>
+  api.get(endpoints.businesses)
+    .then((res) => res.data)
+    .catch((err) => handleError(err, "List all businesses"));
+
+// 🔎 List businesses owned by a specific resident
+BusinessesAPI.listByOwner = (ownerName) =>
+  api.get(endpoints.businesses, { params: { ownerName } })
+    .then(res => res.data)
+    .catch(err => handleError(err, "List resident businesses"));
 
 // 📝 Audit APIs
 export const AuditAPI = {

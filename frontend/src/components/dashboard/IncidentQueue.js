@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { api, endpoints } from "../../services/api"; // ✅ use API layer
+import { api, endpoints } from "../../services/api";
 import { useUser } from "../../context/UserContext";
 import "../../styles/dashboard/incident-queue.css";
 
@@ -11,22 +11,22 @@ const IncidentQueue = () => {
 
   useEffect(() => {
     const fetchIncidents = async () => {
+      if (!can("viewIncidents")) {
+        setIncidents([]);
+        setLoading(false);
+        return;
+      }
+
       try {
-        if (!can("viewIncidents")) {
-          setIncidents([]);
-          setLoading(false);
-          return;
-        }
-
-        // ✅ Fetch incidents via API (already enriched)
         const { data } = await api.get(endpoints.incidents, {
-          params: { status: "pending" }, // only pending cases
+          params: { status: "pending" },
         });
-
-        setIncidents(data);
+        setIncidents(data || []);
+        setError(null);
       } catch (err) {
         console.error("❌ Failed to load incidents:", err);
         setError("Failed to load incidents.");
+        setIncidents([]);
       } finally {
         setLoading(false);
       }
@@ -35,29 +35,34 @@ const IncidentQueue = () => {
     fetchIncidents();
   }, [can]);
 
-  return (
-    <div className="incident-queue" aria-busy={loading} aria-live="polite">
-      <h3>🚨 Incident Queue ({incidents.length} pending)</h3>
-      {loading ? (
-        <p>Loading incidents…</p>
-      ) : error ? (
-        <p className="error">{error}</p>
-      ) : incidents.length === 0 ? (
-        <p>No incidents available.</p>
-      ) : (
-        <table className="incident-table" aria-label="Incident Queue Table">
-          <thead>
-            <tr>
-              <th>Type</th>
-              <th>Description</th>
-              <th>Location</th>
-              <th>Reported By</th>
-              <th>Status</th>
-              <th>Timestamp</th>
-            </tr>
-          </thead>
-          <tbody>
-            {incidents.map(({ id, type, description, location, reported_by_name, status, createdAt }) => (
+  const renderContent = () => {
+    if (loading) return <p>Loading incidents…</p>;
+    if (error) return <p className="error">{error}</p>;
+    if (incidents.length === 0) return <p>No incidents available.</p>;
+
+    return (
+      <table className="incident-table" aria-label="Incident Queue Table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Location</th>
+            <th>Reported By</th>
+            <th>Status</th>
+            <th>Timestamp</th>
+          </tr>
+        </thead>
+        <tbody>
+          {incidents.map(
+            ({
+              id,
+              type,
+              description,
+              location,
+              reported_by_name,
+              status,
+              timestamp,
+            }) => (
               <tr key={id}>
                 <td>{type}</td>
                 <td>{description}</td>
@@ -74,12 +79,21 @@ const IncidentQueue = () => {
                     {status === "escalated" ? "Escalated" : status}
                   </span>
                 </td>
-                <td>{createdAt ? new Date(createdAt).toLocaleString() : "—"}</td>
+                <td>
+                  {timestamp ? new Date(timestamp).toLocaleString() : "—"}
+                </td>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+            )
+          )}
+        </tbody>
+      </table>
+    );
+  };
+
+  return (
+    <div className="incident-queue" aria-busy={loading} aria-live="polite">
+      <h3>🚨 Incident Queue ({incidents.length} pending)</h3>
+      {renderContent()}
     </div>
   );
 };

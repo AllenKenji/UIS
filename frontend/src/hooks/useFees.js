@@ -1,26 +1,24 @@
 // src/hooks/useFees.js
 import { useState, useEffect, useCallback } from "react";
-import { FeesAPI } from "../services/api"; // ✅ centralized API client
+import { FeesAPI } from "../services/api";
 import {
   buildDocumentPayload,
   buildBusinessPayload,
   buildMiscPayload,
-} from "../utils/payloadBuilders"; // ✅ centralized payload builders
+} from "../utils/payloadBuilders";
 
-export function useFees() {
+export function useFees(delayMs = 500) { // ⏱ allow configurable delay
   const [documentFees, setDocumentFees] = useState([]);
   const [businessFees, setBusinessFees] = useState([]);
   const [miscFees, setMiscFees] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // 🔧 Helper for error handling
   const handleError = (err, fallbackMsg) => {
     console.error(err);
     setError(err?.message || fallbackMsg);
   };
 
-  // 🔄 Fetch all fees
   const refreshData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -40,79 +38,14 @@ export function useFees() {
     }
   }, []);
 
-  // 📄 Update document fee
-  const updateDocumentFee = async (id, item, key, value) => {
-    try {
-      const payload = buildDocumentPayload(item, key, value);
-      await FeesAPI.updateDocument(id, payload);
-      setDocumentFees(prev =>
-        prev.map(d => (d.id === id ? { ...d, ...payload } : d))
-      );
-    } catch (err) {
-      handleError(err, "Failed to update document fee");
-    }
-  };
-
-  // 🏢 Update business fee
-  const updateBusinessFee = async (id, item, key, value) => {
-    try {
-      const payload = buildBusinessPayload(item, key, value);
-      await FeesAPI.updateBusiness(id, payload);
-      setBusinessFees(prev =>
-        prev.map(b => (b.id === id ? { ...b, ...payload } : b))
-      );
-    } catch (err) {
-      handleError(err, "Failed to update business fee");
-    }
-  };
-
-  // 🆕 Update misc fee
-  const updateMiscFee = async (id, item, key, value) => {
-    try {
-      const payload = buildMiscPayload(item, key, value);
-      await FeesAPI.updateMisc(id, payload);
-      setMiscFees(prev =>
-        prev.map(m => (m.id === id ? { ...m, ...payload } : m))
-      );
-    } catch (err) {
-      handleError(err, "Failed to update miscellaneous fee");
-    }
-  };
-
-  // 📄 Delete document fee
-  const deleteDocumentFee = async (id) => {
-    try {
-      await FeesAPI.deleteDocument(id);
-      setDocumentFees(prev => prev.filter(d => d.id !== id));
-    } catch (err) {
-      handleError(err, "Failed to delete document fee");
-    }
-  };
-
-  // 🏢 Delete business fee
-  const deleteBusinessFee = async (id) => {
-    try {
-      await FeesAPI.deleteBusiness(id);
-      setBusinessFees(prev => prev.filter(b => b.id !== id));
-    } catch (err) {
-      handleError(err, "Failed to delete business fee");
-    }
-  };
-
-  // 🆕 Delete misc fee
-  const deleteMiscFee = async (id) => {
-    try {
-      await FeesAPI.deleteMisc(id);
-      setMiscFees(prev => prev.filter(m => m.id !== id));
-    } catch (err) {
-      handleError(err, "Failed to delete miscellaneous fee");
-    }
-  };
-
-  // 🚀 Fetch on mount
+  // 🚀 Fetch on mount with delay
   useEffect(() => {
-    refreshData();
-  }, [refreshData]);
+    const timer = setTimeout(() => {
+      refreshData();
+    }, delayMs);
+
+    return () => clearTimeout(timer); // cleanup
+  }, [refreshData, delayMs]);
 
   return {
     documentFees,
@@ -121,11 +54,62 @@ export function useFees() {
     loading,
     error,
     refreshData,
-    updateDocumentFee,
-    updateBusinessFee,
-    updateMiscFee,
-    deleteDocumentFee,
-    deleteBusinessFee,
-    deleteMiscFee,
+    updateDocumentFee: async (id, item, key, value) => {
+      try {
+        const payload = buildDocumentPayload(item, key, value);
+        await FeesAPI.updateDocument(id, payload);
+        setDocumentFees(prev =>
+          prev.map(d => (d.id === id ? { ...d, ...payload } : d))
+        );
+      } catch (err) {
+        handleError(err, "Failed to update document fee");
+      }
+    },
+    updateBusinessFee: async (id, item, key, value) => {
+      try {
+        const payload = buildBusinessPayload(item, key, value);
+        await FeesAPI.updateBusiness(id, payload);
+        setBusinessFees(prev =>
+          prev.map(b => (b.id === id ? { ...b, ...payload } : b))
+        );
+      } catch (err) {
+        handleError(err, "Failed to update business fee");
+      }
+    },
+    updateMiscFee: async (id, item, key, value) => {
+      try {
+        const payload = buildMiscPayload(item, key, value);
+        await FeesAPI.updateMisc(id, payload);
+        setMiscFees(prev =>
+          prev.map(m => (m.id === id ? { ...m, ...payload } : m))
+        );
+      } catch (err) {
+        handleError(err, "Failed to update miscellaneous fee");
+      }
+    },
+    deleteDocumentFee: async (id) => {
+      try {
+        await FeesAPI.deleteDocument(id);
+        setDocumentFees(prev => prev.filter(d => d.id !== id));
+      } catch (err) {
+        handleError(err, "Failed to delete document fee");
+      }
+    },
+    deleteBusinessFee: async (id) => {
+      try {
+        await FeesAPI.deleteBusiness(id);
+        setBusinessFees(prev => prev.filter(b => b.id !== id));
+      } catch (err) {
+        handleError(err, "Failed to delete business fee");
+      }
+    },
+    deleteMiscFee: async (id) => {
+      try {
+        await FeesAPI.deleteMisc(id);
+        setMiscFees(prev => prev.filter(m => m.id !== id));
+      } catch (err) {
+        handleError(err, "Failed to delete miscellaneous fee");
+      }
+    },
   };
 }

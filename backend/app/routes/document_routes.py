@@ -11,7 +11,7 @@ router = APIRouter(tags=["Documents"])
 # ===============================
 # 📤 List Documents
 # ===============================
-@router.get("/", response_model=List[Document])
+@router.get("", response_model=List[Document])
 async def list_documents(
     residentId: Optional[str] = Query(None),
     documentType: Optional[str] = Query(None),
@@ -58,7 +58,7 @@ async def mark_document_resubmitted(doc_id: str, payload: ResubmissionPayload) -
 # ===============================
 # 📝 Create Document (Resident)
 # ===============================
-@router.post("/", response_model=Document, status_code=201)
+@router.post("", response_model=Document, status_code=201)
 async def create_document(
     resident_id: str = Form(...),
     document_type: str = Form(...),
@@ -70,6 +70,9 @@ async def create_document(
     residencyAttachment: UploadFile = File(None),
     medicalAttachment: UploadFile = File(None),   
     photoAttachment: UploadFile = File(None),  
+    activityPlan: UploadFile = File(None),
+    businessPermit: UploadFile = File(None),
+
 
     # Extra fields
     complainant: Optional[str] = Form(None),
@@ -90,6 +93,7 @@ async def create_document(
 ) -> Document:
     return await document_service.create_document(
         resident_id=resident_id,
+        resident_name=None,  # Will be populated in service layer based on residentId
         document_type=document_type,
         purpose=purpose,
         remarks=remarks,
@@ -97,6 +101,8 @@ async def create_document(
         residencyAttachment=residencyAttachment,
         medicalAttachment=medicalAttachment, 
         photoAttachment=photoAttachment,
+        activityPlan=activityPlan,
+        businessPermit=businessPermit,
         complainant=complainant,
         respondent=respondent,
         incident=incident,
@@ -136,7 +142,17 @@ async def confirm_payment(doc_id: str) -> Document:
 class IssuePayload(BaseModel): 
     issuedBy: str 
     fileUrl: Optional[str] = None
+    remarks: Optional[str] = None
 
 @router.patch("/{doc_id}/issue", response_model=Document)
 async def issue_document(doc_id: str, payload: IssuePayload) -> Document:
-    return await document_service.issue_document(doc_id, payload.issuedBy, payload.fileUrl)
+    return await document_service.issue_document(
+        doc_id, 
+        payload.issuedBy, 
+        payload.fileUrl, 
+        payload.remarks
+    )
+
+@router.delete("/{doc_id}", response_model=Document)
+async def delete_document(doc_id: str, uid: str = Depends(require_permission("manageDocuments"))) -> Document:
+    return await document_service.delete_document(doc_id, uid)

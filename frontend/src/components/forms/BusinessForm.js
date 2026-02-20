@@ -5,22 +5,21 @@ import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, addDoc } from 'firebase/firestore';
-import { QRCodeCanvas } from 'qrcode.react';
 import imageCompression from "browser-image-compression";
 import { storage, db } from '../../services/firebase';
 import { useUser } from "../../context/UserContext";
 import { PARANAQUE } from "../../data/locations";
-import { usePublicFees } from "../../hooks/usePublicFees";   // ✅ resident-safe hook
+import { usePublicFees } from "../../hooks/usePublicFees";   
 import './business-form.css';
 
 const BusinessForm = ({ onBusinessAdded, onCancel }) => {
-  const { register, handleSubmit, watch, reset, trigger } = useForm();
+  const { register, handleSubmit, watch, reset, trigger, formState: { errors } } = useForm();
   const { userInfo: user } = useUser();
   const navigate = useNavigate();
 
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [lastBusinessId, setLastBusinessId] = useState('');
+  
 
   // ✅ use public fees
   const { businessTypes: businessFees, loading, error } = usePublicFees();
@@ -69,16 +68,25 @@ const BusinessForm = ({ onBusinessAdded, onCancel }) => {
   const uploadAllDocuments = async (businessName) => {
     const uploaded = {};
     const safeBusinessName = sanitize(businessName);
+
     for (const key of Object.keys(documents)) {
       const file = documents[key];
       if (!file) continue;
+
       const compressed = await compressIfNeeded(file);
       const safeFileName = sanitize(file.name);
       const timestamp = Date.now();
-      const fileRef = ref(storage, `businesses/${safeBusinessName}/${key}_${timestamp}_${safeFileName}`);
+
+      const path = `businesses/${safeBusinessName}/${key}_${timestamp}_${safeFileName}`;
+      const fileRef = ref(storage, path);
+
       await uploadBytes(fileRef, compressed);
-      uploaded[key] = await getDownloadURL(fileRef);
+      const url = await getDownloadURL(fileRef);
+
+      // ✅ Save both URL and path
+      uploaded[key] = { url, path };
     }
+
     return uploaded;
   };
 
@@ -104,24 +112,38 @@ const BusinessForm = ({ onBusinessAdded, onCancel }) => {
     setIsSubmitting(true);
     try {
       const uploadedDocs = await uploadAllDocuments(data.businessName);
+
+      const fullAddress = [data.street, data.barangay, data.city, data.province]
+        .filter(Boolean)
+        .join(", ");
+
+      // 🔎 Resolve fee for selected business type
+      const feeInfo = businessFees.find(f => f.businessType === data.businessType);
+      const amount = feeInfo ? feeInfo.registrationTotal : 0; 
+      // or annualTotal depending on your workflow
+
       const payload = {
         ...data,
+        address: fullAddress,
         ownerName: user.fullName,
         contactNumber: user.contactNumber,
         email: user.email,
         documents: uploadedDocs,
-        status: "pending_evaluation",
+        status: "pending_evaluation",          // ✅ matches your workflow
+        amount,                         // ✅ include fee amount
         businessId: generateBusinessId(data.barangay),
         permitNumber: generatePermitNumber(data.barangay),
         submittedAt: new Date().toISOString(),
       };
+
       await addDoc(collection(db, "businesses"), payload);
-      toast.success(`✅ Business registered! ID: ${payload.businessId}`);
-      setLastBusinessId(payload.businessId);
+      toast.success("📌 Application submitted for staff evaluation.");
+
       reset();
       setDocuments({ validId: null, proofOfAddress: null, dtiCert: null, businessLogo: null });
       setPreviews({});
       onBusinessAdded?.();
+      handleCancel();
     } catch (error) {
       console.error("❌ Error registering business:", error);
       toast.error("❌ Failed to register business.");
@@ -130,62 +152,100 @@ const BusinessForm = ({ onBusinessAdded, onCancel }) => {
     }
   };
 
+
   const handleCancel = () => {
     if (onCancel) onCancel();
-    else navigate("/businesses");
+    else navigate("/businesses/my");
   };
 
   // -----------------------------
   // STEP 1 — BUSINESS DETAILS
   // -----------------------------
-  const renderStep1 = () => (
-    <div className="form-step">
-      <h2>🏢 Business Details</h2>
-      <label>Business Name
-        <input {...register('businessName', { required: true })} />
-      </label>
-      <label>Business Type
-        <select {...register('businessType', { required: true })}>
-          <option value="">Select Type</option>
-          {businessFees.map(bt => (
-            <option key={bt.id} value={bt.businessType}>
-              {bt.businessType} — ₱{bt.registrationTotal}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>Barangay
-        <select {...register('barangay', { required: true })}>
-          <option value="">Select Barangay</option>
-          {PARANAQUE.barangays.map((brgy) => (
-            <option key={brgy} value={brgy}>{brgy}</option>
-          ))}
-        </select>
-      </label>
-      <label>Business Address
-        <input {...register('address', { required: true })} />
-      </label>
-      <label>Registration Date
-        <input type="date" {...register('registrationDate', { required: true })} />
-      </label>
-      <button
-        type="button"
-        onClick={async () => {
-          const valid = await trigger([
-            "businessName",
-            "businessType",
-            "barangay",
-            "address",
-            "registrationDate",
-          ]);
-          if (valid) setStep(2);
-          else toast.error("⚠️ Please fill in all required fields.");
-        }}
-      >
-        Next →
-      </button>
-    </div>
-  );
+  const renderStep1 = () => {
+    const street = watch("street");
+    const barangay = watch("barangay");
+    const city = watch("city");
+    const province = watch("province");
+
+    const fullAddress = [street, barangay, city, province].filter(Boolean).join(", ");
+
+    return (
+      <div className="form-step">
+        <h2>🏢 Business Details</h2>
+
+        <label htmlFor="businessName">Business Name
+          <input id="businessName" {...register("businessName", { required: "Business name is required" })} />
+          {errors.businessName && <span className="error-text">{errors.businessName.message}</span>}
+        </label>
+
+        <label htmlFor="businessType">Business Type
+          <select id="businessType" {...register("businessType", { required: "Business type is required" })}>
+            <option value="">Select Type</option>
+            {businessFees.map(bt => (
+              <option key={bt.id} value={bt.businessType}>
+                {bt.businessType} — ₱{bt.registrationTotal}
+              </option>
+            ))}
+          </select>
+          {errors.businessType && <span className="error-text">{errors.businessType.message}</span>}
+        </label>
+
+        <fieldset className="address-fieldset">
+          <legend>Business Address</legend>
+
+          <label htmlFor="street">Blk# / Lot#, Street
+            <input id="street" {...register("street", { required: "Street is required" })} />
+            {errors.street && <span className="error-text">{errors.street.message}</span>}
+          </label>
+
+          <label htmlFor="barangay">Barangay
+            <select id="barangay" {...register("barangay", { required: "Barangay is required" })}>
+              <option value="">Select Barangay</option>
+              {PARANAQUE.barangays.map(brgy => (
+                <option key={brgy} value={brgy}>{brgy}</option>
+              ))}
+            </select>
+            {errors.barangay && <span className="error-text">{errors.barangay.message}</span>}
+          </label>
+
+          <label htmlFor="city">City
+            <input id="city" value={PARANAQUE.city} readOnly {...register("city")} />
+          </label>
+
+          <label htmlFor="province">Province
+            <input id="province" value={PARANAQUE.province} readOnly {...register("province")} />
+          </label>
+        </fieldset>
+
+        {/* Hidden full address field */}
+        <input type="hidden" {...register("address")} value={fullAddress} />
+
+        <label htmlFor="registrationDate">Registration Date
+          <input id="registrationDate" type="date" {...register("registrationDate", { required: "Registration date is required" })} />
+          {errors.registrationDate && <span className="error-text">{errors.registrationDate.message}</span>}
+        </label>
+
+        <button
+          type="button"
+          onClick={async () => {
+            const valid = await trigger([
+              "businessName",
+              "businessType",
+              "barangay",
+              "street",
+              "city",
+              "province",
+              "registrationDate",
+            ]);
+            if (valid) setStep(2);
+            else toast.error("⚠️ Please fill in all required fields.");
+          }}
+        >
+          Next →
+        </button>
+      </div>
+    );
+  };
 
   // -----------------------------
   // STEP 2 — DOCUMENT SUBMISSION
@@ -254,19 +314,28 @@ const BusinessForm = ({ onBusinessAdded, onCancel }) => {
   const renderStep3 = () => {
     const data = watch();
 
+    const fullAddress = data.address ||
+      [data.street, data.barangay, data.city, data.province].filter(Boolean).join(", ");
+    
+    const feeInfo = businessFees.find(f => f.businessType === data.businessType); 
+    const amount = feeInfo ? feeInfo.registrationTotal : 0;
+
     return (
       <div className="form-step">
         <h2>✅ Review & Submit</h2>
 
         <div className="review-box">
-          <p><strong>Business Name:</strong> {data.businessName}</p>
+          <h3>Business Details</h3>
+          <p><strong>Name:</strong> {data.businessName}</p>
           <p><strong>Type:</strong> {data.businessType}</p>
           <p><strong>Barangay:</strong> {data.barangay}</p>
-          <p><strong>Address:</strong> {data.address}</p>
-          <p><strong>Date:</strong> {data.registrationDate}</p>
+          <p><strong>Address:</strong> {fullAddress}</p>
+          <p><strong>Registration Date:</strong> {data.registrationDate}</p>
+          <p><strong>Fee Amount:</strong> ₱{amount}</p>
 
           <hr />
 
+          <h3>Owner Details</h3>
           <p><strong>Owner:</strong> {user?.fullName || "N/A"}</p>
           <p><strong>Contact:</strong> {user?.contactNumber || "N/A"}</p>
           <p><strong>Email:</strong> {user?.email || "N/A"}</p>
@@ -293,13 +362,6 @@ const BusinessForm = ({ onBusinessAdded, onCancel }) => {
           Cancel
         </button>
       </form>
-
-      {lastBusinessId && (
-        <div className="qr-wrapper">
-          <p>📎 QR Code for Business ID:</p>
-          <QRCodeCanvas value={lastBusinessId} size={128} />
-        </div>
-      )}
     </>
   );
 };

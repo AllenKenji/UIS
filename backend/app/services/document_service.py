@@ -122,23 +122,38 @@ def prepare_generator_data(doc: Document) -> dict:
             "birthDate": safe_field(resident, "birthDate"), 
             "gender": clean_enum(safe_field(resident, "gender")), 
             "civilStatus": clean_enum(safe_field(resident, "civilStatus")), 
-            "occupation": safe_field(resident, "occupation"), 
+            # "occupation": safe_field(resident, "occupation"),
             "contactNumber": safe_field(resident, "contactNumber", ""), 
-            "voterStatus": clean_enum(safe_field(resident, "voterStatus")), 
-            "photoUrl": resident.get("photoUrl"),
+            # "voterStatus": clean_enum(safe_field(resident, "voterStatus")),
+            "photoUrl": None, 
+            "signatureUrl": None,
         },
         "purpose": getattr(doc, "purpose", None),
         "remarks": getattr(doc, "remarks", None),
         "occupation": getattr(doc, "occupation", None),
+        "voterStatus": getattr(doc, "voterStatus", None),
         "attachments": getattr(doc, "attachments", {}),
     }
     
-    # ✅ Ensure photoUrl is preserved 
-    if not data["resident"].get("photoUrl"): 
-        if doc.attachments.get("photoAttachment"): 
-            data["resident"]["photoUrl"] = doc.attachments["photoAttachment"] 
-        elif getattr(doc, "extraFields", {}).get("photoUrl"): 
-            data["resident"]["photoUrl"] = doc.extraFields["photoUrl"]
+    # ✅ Prioritize photoAttachment over photoUrl 
+    photo = doc.attachments.get("photoAttachment")
+    if photo:
+        if isinstance(photo, str):
+            data["resident"]["photoUrl"] = photo
+        elif isinstance(photo, dict) and "url" in photo:
+            data["resident"]["photoUrl"] = photo["url"]
+        elif hasattr(photo, "url"):
+            data["resident"]["photoUrl"] = photo.url
+    elif resident.get("photoUrl"):
+        data["resident"]["photoUrl"] = resident["photoUrl"]
+    elif getattr(doc, "extraFields", {}).get("photoUrl"):
+        data["resident"]["photoUrl"] = doc.extraFields["photoUrl"]
+
+    # ✅ SignatureUrl directly from resident or extraFields 
+    if resident.get("signatureUrl"): 
+        data["resident"]["signatureUrl"] = resident["signatureUrl"] 
+    elif getattr(doc, "extraFields", {}).get("signatureUrl"): 
+        data["resident"]["signatureUrl"] = doc.extraFields["signatureUrl"]
 
     # Merge extraFields if present
     if getattr(doc, "extraFields", None):
@@ -208,6 +223,9 @@ def _serialize(snapshot) -> Document:
 
     # ✅ Ensure resident object is preserved
     if "resident" in data and isinstance(data["resident"], dict):
+        # Promote fullName to residentName
+        data["residentName"] = data["resident"].get("fullName", "Unnamed")
+
         # Normalize address keys inside resident
         address = data["resident"].get("address", {}) or {}
         normalized_address = {}
@@ -296,7 +314,7 @@ def list_my_documents(resident_id: str) -> list[Document]:
             .where("residentId", "==", resident_id).stream()]
 
 def list_active_documents(resident_id: str) -> list[Document]:
-    active_statuses = {DocumentStatus.pending, DocumentStatus.awaiting_payment, DocumentStatus.paid}
+    active_statuses = {DocumentStatus.pending, DocumentStatus.for_payment, DocumentStatus.paid}
     return [doc for s in db.collection("documents")
             .where("residentId", "==", resident_id).stream()
             if (doc := _serialize(s)).status in active_statuses]
@@ -315,6 +333,7 @@ def get_document(doc_id: str) -> Document:
 # ===============================
 async def create_document(
     resident_id: str,
+    resident_name: Optional[str],
     document_type: str,
     purpose: Optional[str] = None,
     remarks: Optional[str] = None,
@@ -335,13 +354,15 @@ async def create_document(
     yearsOfStay: Optional[int] = None,              # NEW
     medicalAttachment: UploadFile = None,           # NEW
     photoAttachment: UploadFile = None,
+    activityPlan: UploadFile = None,              # NEW
+    businessPermit: UploadFile = None,            # NEW
 ) -> Document:
     try:
         doc_ref = db.collection("documents").document()
         now = datetime.now(timezone.utc)
 
         # Upload attachments if provided
-        id_url, residency_url, medical_url, photo_url = None, None, None, None 
+        id_url, residency_url, medical_url, photo_url, activity_plan_url, business_permit_url = None, None, None, None, None, None
         if idAttachment: 
             id_url = await run_in_threadpool( 
                 upload_file, idAttachment, f"documents/{doc_ref.id}/id_{idAttachment.filename}" 
@@ -358,6 +379,14 @@ async def create_document(
             photo_url = await run_in_threadpool( 
                 upload_file, photoAttachment, f"documents/{doc_ref.id}/photo_{photoAttachment.filename}" 
             )
+        if activityPlan:
+            activity_plan_url = await run_in_threadpool(
+                upload_file, activityPlan, f"documents/{doc_ref.id}/activity_plan_{activityPlan.filename}"
+            )
+        if businessPermit:
+            business_permit_url = await run_in_threadpool(
+                upload_file, businessPermit, f"documents/{doc_ref.id}/business_permit_{businessPermit.filename}"
+            )
 
         # 🔎 Fetch resident details
         resident_snapshot = db.collection("residents").document(resident_id).get()
@@ -368,7 +397,16 @@ async def create_document(
         # Counter for sequential IDs
         counter_ref = db.collection("counters").document(document_type)
         counter_snapshot = counter_ref.get()
-        last_number = counter_snapshot.to_dict().get("last_number", 0) if counter_snapshot.exists else 0
+
+        # Check if there are any existing documents of this type
+        docs_exist = db.collection("documents").where("documentType", "==", document_type).limit(1).get()
+
+        if not docs_exist:
+            # Reset counter if no documents of this type exist
+            last_number = 0
+        else:
+            last_number = counter_snapshot.to_dict().get("last_number", 0) if counter_snapshot.exists else 0
+
         new_number = last_number + 1
         await run_in_threadpool(counter_ref.set, {"last_number": new_number})
 
@@ -388,6 +426,10 @@ async def create_document(
             attachments["medicalAttachment"] = medical_url 
         if photo_url: 
             attachments["photoAttachment"] = photo_url
+        if activity_plan_url:
+            attachments["activityPlan"] = activity_plan_url
+        if business_permit_url:
+            attachments["businessPermit"] = business_permit_url
 
         def safe_field(data: dict, key: str, default="N/A"): 
             val = data.get(key) 
@@ -397,6 +439,7 @@ async def create_document(
         document_data = {
             "documentId": document_id,
             "residentId": resident_id,
+            "residentName": resident_name or safe_field(resident_data, "fullName", "Unnamed"),
             "resident": { 
                 "fullName": safe_field(resident_data, "fullName", "Unnamed"), 
                 "address": resident_data.get("address") or {}, 
@@ -404,14 +447,14 @@ async def create_document(
                 "gender": safe_field(resident_data, "gender"), 
                 "civilStatus": safe_field(resident_data, "civilStatus"), 
                 "contactNumber": safe_field(resident_data, "contactNumber", ""), 
-                "occupation": occupation or safe_field(resident_data, "occupation"), 
-                "voterStatus": voterStatus or safe_field(resident_data, "voterStatus"), 
                 "photoUrl": photo_url or resident_data.get("photoUrl") or "", 
             },
             "documentType": document_type,
             "purpose": purpose,
             "remarks": remarks,
             "status": DocumentStatus.paid.value if amount == 0 else DocumentStatus.pending.value,
+            "occupation": occupation,
+            "voterStatus": voterStatus,
             "createdAt": now,
             "updatedAt": now,
             "attachments": attachments,
@@ -549,11 +592,11 @@ async def mark_resubmitted(doc_id: str) -> Document:
 
 async def update_status(doc_id: str, new_status: DocumentStatus, remarks: Optional[str]) -> Document:
     doc = get_and_serialize(doc_id)
-    if doc.amount == 0 and new_status in [DocumentStatus.awaiting_payment, DocumentStatus.payment_submitted]:
+    if doc.amount == 0 and new_status in [DocumentStatus.for_payment, DocumentStatus.payment_submitted]:
         raise HTTPException(status_code=400, detail="Free documents do not require payment")
     valid_transitions = {
-        DocumentStatus.pending: [DocumentStatus.awaiting_payment, DocumentStatus.rejected],
-        DocumentStatus.awaiting_payment: [DocumentStatus.paid, DocumentStatus.rejected],
+        DocumentStatus.pending: [DocumentStatus.for_payment, DocumentStatus.rejected],
+        DocumentStatus.for_payment: [DocumentStatus.paid, DocumentStatus.rejected],
         DocumentStatus.payment_submitted: [DocumentStatus.paid, DocumentStatus.rejected],
         DocumentStatus.paid: [DocumentStatus.approved],
     }
@@ -565,11 +608,11 @@ async def update_status(doc_id: str, new_status: DocumentStatus, remarks: Option
 
 async def confirm_payment(doc_id: str) -> Document:
     doc = get_and_serialize(doc_id)
-    if doc.status not in (DocumentStatus.awaiting_payment, DocumentStatus.payment_submitted):
-        raise HTTPException(status_code=400, detail="Payment can only be confirmed from awaiting_payment or payment_submitted")
+    if doc.status not in (DocumentStatus.for_payment, DocumentStatus.payment_submitted):
+        raise HTTPException(status_code=400, detail="Payment can only be confirmed from for_payment or payment_submitted")
     return await update_document(doc_id, {"status": DocumentStatus.paid.value, "paymentStatus": "paid"})
 
-async def issue_document(doc_id: str, issued_by: str, file_url: Optional[str] = None) -> Document:
+async def issue_document(doc_id: str, issued_by: str, file_url: Optional[str] = None, remarks: Optional[str] = None) -> Document:
     doc = get_and_serialize(doc_id)
 
     if doc.amount > 0 and doc.paymentStatus != "paid":
@@ -601,8 +644,36 @@ async def issue_document(doc_id: str, issued_by: str, file_url: Optional[str] = 
         "issuedBy": issued_by,
         "issuedAt": issued_at,
         "fileUrl": file_url,
+        "remarks": remarks,
     }
     if doc.referenceNumber:
         update_data["referenceNumber"] = doc.referenceNumber
 
     return await update_document(doc_id, update_data)
+
+async def delete_document(doc_id: str, uid: str):
+    """Hard delete a document by ID, along with related payments and receipts."""
+    doc_ref = db.collection("documents").document(doc_id)
+    snapshot = doc_ref.get()
+
+    if not snapshot.exists:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Serialize before deleting so we can return the deleted record
+    from backend.app.services.document_service import _serialize
+    deleted_doc = _serialize(snapshot)
+
+    # Perform deletion
+    doc_ref.delete()
+
+    # --- Delete related payments ---
+    payments = db.collection("payments").where("documentId", "==", doc_id).get()
+    for pay in payments:
+        pay.reference.delete()
+
+    # --- Delete related receipts ---
+    receipts = db.collection("receipts").where("documentId", "==", doc_id).get()
+    for rec in receipts:
+        rec.reference.delete()
+
+    return deleted_doc

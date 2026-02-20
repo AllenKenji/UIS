@@ -69,6 +69,7 @@ def _enrich_with_resident(data: dict) -> ComplaintWithResident:
             **data,
             "filed_for_name": filed_for_name,
             "filed_by_name": filed_by_name,
+            "residentName": filed_for_name,
         }
     )
 
@@ -86,7 +87,7 @@ def file_complaint(data: ComplaintCreate) -> Optional[Complaint]:
     filed_for = data.filed_for or data.filed_by
 
     payload = {
-        **data.dict(),
+        **data.model_dump(),
         "filed_by": data.filed_by,       # who entered the complaint
         "filed_for": filed_for,          # resident the complaint is about
         "timestamp": firestore.SERVER_TIMESTAMP,
@@ -123,34 +124,23 @@ def get_complaint_by_id(complaint_id: str) -> Optional[ComplaintWithResident]:
     return None
 
 # 👤 Resident: list complaints filed for them (self or by staff)
-def list_complaints_by_resident_id(
-    resident_id: str,
-    limit: Optional[int] = None,
-) -> List[Complaint]:
+def list_complaints_by_resident_id(auth_uid: str, limit: Optional[int] = None):
     db = get_firestore()
     results: List[Complaint] = []
 
     try:
-        query = (
-            db.collection(COMPLAINT_COLLECTION)
-            .where("filed_for", "==", resident_id)   # ✅ use filed_for
-            .order_by("timestamp", direction=firestore.Query.DESCENDING)
-        )
-
+        query = db.collection(COMPLAINT_COLLECTION).where("filed_for", "==", auth_uid)
         if limit:
             query = query.limit(limit)
 
         for doc in query.stream():
-            normalized = _normalize_complaint(doc)
-            results.append(Complaint(**normalized))
+            results.append(Complaint(**_normalize_complaint(doc)))
 
-        logger.info("👤 Resident %s retrieved %d complaints", resident_id, len(results))
+        logger.info("👤 Resident %s retrieved %d complaints", auth_uid, len(results))
     except Exception as e:
-        logger.error("❌ Failed to list complaints for resident %s: %s", resident_id, e)
+        logger.error("❌ Failed to list complaints for resident %s: %s", auth_uid, e)
 
     return results
-
-
 
 # 🗂️ Admin/Staff: list all complaints with resident + filer info
 def list_complaints_with_residents(
@@ -217,4 +207,26 @@ def update_complaint_status(
 
     except Exception as e:
         logger.error("❌ Failed to update complaint %s: %s", complaint_id, e)
+        return None
+
+# 🗑️ Delete complaint (admin only)
+def delete_complaint(complaint_id: str) -> Optional[Complaint]:
+    db = get_firestore()
+    doc_ref = db.collection(COMPLAINT_COLLECTION).document(complaint_id)
+
+    try:
+        snapshot = doc_ref.get()
+        if not snapshot.exists:
+            logger.warning("⚠️ Complaint %s not found for deletion", complaint_id)
+            return None
+
+        doc_ref.delete()
+        logger.info("🗑️ Complaint %s deleted successfully", complaint_id)
+
+        # Optionally return the deleted complaint data for confirmation
+        normalized = _normalize_complaint(snapshot)
+        return Complaint(**normalized)
+
+    except Exception as e:
+        logger.error("❌ Failed to delete complaint %s: %s", complaint_id, e)
         return None

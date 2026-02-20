@@ -24,9 +24,7 @@ export const storage = getStorage(app); // ✅ no need to pass gs:// manually
 
 // 🧪 Runtime validation
 try {
-  const testRef = ref(storage, "healthcheck.txt");
-  console.log("✅ Firebase Storage initialized:", testRef.toString());
-  // Expected: gs://barangay-1721d.appspot.com/healthcheck.txt
+  ref(storage, "healthcheck.txt");
 } catch (err) {
   console.error("❌ Firebase Storage failed to initialize:", err);
   throw new Error("❌ Firebase Storage bucket is undefined. Check firebaseConfig.storageBucket and SDK version.");

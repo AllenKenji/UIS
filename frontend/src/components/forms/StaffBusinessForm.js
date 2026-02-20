@@ -26,6 +26,7 @@ const StaffBusinessForm = ({ onBusinessAdded, onCancel }) => {
   const [selectedResident, setSelectedResident] = useState(null);
   const [selectedFee, setSelectedFee] = useState(0);
   const [selectedBusinessType, setSelectedBusinessType] = useState("");
+  const [submittedBusinessName, setSubmittedBusinessName] = useState("");
 
   useEffect(() => {
     const fetchStaffProfile = async () => {
@@ -72,8 +73,8 @@ const StaffBusinessForm = ({ onBusinessAdded, onCancel }) => {
         ...data,
         ownerName: selectedResident.fullName,
         contactNumber: selectedResident.contactNumber,
-        email: selectedResident.email,
-        status: "pending_evaluation",
+        email: selectedResident.email || "",
+        status: "approved",
         businessId: customBusinessId,
         permitNumber: generatePermitNumber(data.barangay),
         submittedAt: new Date().toISOString(),
@@ -92,6 +93,7 @@ const StaffBusinessForm = ({ onBusinessAdded, onCancel }) => {
       reset();
       onBusinessAdded?.();
 
+      setSubmittedBusinessName(data.businessName);
       setStep(4);
       setSelectedFee(feeObj?.registrationTotal || 0);
       setSelectedBusinessType(data.businessType);
@@ -132,9 +134,11 @@ const StaffBusinessForm = ({ onBusinessAdded, onCancel }) => {
           )}
 
           <h2>🏢 Business Details</h2>
+
           <label>Business Name
             <input {...register("businessName", { required: true })} />
           </label>
+
           <label>Business Type
             <select {...register("businessType", { required: true })}>
               <option value="">Select Type</option>
@@ -145,22 +149,37 @@ const StaffBusinessForm = ({ onBusinessAdded, onCancel }) => {
               ))}
             </select>
           </label>
-          <label>Barangay
-            <select {...register("barangay", { required: true })}>
-              <option value="">Select Barangay</option>
-              {PARANAQUE.barangays.map((brgy) => (
-                <option key={brgy} value={brgy}>
-                  {brgy}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>Business Address
-            <input {...register("address", { required: true })} />
-          </label>
+
+          {/* Grouped Business Address */}
+          <fieldset className="address-fieldset">
+            <legend>Business Address</legend>
+
+            <label>Street
+              <input {...register("street", { required: true })} />
+            </label>
+
+            <label>Barangay
+              <select {...register("barangay", { required: true })}>
+                <option value="">Select Barangay</option>
+                {PARANAQUE.barangays.map((brgy) => (
+                  <option key={brgy} value={brgy}>{brgy}</option>
+                ))}
+              </select>
+            </label>
+
+            <label>City
+              <input value={PARANAQUE.city} readOnly {...register("city")} />
+            </label>
+
+            <label>Province
+              <input value={PARANAQUE.province} readOnly {...register("province")} />
+            </label>
+          </fieldset>
+
           <label>Registration Date
             <input type="date" {...register("registrationDate", { required: true })} />
           </label>
+
           <button
             type="button"
             disabled={isSubmitting}
@@ -168,8 +187,10 @@ const StaffBusinessForm = ({ onBusinessAdded, onCancel }) => {
               const valid = await trigger([
                 "businessName",
                 "businessType",
+                "street",
                 "barangay",
-                "address",
+                "city",
+                "province",
                 "registrationDate",
               ]);
               if (valid && selectedResident) handleSubmit(onSubmit)();
@@ -178,6 +199,7 @@ const StaffBusinessForm = ({ onBusinessAdded, onCancel }) => {
           >
             {isSubmitting ? "Registering…" : "Register Business →"}
           </button>
+
         </div>
       )}
 
@@ -187,9 +209,10 @@ const StaffBusinessForm = ({ onBusinessAdded, onCancel }) => {
           entityId={docId}                  // keep UID for internal reference
           entityType="business"
           resident={selectedResident}
-          description={selectedBusinessType}
+          entityCategory={selectedBusinessType}
           fee={selectedFee}
-          customEntityId={businessId}       // ✅ use generated custom ID
+          businessId={businessId}       // ✅ use generated custom ID
+          businessName={submittedBusinessName} // ✅ pass business name for receipt
           onCancel={handleCancel}
         />
       )}

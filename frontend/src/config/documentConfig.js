@@ -1,3 +1,6 @@
+// src/data/documentConfig.js
+import { PARANAQUE } from "../data/locations";
+
 const documentConfig = {
   "Barangay Clearance": {
     fields: [
@@ -47,13 +50,13 @@ const documentConfig = {
     fields: [
       { name: "activityName", label: "Activity Name", type: "text", required: true },
       {
-        label: "Activity Location",   // ✅ parent label
-        type: "group",                // custom type to render grouped inputs
+        label: "Activity Location",
+        type: "group",
         fields: [
-          { name: "location.barangay", label: "Barangay", type: "text", required: true },
-          { name: "location.street", label: "Street", type: "text" },
-          { name: "location.city", label: "City", type: "text" },
-          { name: "location.province", label: "Province", type: "text" },
+          { name: "location.barangay", label: "Barangay", type: "select", required: true, options: PARANAQUE.barangays },
+          { name: "location.street", label: "(Blk# / Lot#), Street", type: "text" },
+          { name: "location.city", label: "City", type: "text", default: PARANAQUE.city, readOnly: true },
+          { name: "location.province", label: "Province", type: "text", default: PARANAQUE.province, readOnly: true },
         ]
       },
       { name: "activityDate", label: "Activity Date", type: "date", required: true },
@@ -69,13 +72,13 @@ const documentConfig = {
       { name: "respondent", label: "Respondent Name", type: "text", required: true },
       { name: "incident", label: "Incident Details", type: "textarea", required: true, minLength: 10 },
       {
-        label: "Incident Location",   // ✅ parent label
+        label: "Incident Location",
         type: "group",
         fields: [
-          { name: "location.barangay", label: "Barangay", type: "text", required: true },
-          { name: "location.street", label: "Street", type: "text" },
-          { name: "location.city", label: "City", type: "text" },
-          { name: "location.province", label: "Province", type: "text" },
+          { name: "location.barangay", label: "Barangay", type: "select", required: true, options: PARANAQUE.barangays },
+          { name: "location.street", label: "(Blk# / Lot#), Street", type: "text" },
+          { name: "location.city", label: "City", type: "text", default: PARANAQUE.city , readOnly: true},
+          { name: "location.province", label: "Province", type: "text", default: PARANAQUE.province , readOnly: true},
         ]
       }
     ],
@@ -99,7 +102,7 @@ const documentConfig = {
       { name: "voterStatus", label: "Voter Status", type: "text", required: true },
     ],
     attachments: [
-      { name: "photoAttachment", label: "Upload 1x1 Photo", required: true }, // ✅ unified with backend
+      { name: "photoAttachment", label: "Upload 1x1 Photo", required: true },
       { name: "idAttachment", label: "Upload Valid ID", required: true },
     ],
   },

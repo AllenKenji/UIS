@@ -4,7 +4,8 @@ export function resolveLocation(documentType, formData, residents = [], business
     barangay: "",
     street: "",
     city: "",
-    province: ""
+    province: "",
+    address: ""
   };
 
   switch (documentType) {
@@ -23,12 +24,12 @@ export function resolveLocation(documentType, formData, residents = [], business
 
     case "Business Clearance": {
       const business = businesses.find(b => b.businessName === formData.businessName);
-      if (business?.address) {
+      if (business) {
         location = {
-          barangay: business.address.barangay || "",
-          street: business.address.street || "",
-          city: business.address.city || "",
-          province: business.address.province || ""
+          barangay: business.barangay || "",
+          street: business.street || "",
+          city: business.city || "",
+          province: business.province || ""
         };
       }
       break;
@@ -44,6 +45,16 @@ export function resolveLocation(documentType, formData, residents = [], business
       };
     }
   }
+
+  // ✅ Always build a clean address string 
+  const parts = [ 
+    location.street, 
+    location.barangay ? `Brgy. ${location.barangay}` : "", 
+    location.city, 
+    location.province 
+  ].filter(Boolean); 
+
+  location.address = parts.join(", ");
 
   return location;
 }

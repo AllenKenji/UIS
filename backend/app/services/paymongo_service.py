@@ -134,3 +134,71 @@ def create_payment_intent(amount: int, description: str, remarks: str = "",
     except Exception as e:
         logger.exception("❌ Unexpected error creating payment intent")
         raise RuntimeError("Failed to create payment intent")
+
+def attach_payment_method(
+    payment_intent_id: str,
+    client_key: str,
+    method: str,
+    billing: dict,
+    return_url: str
+) -> dict:
+    """
+    Create a payment method and attach it to a Payment Intent.
+    Must include a valid return_url so PayMongo generates a redirect URL.
+    """
+    headers = _make_headers(PAYMONGO_SECRET_KEY)
+
+    # Step 1: Create payment method
+    pm_payload = {
+        "data": {
+            "attributes": {
+                "type": method,  # "gcash" or "grab_pay"
+                "billing": billing
+            }
+        }
+    }
+    pm_res = requests.post(f"{BASE_URL}/payment_methods", json=pm_payload, headers=headers)
+    pm_res.raise_for_status()
+    pm_data = pm_res.json()
+    logger.info("📥 Payment method response: %s", pm_data)
+
+    if "errors" in pm_data:
+        raise RuntimeError(f"Payment method creation failed: {pm_data['errors']}")
+
+    payment_method_id = pm_data["data"]["id"]
+
+    # Step 2: Attach to intent
+    attach_payload = {
+        "data": {
+            "attributes": {
+                "payment_method": payment_method_id,
+                "client_key": client_key,
+                "return_url": return_url  # must be a real frontend route
+            }
+        }
+    }
+    intent_res = requests.post(
+        f"{BASE_URL}/payment_intents/{payment_intent_id}/attach",
+        json=attach_payload,
+        headers=headers
+    )
+    intent_res.raise_for_status()
+    intent_data = intent_res.json()
+    logger.info("📥 Attach response: %s", intent_data)
+
+    if "errors" in intent_data:
+        raise RuntimeError(f"Payment intent attach failed: {intent_data['errors']}")
+
+    attrs = intent_data["data"]["attributes"]
+    redirect_url = attrs.get("next_action", {}).get("redirect", {}).get("url")
+
+    if not redirect_url:
+        # Helpful log to see why redirect is missing
+        logger.warning("⚠️ No redirect URL returned. Status=%s", attrs.get("status"))
+
+    return {
+        "status": attrs.get("status"),
+        "redirectUrl": redirect_url,
+        "referenceNumber": attrs.get("reference_number"),
+        "paymentIntentId": payment_intent_id
+    }

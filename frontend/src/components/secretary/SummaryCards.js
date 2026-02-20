@@ -5,7 +5,7 @@ const SummaryCards = ({ stats }) => {
   const cards = [
     { key: "total", label: "Total Requests" },
     { key: "pending", label: "Pending" },
-    { key: "awaiting_payment", label: "Awaiting Payment" },
+    { key: "for_payment", label: "For Payment" },
     { key: "approved", label: "Approved" },
     { key: "rejected", label: "Rejected" },
   ];

@@ -12,7 +12,7 @@ const SecretaryDashboard = () => {
   const counters = useDocumentCounters();
   const statusStats = useFirestoreStats("documents", "status", [
     "pending",
-    "awaiting_payment",
+    "for_payment",
     "approved",
     "rejected",
   ]);

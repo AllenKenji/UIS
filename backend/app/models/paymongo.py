@@ -25,6 +25,7 @@ class AttachPaymentRequest(BaseModel):
     paymongoClientKey: str = Field(..., description="Client key from PayMongo intent creation")
     method: str = Field(..., description="Payment method type (e.g., 'gcash', 'grab_pay')")
     billing: BillingInfo = Field(..., description="Billing information for the resident")
+    type: str = Field(..., description="business or document")
     return_url: Optional[str] = Field(
         None,
         description="URL to redirect after payment success/failure"

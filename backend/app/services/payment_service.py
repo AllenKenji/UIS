@@ -10,6 +10,32 @@ def _get_business_doc(business_id: str):
     docs = db.collection("businesses").where("businessId", "==", business_id).limit(1).get()
     return docs[0] if docs else None
 
+def _next_receipt_number():
+    counter_ref = db.collection("counters").document("receipts")
+    transaction = db.transaction()
+
+    @firestore.transactional
+    def increment_counter(transaction):
+        snapshot = counter_ref.get(transaction=transaction)
+
+        # Check if receipts collection is empty
+        receipts_exist = db.collection("receipts").limit(1).get()
+        if not receipts_exist:
+            # Reset counter if no receipts exist
+            transaction.set(counter_ref, {"value": 0})
+            current = 0
+        else:
+            current = snapshot.get("value") if snapshot.exists else 0
+
+        new_value = current + 1
+        transaction.set(counter_ref, {"value": new_value})
+        return new_value
+
+    new_number = increment_counter(transaction)
+    return f"RCPT-{new_number:05d}"
+
+
+
 def update_payment_status(business_id: str, event_type: str, status: str,
                           transaction_id: str, payment_intent_id: str = None, paid_at=None):
     doc = _get_business_doc(business_id)
@@ -40,6 +66,29 @@ def update_payment_status(business_id: str, event_type: str, status: str,
         update_data["paymentIntentId"] = payment_intent_id
 
     doc.reference.update(update_data)
+
+    # ✅ Extract businessName from the document 
+    business_data = doc.to_dict() 
+    business_name = business_data.get("businessName") 
+    owner_name = business_data.get("ownerName") 
+    amount = business_data.get("amount") or business_data.get("amountDue")
+    
+    # ✅ Log payment with businessName 
+    log_payment_record( 
+        reference_number=business_data.get("referenceNumber") or business_id, 
+        transaction_id=transaction_id, 
+        amount=amount,
+        status=status, 
+        fee_type="business_fee", 
+        business_id=business_id, 
+        business_name=business_name, 
+        owner_name=owner_name, 
+        business_type=business_data.get("businessType"),
+        event_type=event_type, 
+        paid_at=paid_at,
+        method="paymongo"
+    )
+
     logger.info("✅ Updated business %s with status=%s event=%s intent=%s",
                 business_id, status, event_type, payment_intent_id)
     return {"success": True, "status": new_status}
@@ -98,7 +147,64 @@ def update_document_payment_status(event_type: str,
     # --- Update all matching docs ---
     for doc in docs:
         doc.reference.update(update_data)
+        doc_data = doc.to_dict()
+        owner_name = doc_data.get("ownerName")
+        business_name = doc_data.get("businessName")
+        amount = doc_data.get("amount") or doc_data.get("amountDue")
+
+        log_payment_record(
+            reference_number=doc_data.get("referenceNumber") or transaction_id,
+            transaction_id=transaction_id,
+            amount=amount,
+            status=status,
+            fee_type="document_fee",
+            document_id=doc_data.get("documentId"),
+            owner_name=owner_name,
+            business_name=business_name,
+            document_type=doc_data.get("documentType"),
+            event_type=event_type,
+            paid_at=paid_at,
+            method="paymongo"
+        )
+
         logger.info("✅ Updated document %s with status=%s event=%s intent=%s source=%s",
                     doc.id, status, event_type, payment_intent_id, source_id)
 
     return {"success": True, "status": new_status}
+
+def log_payment_record(reference_number, transaction_id, amount, status, fee_type,
+                       business_id=None, document_id=None, owner_name=None, business_name=None,
+                       business_type=None, document_type=None, receipt_number=None,
+                       event_type=None, paid_at=None, method=None):
+    """Log payment into payments and receipts collections."""
+    # Decide entity type
+    entity_type = "business" if business_id else "document"
+    entity_category = business_type if business_id else document_type
+
+    payment_data = {
+        "referenceNumber": reference_number,
+        "transactionId": transaction_id,
+        "amount": amount,
+        "status": status,
+        "feeType": fee_type,
+        "businessId": business_id,
+        "documentId": document_id,
+        "ownerName": owner_name,
+        "businessName": business_name,
+        "entityType": entity_type,
+        "entityCategory": entity_category,
+        "datePaid": paid_at or firestore.SERVER_TIMESTAMP,
+        "eventType": event_type,
+        "method": method
+    }
+    db.collection("payments").add(payment_data)
+
+    receipt_data = {
+        "receiptNumber": receipt_number or _next_receipt_number(),
+        **payment_data,
+        "issuedBy": "system-webhook"
+    }
+    db.collection("receipts").add(receipt_data)
+
+    logger.info("✅ Logged payment and receipt for reference=%s type=%s", reference_number, entity_category)
+    return receipt_data["receiptNumber"]

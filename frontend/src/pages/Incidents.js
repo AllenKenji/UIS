@@ -61,7 +61,7 @@ const Incidents = () => {
         <>
           <div className="header">
             <h2>
-              {role === "staff" ? "Incident Dashboard" : "My Incidents"}
+              {role === "staff" ? "Incident Dashboard" : "Incidents Dashboard"}
             </h2>
             <button onClick={() => setMode("form")}>+ Report Incident</button>
           </div>

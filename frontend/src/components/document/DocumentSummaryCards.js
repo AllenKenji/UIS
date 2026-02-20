@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { db } from "../../services/firebase";
 import DashboardCard from "../dashboard/DashboardCard";
 import "../../styles/dashboard/summary-card.css";
@@ -31,9 +31,8 @@ const DocumentSummaryCards = () => {
               const counterRef = doc(db, "counters", cat.type);
               const snap = await getDoc(counterRef);
 
-              // 🪄 Seed script logic: create doc if missing
               if (!snap.exists()) {
-                await setDoc(counterRef, { last_number: 0 });
+                // No doc yet → treat as 0
                 return { ...cat, value: 0 };
               }
 
@@ -41,17 +40,16 @@ const DocumentSummaryCards = () => {
               return { ...cat, value };
             } catch (err) {
               console.warn(`⚠️ Error fetching counter for ${cat.type}:`, err.message);
-              return { ...cat, value: "N/A" };
+              return { ...cat, value: 0 }; // fallback to 0 instead of "N/A"
             }
           })
         );
-
-        if (!cancelled) {
-          setStats(results);
-          setLoading(false);
+        if (!cancelled) { 
+          setStats(results); 
+          setLoading(false); 
         }
+
       } catch (err) {
-        console.error("❌ Error fetching counters:", err.message);
         if (!cancelled) {
           setStats([]);
           setLoading(false);

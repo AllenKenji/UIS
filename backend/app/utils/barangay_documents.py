@@ -296,19 +296,19 @@ def generate_barangay_id_pdf(data, issued_by, issued_at, doc_id):
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=(large_width, large_height))
 
+    # --- Resident data ---
     resident = data.get("resident", {})
     full_name = safe_text(resident.get("fullName", "Unnamed"))
     birth_date = safe_text(resident.get("birthDate", "N/A"))
     civil_status = safe_text(resident.get("civilStatus", "N/A"))
     gender = safe_text(resident.get("gender", "N/A"))
-    occupation = safe_text(resident.get("occupation", "N/A"))
-    voter_status = safe_text(resident.get("voterStatus", "N/A"))
+    occupation = safe_text(data.get("occupation") or "N/A")
+    voter_status = safe_text(data.get("voterStatus") or "N/A")
     photo_url = resident.get("photoUrl", "")
     address_dict = resident.get("address", {}) or {}
     barangay = safe_text(address_dict.get("barangay", "Unknown"))
 
-
-    # --- Watermark (semi-transparent barangay seal in center) ---
+    # --- Watermark ---
     try:
         c.saveState()
         c.setFillAlpha(0.15)
@@ -320,7 +320,7 @@ def generate_barangay_id_pdf(data, issued_by, issued_at, doc_id):
     except Exception as e:
         logger.warning("Watermark render failed: %s", e)
 
-    # --- Header with logos ---
+    # --- Header ---
     try:
         c.drawImage("backend/app/assets/seals/ph_seal.png",
                     0.2*inch, large_height - 1.4*inch,
@@ -342,27 +342,38 @@ def generate_barangay_id_pdf(data, issued_by, issued_at, doc_id):
     c.drawCentredString(large_width/2, large_height - 1.3*inch, f"Barangay {barangay}")
     c.line(0.35*inch, large_height - 1.50*inch, large_width - 0.35*inch, large_height - 1.50*inch)
 
-    # --- Barangay ID number above photo ---
-    c.setFont("Helvetica-Bold", 18)
-    c.drawString(0.6*inch, large_height - 2.0*inch, f"ID #: {doc_id}")
+    # --- Gold banner ---
+    banner_y = large_height - 2.2*inch
+    banner_height = 0.6*inch
+    c.setFillColorRGB(1.0, 0.84, 0.0)  # gold
+    c.rect(0.35*inch, banner_y, large_width - 0.7*inch, banner_height, fill=True, stroke=False)
+    c.setStrokeColorRGB(0, 0, 0)
+    c.setLineWidth(1)
+    c.rect(0.35*inch, banner_y, large_width - 0.7*inch, banner_height, fill=False, stroke=True)
+    c.setFillColorRGB(0, 0, 0)
+    c.setFont("Helvetica-Bold", 28)
+    c.drawCentredString(large_width/2, banner_y + banner_height/2 - 10, "BARANGAY IDENTIFICATION CARD")
 
-    # --- Photo (left side) ---
+    # --- Barangay ID number ---
+    id_y = large_height - 3.0*inch
+    c.setFont("Helvetica-Bold", 18)
+    c.setFillColorRGB(0, 0, 0)
+    c.drawString(0.6*inch, id_y, f"ID #: {doc_id}")
+
+    # --- Photo ---
     if photo_url:
         try:
             if photo_url.startswith("http"):
-                # Fetch from web
                 img_data = urlopen(photo_url).read()
                 img = ImageReader(BytesIO(img_data))
-            elif photo_url.startswith("data:image"): 
-                # Handle base64 encoded images 
+            elif photo_url.startswith("data:image"):
                 encoded = photo_url.split(",", 1)[1]
-                img_data = base64.b64decode(encoded) 
+                img_data = base64.b64decode(encoded)
                 img = ImageReader(BytesIO(img_data))
             else:
-                # Local file path
                 img = ImageReader(photo_url)
 
-            c.drawImage(img, 0.6*inch, large_height - 5.0*inch,
+            c.drawImage(img, 0.6*inch, large_height - 6.0*inch,
                         width=2.4*inch, height=2.4*inch,
                         preserveAspectRatio=True, mask='auto')
         except Exception as e:
@@ -370,78 +381,124 @@ def generate_barangay_id_pdf(data, issued_by, issued_at, doc_id):
             c.setFont("Helvetica-Oblique", 20)
             c.drawString(0.6*inch, large_height - 3.6*inch, "(Photo unavailable)")
 
-    # --- Details (middle column, dynamic spacing) ---
-    details_x = 3.6*inch
+        # --- Signature area below photo ---
+    signature_x = 0.6*inch
+    signature_y = large_height - 6.8*inch   # adjust relative to photo bottom
+    signature_width = 2.4*inch
+    signature_height = 0.8*inch
 
+    signature_url = resident.get("signatureUrl", None)
+    if signature_url:
+        try:
+            if signature_url.startswith("http"):
+                sig_data = urlopen(signature_url).read()
+                sig_img = ImageReader(BytesIO(sig_data))
+            elif signature_url.startswith("data:image"):
+                encoded = signature_url.split(",", 1)[1]
+                sig_data = base64.b64decode(encoded)
+                sig_img = ImageReader(BytesIO(sig_data))
+            else:
+                sig_img = ImageReader(signature_url)
+
+            # Draw signature image
+            c.drawImage(sig_img, signature_x, signature_y,
+                        width=signature_width, height=signature_height,
+                        preserveAspectRatio=True, mask='auto')
+        except Exception as e:
+            logger.warning("Signature render failed: %s", e)
+
+    # --- Always draw underline below signature area ---
+    underline_y = signature_y - 0.1*inch
+    c.setStrokeColorRGB(0, 0, 0)
+    c.setLineWidth(1)
+    c.line(signature_x, underline_y, signature_x + signature_width, underline_y)
+
+    # --- Label below underline ---
+    c.setFont("Helvetica", 14)
+    c.setFillColorRGB(0, 0, 0)
+    c.drawCentredString(signature_x + signature_width/2, underline_y - 0.3*inch, "Signature")
+
+    # --- Details ---
+    details_x = 4.0*inch
     fields = [
         ("Name:", full_name),
         ("Birth Date:", birth_date),
         ("Civil Status:", civil_status),
         ("Gender:", gender),
         ("Occupation:", occupation),
-        ("Voter Status:", "Registered Voter" if voter_status.lower()=="yes" else voter_status),
-        ("Address:", resident.get("address_str", "")),
+        ("Voter Status:", "Registered Voter" if voter_status.lower() == "yes" else voter_status),
     ]
 
-    # Define margins to keep space for header/footer
-    top_margin = 2.5*inch
-    bottom_margin = 2.0*inch
+        # --- Address split into 3 lines ---
+    line1 = " ".join([address_dict.get("house_number", ""), address_dict.get("street", "")]).strip()
+    line2_parts = []
+    if address_dict.get("barangay"):
+        line2_parts.append(f"Brgy. {address_dict['barangay']}")
+    if address_dict.get("city"):
+        line2_parts.append(address_dict["city"])
+    line2 = ", ".join(line2_parts)
 
-    # Available vertical space
-    available_height = large_height - (top_margin + bottom_margin)
+    line3_parts = []
+    if address_dict.get("province"):
+        line3_parts.append(address_dict["province"])
+    if address_dict.get("zip_code"):
+        line3_parts.append(address_dict["zip_code"])
+    line3 = ", ".join(line3_parts)
 
-    # Compute line height dynamically
+    address_lines = [line1 or "N/A", line2 or "", line3 or ""]
+
+    # Add each line of address as its own field
+    fields.append(("Address:", address_lines[0]))
+    for extra_line in address_lines[1:]:
+        fields.append(("", extra_line))  # continuation lines
+
+    # --- Layout for details ---
+    start_y = banner_y - 1.0*inch
+    bottom_margin = 0.5*inch
+    available_height = start_y - bottom_margin
     line_height = available_height / len(fields)
-
-    # Compute block height
-    block_height = len(fields) * line_height
-
-    # Center block vertically
-    current_y = (large_height / 2) + (block_height / 2)
+    current_y = start_y
 
     for label, value in fields:
-        c.setFont("Helvetica", 28)  # label normal
-        c.drawString(details_x, current_y, label)
-        label_width = c.stringWidth(label, "Helvetica", 28)
-        c.setFont("Helvetica-Bold", 32)  # value bold
-        c.drawString(details_x + label_width + 12, current_y, value)
+        if label:  # normal label/value pair
+            c.setFont("Helvetica", 26)
+            c.setFillColorRGB(0, 0, 0)  # black for labels
+            c.drawString(details_x, current_y, label)
+            label_width = c.stringWidth(label, "Helvetica", 26)
+            c.setFont("Helvetica-Bold", 26)
+            c.setFillColorRGB(0, 0, 1)  # blue for values
+            c.drawString(details_x + label_width + 12, current_y, value)
+        else:  # continuation line (no label, just value)
+            c.setFont("Helvetica-Bold", 26)
+            c.setFillColorRGB(0, 0, 1)  # blue for values
+            c.drawString(details_x, current_y, value)
         current_y -= line_height
 
-    # --- QR code (right side) ---
     # --- QR code (right side, scaled up) ---
     try:
         qr_code = qr.QrCodeWidget(doc_id)
-
-        # Desired target size (make it bigger)
-        target_size = 3.0*inch   # increase from 2.4 to 3.6 inches
-
-        # Get natural bounds of the QR widget
+        target_size = 3.0*inch
         bounds = qr_code.getBounds()
         width = bounds[2] - bounds[0]
         height = bounds[3] - bounds[1]
-
-        # Compute scale factors
         scale_x = target_size / width
         scale_y = target_size / height
-
-        # Apply scaling transform
         d = Drawing(target_size, target_size, transform=[scale_x, 0, 0, scale_y, 0, 0])
         d.add(qr_code)
-
-        # Position QR on the right side
         qr_x = large_width - target_size - 0.6*inch
-        qr_y = large_height - 5.0*inch
+        qr_y = large_height - 6.0*inch
         renderPDF.draw(d, c, qr_x, qr_y)
-
     except Exception as e:
         logger.warning("QR render failed: %s", e)
         c.setFont("Helvetica-Oblique", 20)
+        c.setFillColorRGB(0, 0, 0)
         c.drawString(large_width - 2.0*inch, large_height - 3.6*inch, "(QR error)")
 
     # --- Validity under QR code ---
     valid_until = issued_at + timedelta(days=365)
     c.setFont("Helvetica-Bold", 20)
-    c.drawRightString(large_width - 0.6*inch, large_height - 5.4*inch,
+    c.setFillColorRGB(0, 0, 0)
+    c.drawRightString(large_width - 0.6*inch, large_height - 7.4*inch,
                       f"Valid until: {valid_until.month} / {valid_until.day} / {valid_until.strftime('%y')}")
 
     # --- Scale down to ID size ---

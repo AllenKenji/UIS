@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import HTTPException, status
 from firebase_admin import auth
 from firebase_admin.exceptions import FirebaseError
@@ -84,7 +84,7 @@ def write_firestore_profile(uid: str, payload: dict):
     """Write user profile to Firestore."""
     db = get_firestore()
     try:
-        db.collection("users").document(uid).set(payload)
+        db.collection("users").document(uid).set(payload, merge=True)
         logger.info("✅ Firestore profile created for UID: %s", uid)
     except Exception as e:
         logger.error("❌ Firestore write failed: %s", str(e), exc_info=True)
@@ -156,8 +156,8 @@ def update_user_role(uid: str, new_role: RoleEnum, changed_by: str) -> AccountRe
             full_name=data.get("full_name"),
             role=new_role,
             created_by=data.get("createdBy", changed_by),
-            created_at=data.get("createdAt", datetime.utcnow()),
-            updated_at=datetime.utcnow(),
+            created_at=data.get("createdAt", datetime.now(timezone.utc)),
+            updated_at=datetime.now(timezone.utc),
         )
 
     except Exception as e:
@@ -178,14 +178,28 @@ async def create_barangay_account(data: AccountCreate, created_by: str) -> Accou
     write_firestore_profile(uid, payload)
     set_user_claims(uid, data.role)
 
+    # 📝 Log account creation in audit trail
+    db = get_firestore()
+    try:
+        db.collection("role_changes").add({
+            "action": "create",
+            "target_user": uid,
+            "new_role": data.role.value,
+            "changed_by": created_by,
+            "timestamp": firestore.SERVER_TIMESTAMP,
+        })
+        logger.info("📝 Audit trail logged for account creation: %s", uid)
+    except Exception as e:
+        logger.error("❌ Failed to log account creation audit trail: %s", str(e), exc_info=True)
+
     return AccountResponse(
         uid=uid,
         email=data.email,
         full_name=data.full_name,
         role=data.role,
         created_by=created_by,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
     )
 
 
@@ -194,3 +208,38 @@ async def delete_barangay_account(uid: str, deleted_by: str):
     delete_firebase_user(uid)
     delete_firestore_profile(uid, deleted_by)
     return {"detail": f"Account {uid} deleted successfully"}
+
+async def list_barangay_accounts( 
+        role: RoleEnum | None = None, 
+        limit: int = 20, 
+        offset: int = 0, 
+        order_by: str = "createdAt"
+    ) -> list[AccountResponse]:
+        """List all barangay accounts, optionally filtered by role."""
+        db = get_firestore()
+        try:
+            query = db.collection("users").order_by(order_by)
+            if role:
+                query = query.where("role", "==", role.value)
+            snapshots = query.limit(limit).offset(offset).stream()
+
+            accounts = []
+            for snap in snapshots:
+                data = snap.to_dict()
+                accounts.append(AccountResponse(
+                    uid=snap.id,
+                    email=data.get("email"),
+                    full_name=data.get("full_name"),
+                    role=RoleEnum(data.get("role")),
+                    created_by=data.get("createdBy"),
+                    created_at=data.get("createdAt", datetime.now(timezone.utc)),
+                    updated_at=data.get("updatedAt", datetime.now(timezone.utc)),
+                ))
+            return accounts
+        except Exception as e:
+            logger.error("❌ Failed to list accounts: %s", str(e), exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to list accounts: {str(e)}"
+            )
+

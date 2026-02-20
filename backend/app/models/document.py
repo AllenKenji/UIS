@@ -5,11 +5,15 @@ from enum import Enum
 
 class DocumentStatus(str, Enum):
     pending = "pending"
-    awaiting_payment = "awaiting_payment"
+    for_payment = "for_payment"
     payment_submitted = "payment_submitted"
     paid = "paid"
     approved = "approved"
     rejected = "rejected"
+
+class Attachment(BaseModel):
+    url: str = Field(..., description="Public or signed URL to the uploaded file")
+    path: str = Field(..., description="Storage path inside Firebase bucket")
 
 class Document(BaseModel):
     # 🔑 Firestore document ID
@@ -37,8 +41,11 @@ class Document(BaseModel):
     updatedAt: datetime = Field(..., description="When the document was last updated")
     issuedAt: Optional[datetime] = Field(None, description="When the document was issued")
 
-    # 📎 Attachments
-    attachments: Optional[Dict[str, str]] = Field(None, description="Uploaded file URLs")
+    # 📎 Attachments (now objects with url + path)
+    attachments: Optional[Dict[str, Attachment]] = Field(
+        None,
+        description="Uploaded file metadata including URL and storage path"
+    )
 
     # 💳 Payment info
     amount: Optional[int] = Field(None, description="Payment amount if required")
@@ -52,11 +59,11 @@ class Document(BaseModel):
     fileUrl: Optional[str] = Field(None, description="URL to the issued document file")
 
     # 🧩 Flexible extra fields for type-specific data
-    extraFields: Optional[Dict[str, Any]] = Field( 
-        None, 
-        description="Additional fields depending on document type" 
+    extraFields: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Additional fields depending on document type"
     )
     
-    # Common extras (still explicit for convenience)
+    # Common extras
     occupation: Optional[str] = Field(None, description="Resident occupation")
     voterStatus: Optional[str] = Field(None, description="Resident voter status")

@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  backend:
+    volumes:
+      - ./backend:/app/backend        # bind‑mount your source code
+      - ./config:/app/config          # mount config folder
+      - ./backend/serviceAccountKey.json:/app/serviceAccountKey.json
+      - python_deps:/usr/local/lib/python3.11/site-packages
+      - app_data:/app/data
+    command: uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /app/serviceAccountKey.json
+    env_file:
+      - .env
+
+volumes: 
+  python_deps:
+  app_data:

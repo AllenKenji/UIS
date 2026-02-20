@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { DocumentsAPI } from "../services/api";   // ✅ use centralized API
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { getDoc, doc } from "firebase/firestore";
 import { db } from "../services/firebase";
 
@@ -14,6 +15,7 @@ const normalizeDoc = (doc) => ({
   transactionId: doc.transactionId ?? doc.transaction_id,       // use ?? not ||
   paymentIntentId: doc.paymentIntentId ?? doc.payment_intent_id,
   referenceNumber: doc.referenceNumber ?? doc.reference_number,
+  attachments: doc.attachments ?? {},
 });
 
 const getResidentName = async (uid) => {
@@ -34,6 +36,7 @@ export const useEnrichedRequests = () => {
   const [approved, setApproved] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
 
   const fetchRequests = async () => {
     setLoading(true);
@@ -65,8 +68,21 @@ export const useEnrichedRequests = () => {
   };
 
   useEffect(() => {
-    fetchRequests();
+    const unsubscribe = onAuthStateChanged(getAuth(), async (user) => {
+      if (user) {
+        await user.getIdToken(true);
+        setAuthReady(true);
+      }
+    });
+    return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (authReady) {
+      fetchRequests();
+    }
+  }, [authReady]);
+
 
   return {
     pending,

@@ -1,0 +1,31 @@
+.category-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.category-table th,
+.category-table td {
+  border: 1px solid #ddd;
+  padding: 0.75rem;
+  text-align: left;
+}
+
+.category-table th {
+  background-color: #f5f5f5;
+  font-weight: bold;
+}
+
+.category-table tr:nth-child(even) {
+  background-color: #fafafa;
+}
+
+.category-table .paid {
+  color: #2e7d32; /* green */
+  font-weight: 500;
+}
+
+.category-table .unpaid {
+  color: #c62828; /* red */
+  font-weight: 500;
+}

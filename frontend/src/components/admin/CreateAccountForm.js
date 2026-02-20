@@ -51,7 +51,27 @@ const CreateAccountForm = () => {
       resetForm();
       setConfirming(false);
     } catch (error) {
-      const errorMsg = error.response?.data?.detail || error.message;
+      let errorMsg;
+
+      if (error.response?.data) {
+        const data = error.response.data;
+
+        // Case 1: API returns { detail: "message" }
+        if (typeof data.detail === "string") {
+          errorMsg = data.detail;
+        }
+        // Case 2: API returns { detail: [{ msg: "error message", loc: [...] }] }
+        else if (Array.isArray(data.detail)) {
+          errorMsg = data.detail.map(err => err.msg || JSON.stringify(err)).join("; ");
+        }
+        // Fallback: stringify the whole response
+        else {
+          errorMsg = JSON.stringify(data);
+        }
+      } else {
+        errorMsg = error.message;
+      }
+
       console.error("❌ Account creation failed:", errorMsg);
       setFeedback(`❌ Failed to create account: ${errorMsg}`);
       setConfirming(false);

@@ -1,19 +1,12 @@
-import React from "react";
+import React, { useEffect, useCallback } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import jsPDF from "jspdf";
 import QRCode from "qrcode";
 import logo from "../../assets/barangay_logo.png";
 
-const ReceiptPreview = ({ receiptData }) => {
-  if (!receiptData) return null;
-
-  const getCleanAmount = (amount) => {
-    const cleaned = String(amount || "0").replace(/[^\d.-]/g, "");
-    const parsed = parseFloat(cleaned);
-    return isNaN(parsed) ? 0 : parsed;
-  };
-
-  const generatePDF = async () => {
+const ReceiptPreview = ({ receiptData, onGeneratePDF }) => {
+  
+  const generatePDF = useCallback(async () => {
     if (!receiptData) return;
 
     const doc = new jsPDF({
@@ -96,8 +89,25 @@ const ReceiptPreview = ({ receiptData }) => {
     const qrSize = 25;
     doc.addImage(qrDataUrl, "PNG", pageWidth / 2 - qrSize / 2, pageHeight - qrSize - margin, qrSize, qrSize);
 
-    doc.save(`${receiptData.receiptNumber}.pdf`);
+    // doc.save(`${receiptData.receiptNumber}.pdf`);
+    doc.autoPrint(); 
+    doc.output("dataurlnewwindow");
+  }, [receiptData]);
+
+  useEffect(() => {
+    if (onGeneratePDF) {
+      onGeneratePDF(() => generatePDF);
+    }
+  }, [onGeneratePDF, generatePDF]);
+
+  if (!receiptData) return null;
+
+  const getCleanAmount = (amount) => {
+    const cleaned = String(amount || "0").replace(/[^\d.-]/g, "");
+    const parsed = parseFloat(cleaned);
+    return isNaN(parsed) ? 0 : parsed;
   };
+
 
   return (
     <div className="receipt-preview">

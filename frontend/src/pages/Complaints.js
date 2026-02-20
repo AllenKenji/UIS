@@ -10,13 +10,12 @@ const Complaints = () => {
   const [mode, setMode] = useState("dashboard");
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
-  const { getToken } = useUser();
+
+  const { getToken, role, can, isAuthenticated, loading: authLoading } = useUser();
 
   // Modal state
   const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [showModal, setShowModal] = useState(false);
-
-  const { role, can, isAuthenticated, loading: authLoading } = useUser();
 
   // ✅ Permission checks
   const canViewAll = can("viewAllComplaints"); // admin + staff
@@ -26,7 +25,9 @@ const Complaints = () => {
   const canFile =
     (role === "resident" && can("fileComplaints")) ||
     ((role === "staff" || role === "admin") && can("fileComplaintsForResidents"));
+
   const canEvaluate = can("manageComplaints"); // staff + admin
+  const canDelete = can("manageComplaints");
 
   // ✅ Fetch complaints
   const fetchComplaints = useCallback(async () => {
@@ -37,17 +38,16 @@ const Complaints = () => {
     }
 
     try {
-      const token = await getToken();
-      if (!token) throw new Error("Missing ID token");
+      let token = await getToken();
+      if (!token) {
+        console.warn("⚠️ No token yet, retrying in 500ms...");
+        setTimeout(fetchComplaints, 500);
+        return;
+      }
 
-      const endpoint = canViewAll
-        ? endpoints.complaints.all
-        : endpoints.complaints.mine;
-
+      const endpoint = canViewAll ? endpoints.complaints.all : endpoints.complaints.mine;
       const { data } = await api.get(endpoint, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       setComplaints(data);
@@ -64,8 +64,10 @@ const Complaints = () => {
 
 
   useEffect(() => {
-    fetchComplaints();
-  }, [fetchComplaints]);
+    if (!authLoading && isAuthenticated) {
+      fetchComplaints();
+    }
+  }, [authLoading, isAuthenticated, fetchComplaints]);
 
   // ✅ Modal handlers
   const openEvaluationModal = (complaint) => {
@@ -80,13 +82,24 @@ const Complaints = () => {
         resolution_notes: notes,
         resolved_at: status === "resolved" ? new Date().toISOString() : null,
       });
-
       setShowModal(false);
       setSelectedComplaint(null);
       fetchComplaints();
     } catch (err) {
       console.error("❌ Failed to update complaint:", err);
       alert("Failed to update complaint.");
+    }
+  };
+
+  // ✅ Delete handler
+  const handleDeleteComplaint = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this complaint?")) return;
+    try {
+      await ComplaintsAPI.deleteComplaint(id);
+      fetchComplaints();
+    } catch (err) {
+      console.error("❌ Failed to delete complaint:", err);
+      alert("Failed to delete complaint.");
     }
   };
 
@@ -105,9 +118,7 @@ const Complaints = () => {
     <>
       <div className="header">
         <h2>{canViewAll ? "Complaints Dashboard" : "My Complaints"}</h2>
-        {canFile && (
-          <button onClick={() => setMode("form")}>+ Report Complaint</button>
-        )}
+        {canFile && <button onClick={() => setMode("form")}>+ Report Complaint</button>}
       </div>
 
       {loading || authLoading ? (
@@ -120,9 +131,7 @@ const Complaints = () => {
         <table className="complaint-table">
           <thead>
             <tr>
-              {canViewAll && (
-                <th>{role === "resident" ? "Logged By Officer" : "Filed By"}</th>
-              )}
+              {canViewAll && <th>{role === "resident" ? "Logged By Officer" : "Filed By"}</th>}
               <th>Category</th>
               <th>Description</th>
               <th>Location</th>
@@ -152,14 +161,22 @@ const Complaints = () => {
                     : "—"}
                 </td>
                 <td>{complaint.resolution_notes || "—"}</td>
-                {canEvaluate && (
-                  <td>
+                {(canEvaluate || canDelete) && (
+                  <td className="actions-cell">
                     <button
                       className="evaluate-btn"
                       onClick={() => openEvaluationModal(complaint)}
                     >
                       Evaluate
                     </button>
+                    {canDelete && (
+                      <button
+                        className="delete-btn"
+                        onClick={() => handleDeleteComplaint(complaint.id)}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </td>
                 )}
               </tr>

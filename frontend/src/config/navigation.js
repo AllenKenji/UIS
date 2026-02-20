@@ -17,9 +17,9 @@ const links = {
   fileComplaint: { path: "/complaints/new", label: "🗣️ File Complaint", action: "fileComplaints" },
   evaluateComplaints: { path: "/complaints/evaluate", label: "🗣️ Evaluate Complaints", action: "manageComplaints" },
   viewOwnComplaints: { path: "/myComplaints", label: "🗣️ My Complaints", action: "viewOwnComplaints" },
-  viewAllComplaints: { path: "/allComplaints", label: "🗣️ View All Complaints", action: "viewAllComplaints" },
-  createAccount: { path: "/accounts/new", label: "➕ Create Account", action: "createAccounts" },
-  finance: { path: "/finance", label: "💰 Finance", action: "viewFinancialRecords" },
+  viewAllComplaints: { path: "/allComplaints", label: "🗣️ Complaints", action: "viewAllComplaints" },
+  createAccount: { path: "/accounts/new", label: "➕ Create Account", action: "createAccount" },
+  treasurer: { path: "/treasurer", label: "💰 Finance", action: "viewFinancialRecords" },
   audit: { path: "/audit", label: "📊 Audit", action: "auditBarangayData" },
   youth: { path: "/youth", label: "🏠 Dashboard", action: "viewDashboard" },
   home: { path: "/", label: "🏠 Home", action: "viewDashboard" },
@@ -30,6 +30,11 @@ const links = {
   paidRequests: { path: "/secretary/payments", label: "💳 Paid Requests", action: "paidRequests" },
   issuedDocuments: { path: "/secretary/issued", label: "✅ Issued Documents", action: "issuedDocuments" },
   rejectedRequests: { path: "/secretary/rejected", label: "❌ Rejected Requests", action: "rejectedRequests" },
+
+  incomingPayments: { path: "/treasurer/incoming", label: "💳 Incoming Payments", action: "incomingPayments" },
+  expenses: { path: "/treasurer/expenses", label: "💸 Expenses", action: "barangayExpenses" },
+  reports: { path: "/treasurer/reports", label: "📊 Financial Reports", action: "financialReports" },
+  settings: { path: "/treasurer/settings", label: "⚙️ Settings", action: "settings" },
 };
 
 const sidebarLinks = {
@@ -42,7 +47,7 @@ const sidebarLinks = {
     links.viewAllComplaints,   // 👀 Admin oversight
     links.fileComplaint,
     links.createAccount,
-    links.finance,
+    links.treasurer,
     links.audit,
   ],
   staff: [
@@ -65,8 +70,11 @@ const sidebarLinks = {
     links.rejectedRequests,
   ],
   treasurer: [
-    links.dashboard("/finance"),
-    links.documents,
+    links.dashboard("/treasurer"),
+    links.incomingPayments,
+    links.expenses,
+    links.reports,
+    links.settings,
   ],
   sk: [
     links.youth,

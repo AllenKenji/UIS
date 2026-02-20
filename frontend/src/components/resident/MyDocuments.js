@@ -37,6 +37,7 @@ const MyDocuments = ({ residentId }) => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        type: "payment_method",
         paymentIntentId,
         paymongoClientKey,
         method,
@@ -117,8 +118,16 @@ const MyDocuments = ({ residentId }) => {
         <div className="doc-info">
           <strong>{doc.document_type || "Untitled Document"}</strong>
           <span>Status: {renderStatusBadge(doc.status)}</span>
-          <span>Purpose: {doc.purpose || "—"}</span>
-          {doc.referenceNumber && <span>Ref #: {doc.referenceNumber}</span>}
+          {doc.issuedAt && (
+            <span>
+              Issued At: {new Date(doc.issuedAt).toLocaleString()}
+            </span>
+          )}
+          {doc.transactionId && (
+            <span>
+              Transaction ID: {doc.transactionId}
+            </span>
+          )}
         </div>
 
         {doc.remarks && <p className="doc-remarks">Remarks: {doc.remarks}</p>}
@@ -129,7 +138,7 @@ const MyDocuments = ({ residentId }) => {
           </button>
         )}
 
-        {doc.status === "awaiting_payment" && tab === "active" && renderPaymentButtons(doc, isPaying)}
+        {doc.status === "for_payment" && tab === "active" && renderPaymentButtons(doc, isPaying)}
 
         {/* ✅ Show download link if document is approved and fileUrl exists */}
         {doc.status === "approved" && doc.fileUrl && (
@@ -152,7 +161,7 @@ const MyDocuments = ({ residentId }) => {
   const filterDocs = (docs) => {
     switch (tab) {
       case "active":
-        return docs.filter((doc) => ["pending", "awaiting_payment", "paid"].includes(doc.status));
+        return docs.filter((doc) => ["pending", "for_payment", "awaiting_payment", "paid"].includes(doc.status));
       case "needsAttention":
         return docs.filter((doc) => doc.status === "rejected" && !doc.resubmitted);
       case "history":

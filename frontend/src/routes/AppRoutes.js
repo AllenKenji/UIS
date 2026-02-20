@@ -53,6 +53,11 @@ import PaidRequests from "../components/secretary/PaidRequests";
 import IssuedDocuments from "../components/secretary/IssuedDocuments";
 import RejectedRequests from "../components/secretary/RejectedRequests";
 
+import Collections from "../components/treasurer/Collections";
+import Disbursements from "../components/treasurer/Disbursements";
+import Reports from "../components/treasurer/Reports";
+import Settings from "../components/treasurer/Settings";
+
 
 const AppRoutes = ({ isDarkMode, toggleDarkMode }) => {
   const { userInfo, role, loading } = useUser();
@@ -64,7 +69,7 @@ const AppRoutes = ({ isDarkMode, toggleDarkMode }) => {
     staff: "/staff",
     resident: "/resident",
     secretary: "/secretary",
-    treasurer: "/finance",
+    treasurer: "/treasurer",
     sk: "/youth",
     dilg: "/audit",
   };
@@ -136,7 +141,7 @@ const AppRoutes = ({ isDarkMode, toggleDarkMode }) => {
             <Route path="/businesses/my" element={<ProtectedRoute allowedRoles={["resident"]} allowAdminOverride={false}><ResidentBusinessDashboard residentId={userInfo?.uid} /></ProtectedRoute>} />
             <Route path="/incidents/new" element={<ProtectedRoute allowedRoles={["resident"]} allowAdminOverride={false}><IncidentForm isReportMode={true} residentId={userInfo?.uid} /></ProtectedRoute>} />
             <Route path="/myIncidents" element={<ProtectedRoute allowedRoles={["resident"]} allowAdminOverride={false}><MyIncidents residentId={userInfo?.uid} /></ProtectedRoute>} />
-            <Route path="/documents/request" element={<ProtectedRoute allowedRoles={["resident"]} allowAdminOverride={false}><ResidentDocumentRequestForm isRequestMode={true} residentId={userInfo?.uid} /></ProtectedRoute>} />
+            <Route path="/documents/request" element={<ProtectedRoute allowedRoles={["resident"]} allowAdminOverride={false}><ResidentDocumentRequestForm isRequestMode={true} residentId={userInfo?.uid} residentName={userInfo?.fullName} /></ProtectedRoute>} />
             <Route path="/ownDocuments" element={<ProtectedRoute allowedRoles={["resident"]} allowAdminOverride={false}><MyDocuments residentId={userInfo?.uid} /></ProtectedRoute>} />
             <Route path="/resubmit/:docId" element={<ProtectedRoute allowedRoles={["resident"]} allowAdminOverride={false}><ResubmissionPage /></ProtectedRoute>} />
 
@@ -149,7 +154,11 @@ const AppRoutes = ({ isDarkMode, toggleDarkMode }) => {
             <Route path="/secretary/rejected" element={<ProtectedRoute allowedRoles={["secretary"]}><RejectedRequests /></ProtectedRoute>} />
 
             {/* Treasurer */}
-            <Route path="/finance" element={<ProtectedRoute allowedRoles={["admin","treasurer"]}><TreasurerDashboard /></ProtectedRoute>} />
+            <Route path="/treasurer" element={<ProtectedRoute allowedRoles={["admin","treasurer"]}><TreasurerDashboard /></ProtectedRoute>} />
+            <Route path="/treasurer/incoming" element={<ProtectedRoute allowedRoles={["treasurer"]}><Collections /></ProtectedRoute>} />
+            <Route path="/treasurer/expenses" element={<ProtectedRoute allowedRoles={["treasurer"]}><Disbursements /></ProtectedRoute>} />
+            <Route path="/treasurer/reports" element={<ProtectedRoute allowedRoles={["treasurer"]}><Reports /></ProtectedRoute>} />
+            <Route path="/treasurer/settings" element={<ProtectedRoute allowedRoles={["treasurer"]}><Settings /></ProtectedRoute>} />
 
             {/* SK */}
             <Route path="/youth" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />

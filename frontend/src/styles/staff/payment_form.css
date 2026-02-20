@@ -1,0 +1,99 @@
+/* payment_form.css */
+
+.form-step {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 20px;
+  margin-top: 20px;
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+
+.form-step h2 {
+  margin-bottom: 15px;
+  font-size: 1.4rem;
+  color: #333;
+}
+
+.form-step p {
+  margin: 5px 0;
+  font-size: 0.95rem;
+  color: #555;
+}
+
+.form-step label {
+  display: block;
+  margin: 12px 0;
+  font-weight: 500;
+  color: #444;
+}
+
+.form-step select {
+  width: 100%;
+  padding: 8px;
+  margin-top: 6px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+button {
+  padding: 8px 14px;
+  margin: 8px 6px 0 0;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Specific button styles */
+button.cancel-btn,
+button.close-btn {
+  background: #f5f5f5;
+  color: #333;
+}
+
+button.cancel-btn:hover,
+button.close-btn:hover {
+  background: #e0e0e0;
+}
+
+button.proceed-btn {
+  background: #4caf50;
+  color: #fff;
+}
+
+button.proceed-btn:hover {
+  background: #43a047;
+}
+
+button.print-btn {
+  background: #2196f3;
+  color: #fff;
+}
+
+button.print-btn:hover {
+  background: #1976d2;
+}
+
+button[type="submit"] {
+  background: #ff9800;
+  color: #fff;
+}
+
+button[type="submit"]:hover {
+  background: #fb8c00;
+}
+
+/* Align Proceed and Close buttons side by side */
+.action-buttons {
+  display: flex;
+  justify-content: flex-start;
+  gap: 10px;
+  margin-top: 15px;
+}

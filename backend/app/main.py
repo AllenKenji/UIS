@@ -1,8 +1,9 @@
 import os
 import logging
 from dotenv import load_dotenv
+load_dotenv()
 
-load_dotenv("C:/Projects/BIS/.env")
+from backend.app.config import settings
 
 from contextlib import asynccontextmanager
 
@@ -49,6 +50,8 @@ def create_app() -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
         lifespan=lifespan,   # ✅ attach lifespan handler
+        root_path="/", # optional 
+        proxy_headers=True
     )
 
     # 🌐 CORS Configuration
@@ -110,6 +113,6 @@ ENCODERS_BY_TYPE[bytes] = lambda o: "<binary data>"
 
 if __name__ == "__main__":
     logger.info("🚀 Starting FastAPI app...")
-    port = int(os.environ.get("PORT", 8000))
+    port = int(os.environ.get("PORT", 8080))
     import uvicorn
     uvicorn.run("backend.app.main:app", host="0.0.0.0", port=port, reload=True)
