@@ -1,0 +1,30 @@
+runtime: python3.12
+
+runConfig:
+  minInstances: 0
+  maxInstances: 50
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 512
+  entrypoint: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
+
+env:
+  # Firebase bucket
+  - variable: FIREBASE_STORAGE_BUCKET
+    value: barangay-1721d.appspot.com
+    availability:
+      - RUNTIME
+
+  # PayMongo secrets
+  - variable: PAYMONGO_SECRET_KEY
+    secret: paymongoSecretKeyRef
+    availability:
+      - RUNTIME
+  - variable: PAYMONGO_PUBLIC_KEY
+    secret: paymongoPublicKeyRef
+    availability:
+      - RUNTIME
+  - variable: PAYMONGO_WEBHOOK_SECRET
+    secret: paymongoWebhookSecretRef
+    availability:
+      - RUNTIME
