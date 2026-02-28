@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import documentConfig from "../../config/documentConfig";
 
 const RequestModal = ({ doc, onClose, onUpdateStatus }) => {

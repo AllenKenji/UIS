@@ -1,25 +1,24 @@
 import logging
 from google.cloud import firestore
-from backend.app.core.firebase import get_firestore
+from backend.app.utils.firestore_utils import get_db
 
-db = get_firestore()
 
 logger = logging.getLogger("uvicorn.error")
 
 def _get_business_doc(business_id: str):
-    docs = db.collection("businesses").where("businessId", "==", business_id).limit(1).get()
+    docs = get_db().collection("businesses").where("businessId", "==", business_id).limit(1).get()
     return docs[0] if docs else None
 
 def _next_receipt_number():
-    counter_ref = db.collection("counters").document("receipts")
-    transaction = db.transaction()
+    counter_ref = get_db().collection("counters").document("receipts")
+    transaction = get_db().transaction()
 
     @firestore.transactional
     def increment_counter(transaction):
         snapshot = counter_ref.get(transaction=transaction)
 
         # Check if receipts collection is empty
-        receipts_exist = db.collection("receipts").limit(1).get()
+        receipts_exist = get_db().collection("receipts").limit(1).get()
         if not receipts_exist:
             # Reset counter if no receipts exist
             transaction.set(counter_ref, {"value": 0})
@@ -108,11 +107,11 @@ def update_document_payment_status(event_type: str,
     # --- Find matching document ---
     docs = []
     if paymongo_link_id:
-        docs = db.collection("documents").where("paymongoLinkId", "==", paymongo_link_id).get()
+        docs = get_db().collection("documents").where("paymongoLinkId", "==", paymongo_link_id).get()
     elif payment_intent_id:
-        docs = db.collection("documents").where("paymongoIntentId", "==", payment_intent_id).get()
+        docs = get_db().collection("documents").where("paymongoIntentId", "==", payment_intent_id).get()
     elif source_id:
-        docs = db.collection("documents").where("paymongoSourceId", "==", source_id).get()
+        docs = get_db().collection("documents").where("paymongoSourceId", "==", source_id).get()
 
     if not docs:
         logger.warning("⚠️ No document found for link=%s intent=%s source=%s",
@@ -197,14 +196,14 @@ def log_payment_record(reference_number, transaction_id, amount, status, fee_typ
         "eventType": event_type,
         "method": method
     }
-    db.collection("payments").add(payment_data)
+    get_db().collection("payments").add(payment_data)
 
     receipt_data = {
         "receiptNumber": receipt_number or _next_receipt_number(),
         **payment_data,
         "issuedBy": "system-webhook"
     }
-    db.collection("receipts").add(receipt_data)
+    get_db().collection("receipts").add(receipt_data)
 
     logger.info("✅ Logged payment and receipt for reference=%s type=%s", reference_number, entity_category)
     return receipt_data["receiptNumber"]

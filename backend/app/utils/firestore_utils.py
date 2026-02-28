@@ -4,8 +4,11 @@ from fastapi import HTTPException
 from backend.app.core.firebase import get_firestore
 from datetime import datetime
 
-db = get_firestore()
 logger = logging.getLogger("uvicorn.error")
+
+def get_db(): 
+    """Return a Firestore client lazily.""" 
+    return get_firestore()
 
 # -----------------------------
 # 🔧 Unified Fee Validator
@@ -28,7 +31,7 @@ def create_document(collection: str, doc_id: str, data: dict):
 
     try:
         validate_fee(data)  # ✅ unified check
-        ref = db.collection(collection).document(doc_id)
+        ref = get_db().collection(collection).document(doc_id)
         data["createdAt"] = datetime.utcnow().isoformat()
         ref.set(data)
         return {"id": doc_id, "data": data}
@@ -41,7 +44,7 @@ def create_document(collection: str, doc_id: str, data: dict):
 def update_document(collection: str, doc_id: str, data: dict):
     try:
         validate_fee(data)  # ✅ unified check
-        ref = db.collection(collection).document(doc_id)
+        ref = get_db().collection(collection).document(doc_id)
         if not ref.get().exists:
             raise HTTPException(status_code=404, detail=f"{collection}/{doc_id} not found")
         data["updatedAt"] = datetime.utcnow().isoformat()
@@ -55,7 +58,7 @@ def update_document(collection: str, doc_id: str, data: dict):
 # -----------------------------
 def delete_document(collection: str, doc_id: str):
     try:
-        ref = db.collection(collection).document(doc_id)
+        ref = get_db().collection(collection).document(doc_id)
         if not ref.get().exists:
             raise HTTPException(status_code=404, detail=f"{collection}/{doc_id} not found")
         ref.delete()
@@ -68,7 +71,7 @@ def delete_document(collection: str, doc_id: str):
 # -----------------------------
 def get_document(collection: str, doc_id: str):
     try:
-        ref = db.collection(collection).document(doc_id)
+        ref = get_db().collection(collection).document(doc_id)
         doc = ref.get()
         if not doc.exists:
             raise HTTPException(status_code=404, detail=f"{collection}/{doc_id} not found")

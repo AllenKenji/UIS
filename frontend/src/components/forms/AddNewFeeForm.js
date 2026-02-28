@@ -3,7 +3,7 @@ import axios from "axios";
 import { auth } from "../../services/firebase";
 import "./add-new-fee-form.css";
 import { validateFeePayload } from "../../utils/validation";
-import modesConfig from "../../config/modesConfig"; // 🔑 import config
+import modesConfig from "../../config/modesConfig"; 
 
 export default function AddNewFeeForm({ onAdded, miscFees = [] }) {
   const [mode, setMode] = useState("document");

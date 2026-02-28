@@ -4,16 +4,16 @@ import os
 import requests
 from fastapi import APIRouter, HTTPException
 from fastapi.concurrency import run_in_threadpool
+from backend.app.utils.firestore_utils import get_db
 from backend.app.services.paymongo_service import create_payment_link, create_payment_intent, attach_payment_method
 from backend.app.models.paymongo import DocumentPaymentRequest, BusinessPaymentRequest, AttachPaymentRequest
-from backend.app.core.firebase import get_firestore
 from backend.app.routes.fee_routes import (
     compute_document_fee,
     compute_business_registration_fee,
     compute_business_annual_fee,
 )
 
-db = get_firestore()
+
 logger = logging.getLogger("uvicorn.error")
 router = APIRouter(tags=["Payments"])
 
@@ -21,11 +21,11 @@ router = APIRouter(tags=["Payments"])
 # Firestore helpers
 # -----------------------------
 def _get_document_doc(document_id: str):
-    docs = db.collection("documents").where("documentId", "==", document_id).limit(1).get()
+    docs = get_db().collection("documents").where("documentId", "==", document_id).limit(1).get()
     return docs[0] if docs else None
 
 def _get_business_doc(business_id: str):
-    docs = db.collection("businesses").where("businessId", "==", business_id).limit(1).get()
+    docs = get_db().collection("businesses").where("businessId", "==", business_id).limit(1).get()
     return docs[0] if docs else None
 
 # -----------------------------

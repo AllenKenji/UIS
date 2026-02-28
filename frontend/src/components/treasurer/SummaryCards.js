@@ -1,4 +1,3 @@
-import React from "react";
 import { usePayments } from "../../hooks/usePayments";
 import "../../styles/treasurer/summary-cards.css";
 

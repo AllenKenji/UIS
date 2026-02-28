@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
-from backend.app.core.firebase import get_firestore
 from backend.app.core.auth import get_admin_uid
 from backend.app.services.paymongo_service import ( 
     create_payment_link, 
@@ -12,14 +11,15 @@ from backend.app.models.fee import (
 from backend.app.utils.firestore_utils import (
     create_document,
     update_document,
-    delete_document
+    delete_document,
+    get_db
 )
 import re
 import logging
 from typing import List, Dict, Optional, Type
 from pydantic import BaseModel
 
-db = get_firestore()
+
 router = APIRouter(prefix="/fees", tags=["Fees"])
 logger = logging.getLogger("uvicorn.error")
 
@@ -35,14 +35,14 @@ def normalize_id(value: str) -> str:
 # 🔧 Shared Firestore Helpers
 # -----------------------------
 def list_collection(collection: str) -> List[Dict]:
-    docs = db.collection(collection).get()
+    docs = get_db().collection(collection).get()
     return [doc.to_dict() | {"id": doc.id} for doc in docs]
 
 def list_with_misc(collection: str) -> List[Dict]:
-    docs = db.collection(collection).get()
+    docs = get_db().collection(collection).get()
     misc_map = {
         normalize_id(m.id): m.to_dict()
-        for m in db.collection("misc_fees").get()
+        for m in get_db().collection("misc_fees").get()
     }
     result = []
     for doc in docs:
@@ -62,20 +62,20 @@ def list_with_misc(collection: str) -> List[Dict]:
 
 def get_business_ref(identifier: str):
     # Try Firestore doc ID
-    ref = db.collection("businesses").document(identifier)
+    ref = get_db().collection("businesses").document(identifier)
     if ref.get().exists:
         return ref
     # Try custom businessId field
-    docs = db.collection("businesses").where("businessId", "==", identifier).limit(1).get()
+    docs = get_db().collection("businesses").where("businessId", "==", identifier).limit(1).get()
     if docs:
         return docs[0].reference
     raise HTTPException(status_code=404, detail=f"Business {identifier} not found")
 
 def get_document_ref(identifier: str):
-    ref = db.collection("documents").document(identifier)
+    ref = get_db().collection("documents").document(identifier)
     if ref.get().exists:
         return ref
-    docs = db.collection("documents").where("documentId", "==", identifier).limit(1).get()
+    docs = get_db().collection("documents").where("documentId", "==", identifier).limit(1).get()
     if docs:
         return docs[0].reference
     raise HTTPException(status_code=404, detail=f"Document {identifier} not found")
@@ -206,7 +206,7 @@ def resolve_misc_fee(bt: dict) -> int:
     misc_type_raw = bt.get("miscType") 
     if misc_type_raw: 
         misc_type_key = normalize_id(misc_type_raw) 
-        misc_entry = db.collection("misc_fees").document(misc_type_key).get() 
+        misc_entry = get_db().collection("misc_fees").document(misc_type_key).get() 
         if misc_entry.exists: 
             misc = misc_entry.to_dict() 
             if misc.get("enabled") and bt.get("enabled"): 
@@ -214,7 +214,7 @@ def resolve_misc_fee(bt: dict) -> int:
     return 0
 
 def compute_document_fee(document_type: str) -> int:
-    docs = db.collection("document_types").where("documentType", "==", document_type).limit(1).get()
+    docs = get_db().collection("document_types").where("documentType", "==", document_type).limit(1).get()
     if not docs:
         raise HTTPException(status_code=404, detail=f"No fee configured for document type: {document_type}")
     doc = docs[0].to_dict()
@@ -226,7 +226,7 @@ def compute_document_fee(document_type: str) -> int:
 
 
 def compute_business_registration_fee(business_type: str) -> int:
-    docs = db.collection("business_types").where("businessType", "==", business_type).limit(1).get()
+    docs = get_db().collection("business_types").where("businessType", "==", business_type).limit(1).get()
     if not docs:
         raise HTTPException(status_code=404, detail=f"No fee configured for business type: {business_type}")
     bt = docs[0].to_dict()
@@ -238,7 +238,7 @@ def compute_business_registration_fee(business_type: str) -> int:
 
 
 def compute_business_annual_fee(business_type: str) -> int:
-    docs = db.collection("business_types").where("businessType", "==", business_type).limit(1).get()
+    docs = get_db().collection("business_types").where("businessType", "==", business_type).limit(1).get()
     if not docs:
         raise HTTPException(status_code=404, detail=f"No fee configured for business type: {business_type}")
     bt = docs[0].to_dict()

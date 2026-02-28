@@ -22,5 +22,5 @@
 .card p {
   margin-top: 8px;
   font-size: 0.9rem;
-  color: #7f8c8d;
+  color: var(--color-text-muted);
 }

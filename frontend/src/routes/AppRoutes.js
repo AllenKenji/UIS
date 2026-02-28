@@ -1,4 +1,3 @@
-import React from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useUser } from "../context/UserContext";
 
@@ -111,12 +110,12 @@ const AppRoutes = ({ isDarkMode, toggleDarkMode }) => {
             <Route
               path="/"
               element={
-                userInfo ? (
-                  normalizedRole ? (
+                loading ? ( 
+                  <div className="loading">🔄 Restoring session…</div>  
+                ) : userInfo && normalizedRole ? (
                     <Navigate to={getRedirectPath()} replace />
-                  ) : (
+                ) : userInfo ? (
                     <Navigate to="/unauthorized" replace />
-                  )
                 ) : (
                   <Navigate to="/login" replace />
                 )

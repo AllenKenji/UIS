@@ -1,6 +1,5 @@
-// hooks/useCounters.js
 import { useEffect, useState } from "react";
-import { api } from "../services/api"; // or use Firestore directly
+import { api } from "../services/api"; 
 
 export const useCounters = () => {
   const [counters, setCounters] = useState([]);

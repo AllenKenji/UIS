@@ -9,7 +9,7 @@ from backend.app.services.account_service import (
     update_user_role,
     list_barangay_accounts,
 )
-from backend.app.core.auth import get_admin_uid, require_permission
+from backend.app.core.auth import get_admin_uid, get_current_user, require_permission
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -116,15 +116,16 @@ async def update_role_handler(
     response_model=list[AccountResponse],
     status_code=status.HTTP_200_OK,
     summary="List all barangay accounts",
-    description="Accessible only to admins. Returns all accounts with optional filters."
+    description="Accessible to admins and treasurers."
 )
 async def list_accounts_handler(
-    admin_uid: str = Depends(get_admin_uid),
+    user_uid: str = Depends(get_current_user),
+    _: None = Depends(require_permission("manageUsers")),
     role: RoleEnum | None = None,
     limit: int = 20,
     offset: int = 0,
 ):
-    logger.info("📋 Account list requested by admin: %s", admin_uid)
+    logger.info("📋 Account list requested by user: %s", user_uid)
     # You’d implement a service function to query Firestore
     accounts = await safe_service_call(list_barangay_accounts, role=role, limit=limit, offset=offset) 
     return accounts

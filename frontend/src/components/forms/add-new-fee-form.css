@@ -1,16 +1,16 @@
 .add-fee-form {
   margin-bottom: 2rem;
   padding: 1.5rem;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  background: #fafafa;
+  background: var(--color-card-bg);
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
 .add-fee-form h2 {
   font-size: 1.4rem;
   margin-bottom: 1rem;
-  color: #2c3e50;
+  color: var(--color-success);
 }
 
 /* Labels stack neatly above inputs */
@@ -18,7 +18,7 @@
   display: block;
   margin-bottom: 0.75rem;
   font-weight: 600;
-  color: #444;
+  color: var(--color-text);
 }
 
 .add-fee-form select,

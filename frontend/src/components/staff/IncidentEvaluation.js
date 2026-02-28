@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { IncidentsAPI } from "../../services/api"; // ✅ centralized API layer
+import { useState } from "react";
+import { IncidentsAPI } from "../../services/api"; 
 
 const IncidentEvaluation = ({ incident, role, onClose, onUpdate }) => {
   const [status, setStatus] = useState(incident.status);
@@ -7,7 +7,7 @@ const IncidentEvaluation = ({ incident, role, onClose, onUpdate }) => {
 
   const handleUpdate = async () => {
     try {
-      // ✅ Both admin and staff can update status and assign
+      
       const payload = {
         status,
         assigned_to: assignedTo || undefined,
@@ -15,8 +15,8 @@ const IncidentEvaluation = ({ incident, role, onClose, onUpdate }) => {
 
       await IncidentsAPI.patchStatus(incident.id, payload);
 
-      onUpdate(); // refresh dashboard
-      onClose();  // close evaluation view
+      onUpdate(); 
+      onClose();  
     } catch (err) {
       console.error(
         "❌ Failed to update incident:",

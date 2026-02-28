@@ -34,9 +34,9 @@ export const useAllDocuments = () => {
       } finally {
         setLoading(false);
       }
-    }, 1000); // ⏱ delay 1 second
+    }, 1000); 
 
-    return () => clearTimeout(timer); // cleanup
+    return () => clearTimeout(timer); 
   }, []);
 
   return { docs, loading, error };

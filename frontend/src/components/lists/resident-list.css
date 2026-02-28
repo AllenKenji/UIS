@@ -4,7 +4,7 @@
   margin: 0 auto;
   padding: 20px;
   font-family: "Segoe UI", Arial, sans-serif;
-  color: #333;
+  color: var(--color-text);
 }
 
 .resident-list h2 {

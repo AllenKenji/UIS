@@ -1,4 +1,3 @@
-import React from "react";
 import "../../styles/secretary/summary-cards.css";
 
 const SummaryCards = ({ stats }) => {

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useReports } from "../../hooks/useReports";
 import { Line } from "react-chartjs-2";
 import {
@@ -32,7 +32,6 @@ function Reports() {
     ]);
   };
 
-  // Clear selected report by index
   const handleClearSelected = (index) => {
     setArchive(prev => prev.filter((_, i) => i !== index));
   };
@@ -49,12 +48,25 @@ function Reports() {
         tension: 0.3
       },
       {
-        label: "Disbursements",
+        label: "Approved Disbursements",
         data: archive.map(r =>
-          r.disbursements?.reduce((sum, d) => sum + (d.amount || 0), 0) || 0
+          r.disbursements
+            ?.filter(d => d.status === "approved")
+            .reduce((sum, d) => sum + (d.amount || 0), 0) || 0
         ),
-        borderColor: "#dd2d2d",
-        backgroundColor: "rgba(221,45,45,0.2)",
+        borderColor: "#28a745",
+        backgroundColor: "rgba(40,167,69,0.2)",
+        tension: 0.3
+      },
+      {
+        label: "Pending Disbursements",
+        data: archive.map(r =>
+          r.disbursements
+            ?.filter(d => d.status === "pending")
+            .reduce((sum, d) => sum + (d.amount || 0), 0) || 0
+        ),
+        borderColor: "#ffc107",
+        backgroundColor: "rgba(255,193,7,0.2)",
         tension: 0.3
       }
     ]
@@ -83,8 +95,9 @@ function Reports() {
           <h2>Current Report Summary</h2>
           <ul>
             <li><strong>Total Collections:</strong> ₱{currentReport.collections?.toLocaleString() || 0}</li>
-            <li><strong>Total Disbursements:</strong> ₱{currentReport.disbursements?.reduce((sum, d) => sum + (d.amount || 0), 0).toLocaleString()}</li>
-            <li><strong>Net Balance:</strong> ₱{(currentReport.collections - currentReport.disbursements?.reduce((sum, d) => sum + (d.amount || 0), 0)).toLocaleString()}</li>
+            <li><strong>Approved Disbursements:</strong> ₱{currentReport.disbursements?.filter(d => d.status === "approved").reduce((sum, d) => sum + (d.amount || 0), 0).toLocaleString()}</li>
+            <li><strong>Pending Disbursements:</strong> ₱{currentReport.disbursements?.filter(d => d.status === "pending").reduce((sum, d) => sum + (d.amount || 0), 0).toLocaleString()}</li>
+            <li><strong>Net Balance:</strong> ₱{(currentReport.collections - currentReport.disbursements?.filter(d => d.status === "approved").reduce((sum, d) => sum + (d.amount || 0), 0)).toLocaleString()}</li>
           </ul>
         </section>
       ) : (
@@ -103,20 +116,23 @@ function Reports() {
               <tr>
                 <th>Month</th>
                 <th>Total Collections</th>
-                <th>Total Disbursements</th>
+                <th>Approved Disbursements</th>
+                <th>Pending Disbursements</th>
                 <th>Net Balance</th>
                 <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {archive.map((r, idx) => {
-                const totalDisb = r.disbursements?.reduce((sum, d) => sum + (d.amount || 0), 0) || 0;
-                const netBalance = (r.collections || 0) - totalDisb;
+                const approved = r.disbursements?.filter(d => d.status === "approved").reduce((sum, d) => sum + (d.amount || 0), 0) || 0;
+                const pending = r.disbursements?.filter(d => d.status === "pending").reduce((sum, d) => sum + (d.amount || 0), 0) || 0;
+                const netBalance = (r.collections || 0) - approved;
                 return (
                   <tr key={idx}>
                     <td>{r.month}</td>
                     <td>₱{r.collections?.toLocaleString() || 0}</td>
-                    <td>₱{totalDisb.toLocaleString()}</td>
+                    <td>₱{approved.toLocaleString()}</td>
+                    <td>₱{pending.toLocaleString()}</td>
                     <td>₱{netBalance.toLocaleString()}</td>
                     <td>
                       <button className="clear-btn" onClick={() => handleClearSelected(idx)}>

@@ -28,14 +28,13 @@ export default function FeeDashboard() {
     getDocumentTotal,
   } = useResolvedFees();
 
-  // 🔧 Column definitions
   const documentColumns = [
     { key: "documentType", label: "Document Type", editable: false },
     { key: "fee", label: "Fee (₱)", editable: true },
     { key: "enabled", label: "Enabled", editable: true, type: "checkbox" },
     { key: "miscType", label: "Misc Type", editable: false },
     { key: "miscFeeResolved", label: "Misc Fee (₱)", editable: false },
-    { key: "totalFee", label: "Total Fee (₱)", editable: false }, // ✅ new column
+    { key: "totalFee", label: "Total Fee (₱)", editable: false }, 
   ];
 
   const businessColumns = [
@@ -56,7 +55,6 @@ export default function FeeDashboard() {
     { key: "enabled", label: "Enabled", editable: true, type: "checkbox" },
   ];
 
-  // 🔧 Reusable renderer for FeeTable
   const renderFeeTable = (title, columns, data, onUpdate, onDelete) => (
     <FeeTable
       title={title}

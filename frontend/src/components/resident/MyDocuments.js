@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useMyDocuments } from "../../hooks/useMyDocuments";
 import "../../styles/resident/my-documents.css";
 

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import ResidentForm from "./forms/ResidentForm";
 import ResidentList from "./lists/ResidentList";
-import { useResidents } from "../hooks/useResidents";   // ✅ new custom hook
+import { useResidents } from "../hooks/useResidents";   
 import { useOutletContext } from "react-router-dom";
 import "../components/forms/resident-form.css";
 
@@ -51,6 +51,7 @@ const ResidentRegistry = () => {
             canDelete={canDelete}
             onUpdate={updateResident}
             onDelete={deleteResident}
+            fetchResidents={fetchResidents}
           />
 
           {!loading && residents.length === 0 && (

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { ResidentsAPI } from "../services/api";
 import "./resident.css";
 

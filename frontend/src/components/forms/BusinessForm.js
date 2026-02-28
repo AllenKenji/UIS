@@ -1,5 +1,5 @@
 // src/components/forms/BusinessForm.jsx
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';

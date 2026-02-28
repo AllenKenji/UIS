@@ -43,3 +43,4 @@
 .dashboard-card.neutral { border-left: 6px solid var(--color-neutral); }
 .dashboard-card.danger  { border-left: 6px solid var(--color-danger); }
 .dashboard-card.youth    { border-left: 6px solid var(--color-youth); }
+.dashboard-card.dilg  { border-left: 6px solid var(--color-dilg); }

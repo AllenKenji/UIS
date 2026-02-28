@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react"; // ✅ add useEffect
-import { api } from "../services/api";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { api, DocumentsAPI } from "../services/api";
 import DocumentSummaryCards from "../components/document/DocumentSummaryCards";
 import AuditTable from "../components/document/AuditTable";
 import SearchFilters from "../components/document/SearchFilters";
@@ -9,8 +10,9 @@ const DocumentsAdmin = () => {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const navigate = useNavigate();
 
-  // 🔄 Fetch all documents with optional filters
   const fetchDocuments = async (filters = {}) => {
     setLoading(true);
     setStatus("Fetching all documents...");
@@ -33,12 +35,10 @@ const DocumentsAdmin = () => {
     }
   };
 
-
-  // ✅ Auto-fetch on mount with a slight delay to allow token refresh
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchDocuments({});
-    }, 5000); // short delay for token refresh
+    }, 5000); 
     return () => clearTimeout(timer);
   }, []);
 
@@ -49,6 +49,7 @@ const DocumentsAdmin = () => {
       await api.delete(`/api/documents/${docId}`);
       setDocuments((prev) => prev.filter((d) => d.id !== docId));
       setStatus("✅ Document deleted successfully.");
+      setRefreshKey((prev) => prev + 1);
     } catch (err) {
       const errorMsg = err.response?.data?.detail || err.message;
       console.error("❌ Error deleting document:", errorMsg);
@@ -58,8 +59,14 @@ const DocumentsAdmin = () => {
 
   return (
     <div className="documents-admin-page">
-      <h1>📊 Document Oversight</h1>
-      <DocumentSummaryCards role="admin" />
+      <div className="header-row">
+        <h1>📊 Document Oversight</h1>
+        <button className="issue-document-btn" onClick={() => navigate("/secretary/documents")}
+        >
+          ➕ Issue Document
+        </button>
+      </div>
+      <DocumentSummaryCards key={refreshKey} role="admin" />
       <SearchFilters onSearch={fetchDocuments} />
       <h2>Recent Document Activity</h2>
       <AuditTable />
@@ -89,8 +96,30 @@ const DocumentsAdmin = () => {
                 {/* Resident */}
                 <td>{doc.residentName}</td>
 
-                {/* Status */}
-                <td>{doc.status}</td>
+                {/* Status with editable dropdown */}
+                <td>
+                  <select value={doc.status} onChange={async (e) => {
+                      const newStatus = e.target.value;
+                      try {
+                        setStatus("Updating status...");
+                        await DocumentsAPI.patchStatus(doc.id, { status: newStatus }); 
+                        setDocuments((prev) =>
+                          prev.map((d) =>
+                            d.id === doc.id ? { ...d, status: newStatus } : d
+                          )
+                        );
+                        setStatus("✅ Status updated successfully.");
+                      } catch (err) {
+                        const errorMsg = err.response?.data?.detail || err.message;
+                        console.error("❌ Error updating status:", errorMsg);
+                        setStatus("❌ Failed to update status.");
+                      }
+                    }}
+                  >
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                </td>
 
                 {/* Created At */}
                 <td>

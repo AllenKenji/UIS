@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import { auth, db } from "../../services/firebase";
@@ -7,7 +7,6 @@ import ReceiptPreview from "../staff/ReceiptPreview";
 import "../../styles/staff/payment_form.css";
 
 const PaymentForm = ({
-  docId,
   entityId,        // businessId or documentId
   entityType,      // "business" or "document"
   resident,
@@ -15,7 +14,9 @@ const PaymentForm = ({
   fee,
   onCancel,
   onPaymentCompleted,
-  businessName
+  businessName,
+  description,
+  customEntityId,
 }) => {
   const { register, handleSubmit } = useForm();
   const [receiptData, setReceiptData] = useState(null);
@@ -25,15 +26,20 @@ const PaymentForm = ({
 
   useEffect(() => {
     const fetchStaffProfile = async () => {
-      if (!auth.currentUser) return;
-      const ref = doc(db, "users", auth.currentUser.uid);
-      const snap = await getDoc(ref);
-      if (snap.exists()) {
-        setCurrentStaff({ ...snap.data(), uid: auth.currentUser.uid });
+      try {
+        if (!auth.currentUser) return;
+        const ref = doc(db, "users", auth.currentUser.uid);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          setCurrentStaff({ ...snap.data(), uid: auth.currentUser.uid });
+        }
+      } catch (err) {
+        console.error("⚠️ Failed to fetch staff profile:", err);
       }
     };
     fetchStaffProfile();
   }, []);
+
 
   const onSubmit = async (data) => {
     if (!resident || !currentStaff || !entityId) {
@@ -56,14 +62,15 @@ const PaymentForm = ({
               businessName: data.businessName || businessName,
               amount: fee,
               method: data.method,
-              processedBy: currentStaff.full_name,
+              processedBy: currentStaff.full_name || currentStaff.fullName,
             }
           : {
               documentId: entityId,
+              documentName: customEntityId,
               docType: entityCategory,
               amount: fee,
               method: data.method,
-              processedBy: currentStaff.full_name,
+              processedBy: currentStaff.full_name || currentStaff.fullName,
               residentName: resident.fullName,
             };
 
@@ -85,21 +92,38 @@ const PaymentForm = ({
 
       if (result.success) {
         toast.success(`💵 Payment recorded. Receipt #: ${result.receiptNumber}`);
-        setReceiptData({
+
+        const receiptBase = {
           receiptNumber: result.receiptNumber,
-          businessId: result.businessId,
-          documentId: result.documentId,
-          businessName: result.businessName,
-          ownerName: result.ownerName,
-          businessType: result.businessType,
-          documentType: result.documentType,
-          barangay: result.barangay,
           residentName: resident.fullName,
           amount: fee,
           method: data.method,
-          processedBy: currentStaff.full_name,
+          processedBy: currentStaff.full_name || currentStaff.fullName,
           issuedAt: new Date().toISOString(),
-        });
+          entityType,
+        };
+
+        const receiptData =
+          entityType === "business"
+            ? {
+                ...receiptBase,
+                businessId: result.businessId,
+                businessName: result.businessName,
+                ownerName: result.ownerName,
+                businessType: result.businessType,
+                barangay: result.barangay,
+                description: result.businessType,
+              }
+            : {
+                ...receiptBase,
+                entityId: result.documentId, // Firestore ID 
+                customEntityId: customEntityId, // sequential ID 
+                documentType: result.documentType, 
+                barangay: result.barangay, 
+                description: result.documentType,
+              };
+
+        setReceiptData(receiptData);
       } else {
         toast.error(`❌ Failed to record payment: ${result.message || "Unknown error"}`);
       }

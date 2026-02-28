@@ -1,8 +1,7 @@
 import logging
 from typing import Optional, List
 from google.cloud import firestore
-
-from backend.app.core.firebase import get_firestore
+from backend.app.utils.firestore_utils import get_db
 from backend.app.models.complaint import (
     ComplaintCreate,
     Complaint,
@@ -40,14 +39,13 @@ def _normalize_complaint(doc) -> dict:
 
 # ✅ Enrich complaint with resident info (admin/staff view)
 def _enrich_with_resident(data: dict) -> ComplaintWithResident:
-    db = get_firestore()
 
     # Resident info (complaint subject)
     resident_id = data.get("filed_for") or data.get("filed_by")
     filed_for_name = "Unknown"
     if resident_id:
         try:
-            doc = db.collection(RESIDENT_COLLECTION).document(resident_id).get()
+            doc = get_db().collection(RESIDENT_COLLECTION).document(resident_id).get()
             if doc.exists:
                 filed_for_name = doc.to_dict().get("fullName", "Unknown")
         except Exception as e:
@@ -58,7 +56,7 @@ def _enrich_with_resident(data: dict) -> ComplaintWithResident:
     filer_id = data.get("filed_by")
     if filer_id:
         try:
-            doc = db.collection(RESIDENT_COLLECTION).document(filer_id).get()
+            doc = get_db().collection(RESIDENT_COLLECTION).document(filer_id).get()
             if doc.exists:
                 filed_by_name = doc.to_dict().get("fullName", "Unknown")
         except Exception as e:
@@ -80,8 +78,7 @@ def file_complaint(data: ComplaintCreate) -> Optional[Complaint]:
     - filed_by: the ID of the user who entered the complaint (resident or staff/admin)
     - filed_for: the resident ID the complaint is about (required if staff/admin files)
     """
-    db = get_firestore()
-    doc_ref = db.collection(COMPLAINT_COLLECTION).document()
+    doc_ref = get_db().collection(COMPLAINT_COLLECTION).document()
 
     # Ensure filed_for is set: if not provided, default to filed_by (resident self-filing)
     filed_for = data.filed_for or data.filed_by
@@ -111,9 +108,8 @@ def file_complaint(data: ComplaintCreate) -> Optional[Complaint]:
 
 # 🔍 Get a specific complaint (enriched with resident + filer info)
 def get_complaint_by_id(complaint_id: str) -> Optional[ComplaintWithResident]:
-    db = get_firestore()
     try:
-        doc = db.collection(COMPLAINT_COLLECTION).document(complaint_id).get()
+        doc = get_db().collection(COMPLAINT_COLLECTION).document(complaint_id).get()
         if doc.exists:
             normalized = _normalize_complaint(doc)
             enriched = _enrich_with_resident(normalized)  # ✅ add resident + filer names
@@ -125,11 +121,10 @@ def get_complaint_by_id(complaint_id: str) -> Optional[ComplaintWithResident]:
 
 # 👤 Resident: list complaints filed for them (self or by staff)
 def list_complaints_by_resident_id(auth_uid: str, limit: Optional[int] = None):
-    db = get_firestore()
     results: List[Complaint] = []
 
     try:
-        query = db.collection(COMPLAINT_COLLECTION).where("filed_for", "==", auth_uid)
+        query = get_db().collection(COMPLAINT_COLLECTION).where("filed_for", "==", auth_uid)
         if limit:
             query = query.limit(limit)
 
@@ -147,11 +142,10 @@ def list_complaints_with_residents(
     limit: Optional[int] = None,
     status: Optional[ComplaintStatus] = None,
 ) -> List[ComplaintWithResident]:
-    db = get_firestore()
     results: List[ComplaintWithResident] = []
 
     try:
-        query = db.collection(COMPLAINT_COLLECTION).order_by(
+        query = get_db().collection(COMPLAINT_COLLECTION).order_by(
             "timestamp", direction=firestore.Query.DESCENDING
         )
 
@@ -177,8 +171,7 @@ def update_complaint_status(
     status: ComplaintStatus,
     notes: Optional[str] = None,
 ) -> Optional[Complaint]:
-    db = get_firestore()
-    doc_ref = db.collection(COMPLAINT_COLLECTION).document(complaint_id)
+    doc_ref = get_db().collection(COMPLAINT_COLLECTION).document(complaint_id)
 
     try:
         snapshot = doc_ref.get()
@@ -211,8 +204,7 @@ def update_complaint_status(
 
 # 🗑️ Delete complaint (admin only)
 def delete_complaint(complaint_id: str) -> Optional[Complaint]:
-    db = get_firestore()
-    doc_ref = db.collection(COMPLAINT_COLLECTION).document(complaint_id)
+    doc_ref = get_db().collection(COMPLAINT_COLLECTION).document(complaint_id)
 
     try:
         snapshot = doc_ref.get()

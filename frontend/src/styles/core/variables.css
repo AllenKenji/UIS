@@ -25,8 +25,8 @@
   --color-info: #9b59b6;
   --color-info-hover: #8e44ad;
 
-  --color-review: #3498db; /* light mode: blue */ 
-  --color-review-hover: #2980b9; /* darker blue for hover */
+  --color-review: #3498db; 
+  --color-review-hover: #2980b9; 
 
   --color-neutral: #bdc3c7;
 
@@ -53,7 +53,9 @@
   --color-staff: #2980b9;
   --color-secretary: #27ae60;
   --color-admin: #c0392b;
-  --color-youth: #3b82f6;
+  --color-youth: #f63bed; 
+  --color-treasurer: #f39c12; 
+  --color-dilg: #8b4513; 
 
   /* 🖋 Typography */
   --font-family-base: system-ui, sans-serif;
@@ -104,7 +106,7 @@
 
   /* 🛡 Focus Ring */
   --focus-ring: 0 0 0 3px rgba(52, 152, 219, 0.25);
-  --focus-ring-color: #ffcc00; /* accessibility/high-contrast */
+  --focus-ring-color: #ffcc00; 
 
   /* 📱 Breakpoints */
   --bp-xs: 400px;
@@ -141,8 +143,8 @@
   --color-info: #8e44ad;
   --color-info-hover: #6c3483;
 
-  --color-review: #4aa8ff; /* bright blue for dark mode */ 
-  --color-review-hover: #007acc; /* darker blue for hover */
+  --color-review: #4aa8ff; 
+  --color-review-hover: #007acc; 
 
   --color-neutral: #95a5a6;
 
@@ -169,4 +171,7 @@
   --color-staff: #3498db;
   --color-secretary: #2ecc71;
   --color-admin: #e74c3c;
+  --color-treasurer: #f39c12; 
+  --color-dilg: #8b4513; 
+  --color-youth: #f63bed;
 }

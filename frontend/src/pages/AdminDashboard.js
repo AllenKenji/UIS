@@ -5,21 +5,23 @@ import AnalyticsPanel from "../components/admin/AnalyticsPanel";
 import DocumentQueue from "../components/dashboard/DocumentQueue";
 import ComplaintList from "../components/dashboard/ComplaintList";
 import IncidentQueue from "../components/dashboard/IncidentQueue";
-import OfficialsSection from "../components/dashboard/RegistryAudit";
+import RegistryAudit from "../components/dashboard/RegistryAudit";
 import { useUser } from "../context/UserContext";
 import { Navigate } from "react-router-dom";
 import DashboardSection from "../components/layout/DashboardSection";
-import "./adminDashboard.css";
+
+// import "./adminDashboard.css";
 
 const AdminDashboard = () => {
-  const { isAdmin, role } = useUser(); // 👈 get role from context
+  const { isAdmin, role } = useUser();
+  
 
   if (!isAdmin) {
     return <Navigate to="/unauthorized" replace />;
   }
 
   return (
-    <section className="dashboard admin-dashboard" aria-label="Admin Dashboard">
+    <section aria-label="Admin Dashboard">
       <header className="dashboard-header">
         <h2>🧑‍💼 Barangay Captain Dashboard</h2>
         <p className="dashboard-subtitle">
@@ -28,7 +30,6 @@ const AdminDashboard = () => {
       </header>
 
       <div className="section-stack">
-        {/* Registry Management */}
         <DashboardSection
           title="Registry Management"
           icon="📦"
@@ -36,12 +37,11 @@ const AdminDashboard = () => {
           layout="stack"
           ariaLabel="Registry Management"
         >
-          <SummaryCards role={role} /> {/* 👈 use actual role */}
+          <SummaryCards role={role} /> 
           <RegistryOverview />
-          <OfficialsSection />
+          <RegistryAudit />
         </DashboardSection>
 
-        {/* Administrative Tools */}
         <DashboardSection
           title="Administrative Tools"
           icon="⚙️"
@@ -50,11 +50,10 @@ const AdminDashboard = () => {
           ariaLabel="Administrative Tools"
         >
           <RoleManager />
-          {/* 👇 Only render AnalyticsPanel if role is admin */}
+          
           {role === "admin" && <AnalyticsPanel role={role} />}
         </DashboardSection>
 
-        {/* Document, Complaints & Incident Queue */}
         <DashboardSection
           title="Document, Complaints & Incident Queue"
           icon="📋"

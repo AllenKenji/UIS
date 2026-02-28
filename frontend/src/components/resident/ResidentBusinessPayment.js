@@ -1,4 +1,3 @@
-import React from "react";
 import { useUser } from "../../context/UserContext";
 
 const ResidentBusinessPayment = ({ business }) => {
@@ -41,8 +40,8 @@ const ResidentBusinessPayment = ({ business }) => {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            paymentIntentId: data.paymentIntentId,   // ✅ camelCase
-            paymongoClientKey: data.paymongoClientKey, // ✅ camelCase
+            paymentIntentId: data.paymentIntentId,   
+            paymongoClientKey: data.paymongoClientKey, 
             method,
             billing: {
               name: user?.name || "Resident",

@@ -5,11 +5,15 @@ import logging
 
 logger = logging.getLogger("uvicorn.error")
 
-PAYMONGO_SECRET_KEY = os.getenv("PAYMONGO_SECRET_KEY")
 BASE_URL = "https://api.paymongo.com/v1"
 
-if not PAYMONGO_SECRET_KEY:
-    raise RuntimeError("❌ PAYMONGO_SECRET_KEY not set in environment")
+def _get_secret_key() -> str: 
+    """Retrieve PayMongo secret key from environment at runtime.""" 
+    key = os.getenv("PAYMONGO_SECRET_KEY") 
+    if not key: 
+        logger.error("❌ PAYMONGO_SECRET_KEY not set in environment") 
+        raise RuntimeError("PAYMONGO_SECRET_KEY missing") 
+    return key
 
 def _make_headers(secret_key: str) -> dict:
     """Build headers for PayMongo API requests."""
@@ -23,7 +27,7 @@ def create_payment_link(amount: int, description: str, remarks: str = "", metada
                         success_url: str = "https://your-app.com/payment-success",
                         cancel_url: str = "https://your-app.com/payment-cancel") -> dict:
     """Create a PayMongo payment link with redirect URLs."""
-    headers = _make_headers(PAYMONGO_SECRET_KEY)
+    headers = _make_headers(_get_secret_key())
     payload = {
         "data": {
             "attributes": {
@@ -60,7 +64,7 @@ def create_payment_link(amount: int, description: str, remarks: str = "", metada
 
 def get_payment_link(link_id: str) -> dict:
     """Retrieve an existing PayMongo payment link by ID."""
-    headers = _make_headers(PAYMONGO_SECRET_KEY)
+    headers = _make_headers(_get_secret_key())
     try:
         response = requests.get(f"{BASE_URL}/links/{link_id}", headers=headers)
         response.raise_for_status()
@@ -84,7 +88,7 @@ def get_payment_link(link_id: str) -> dict:
 
 def create_payment_intent(amount: int, description: str, remarks: str = "",
                           metadata: dict = None) -> dict:
-    headers = _make_headers(PAYMONGO_SECRET_KEY)
+    headers = _make_headers(_get_secret_key())
     payload = {
         "data": {
             "attributes": {
@@ -146,7 +150,7 @@ def attach_payment_method(
     Create a payment method and attach it to a Payment Intent.
     Must include a valid return_url so PayMongo generates a redirect URL.
     """
-    headers = _make_headers(PAYMONGO_SECRET_KEY)
+    headers = _make_headers(_get_secret_key())
 
     # Step 1: Create payment method
     pm_payload = {

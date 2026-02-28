@@ -6,7 +6,7 @@ export const roleCollections = {
 };
 
 export const metricConfig = {
-  logins: { label: "Logins", variant: "info", icon: "🔑" },
-  documents: { label: "Certificates Issued", variant: "success", icon: "📄" },
+  logins: { label: "Logins", variant: "success", icon: "🔑" },
+  documents: { label: "Certificates Issued", variant: "accent", icon: "📄" },
   incidents: { label: "Incidents Logged", variant: "danger", icon: "⚠️" },
 };

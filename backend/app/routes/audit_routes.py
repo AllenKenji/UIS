@@ -1,6 +1,6 @@
 # app/routes/audit_routes.py
 from fastapi import APIRouter, HTTPException
-from backend.app.core.firebase import get_firestore
+from backend.app.utils.firestore_utils import get_db
 import logging
 
 router = APIRouter()
@@ -11,10 +11,9 @@ def list_audit_logs(limit: int = 50):
     """
     Return the latest document audit logs.
     """
-    db = get_firestore()
     try:
         logs = (
-            db.collection("document_audit")
+            get_db().collection("document_audit")
             .order_by("timestamp", direction="DESCENDING")
             .limit(limit)
             .stream()

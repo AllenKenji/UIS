@@ -140,19 +140,25 @@ async def confirm_payment(doc_id: str) -> Document:
 # 📜 Issue Document
 # ===============================
 class IssuePayload(BaseModel): 
-    issuedBy: str 
-    fileUrl: Optional[str] = None
+    issued_by: str 
+    file_url: Optional[str] = None
     remarks: Optional[str] = None
 
 @router.patch("/{doc_id}/issue", response_model=Document)
 async def issue_document(doc_id: str, payload: IssuePayload) -> Document:
     return await document_service.issue_document(
         doc_id, 
-        payload.issuedBy, 
-        payload.fileUrl, 
+        payload.issued_by, 
+        payload.file_url, 
         payload.remarks
     )
 
 @router.delete("/{doc_id}", response_model=Document)
 async def delete_document(doc_id: str, uid: str = Depends(require_permission("manageDocuments"))) -> Document:
     return await document_service.delete_document(doc_id, uid)
+
+@router.get("/count/issued")
+async def get_issued_count(documentType: Optional[str] = Query(None)) -> dict:
+    count = document_service.count_issued_documents(documentType)
+    return {"documentType": documentType, "issuedCount": count}
+

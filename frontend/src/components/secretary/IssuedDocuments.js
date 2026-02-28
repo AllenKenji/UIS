@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useEnrichedRequests } from "../../hooks/useEnrichedRequests";
 import "../../styles/secretary/issued-documents.css";
 
 const IssuedDocuments = () => {
-  const { approved, loading } = useEnrichedRequests(); // hook extended to include approved
+  const { approved, loading } = useEnrichedRequests(); 
   const [selectedDoc, setSelectedDoc] = useState(null);
 
   const renderDocumentCard = (doc) => (

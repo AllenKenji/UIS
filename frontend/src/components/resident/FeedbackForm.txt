@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import "../../styles/admin.css";
 
 const FeedbackForm = () => {
@@ -7,7 +7,6 @@ const FeedbackForm = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     console.log("Feedback submitted:", message);
-    // TODO: Send to Firestore
   };
 
   return (

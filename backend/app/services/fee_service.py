@@ -1,9 +1,6 @@
-from backend.app.core.firebase import get_firestore
 from backend.app.routes.fee_routes import list_with_misc, list_collection
 from datetime import datetime, timezone
 from dateutil.relativedelta import relativedelta
-
-db = get_firestore()
 
 # -----------------------------
 # 🔧 Utility

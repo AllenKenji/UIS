@@ -1,6 +1,4 @@
-import os
-import logging
-import firebase_admin
+import os, logging, json, firebase_admin
 from firebase_admin import credentials, firestore, storage
 from google.cloud.storage.bucket import Bucket
 from google.cloud import exceptions
@@ -10,11 +8,6 @@ logger = logging.getLogger("uvicorn.error")
 
 
 def ensure_firebase_initialized() -> firebase_admin.App:
-    """
-    Ensure Firebase Admin SDK is initialized once.
-    Uses FIREBASE_STORAGE_BUCKET env var.
-    Falls back to GOOGLE_APPLICATION_CREDENTIALS locally if provided.
-    """
     try:
         app = firebase_admin.get_app()
         logger.debug("ℹ️ Firebase already initialized. Options: %s", app.options.__dict__)
@@ -24,16 +17,22 @@ def ensure_firebase_initialized() -> firebase_admin.App:
         if not bucket:
             raise RuntimeError("❌ FIREBASE_STORAGE_BUCKET environment variable is not set")
 
-        cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
-        if cred_path and os.path.exists(cred_path):
-            # Local dev: use service account JSON
-            logger.info("🔍 Using service account key at: %s", cred_path)
-            cred = credentials.Certificate(cred_path)
+        # Case 1: Service account JSON injected directly into env var
+        service_account_json = os.environ.get("FIREBASE_SERVICE_ACCOUNT")
+        if service_account_json:
+            logger.info("🔑 Using service account JSON from FIREBASE_SERVICE_ACCOUNT env var")
+            cred = credentials.Certificate(json.loads(service_account_json))
             app = firebase_admin.initialize_app(cred, {"storageBucket": bucket})
         else:
-            # Cloud runtime: use default credentials
-            logger.info("🔑 Using default application credentials")
-            app = firebase_admin.initialize_app(options={"storageBucket": bucket})
+            # Case 2: Fallback to GOOGLE_APPLICATION_CREDENTIALS file path (local dev)
+            cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+            if cred_path and os.path.exists(cred_path):
+                logger.info("🔍 Using service account key at: %s", cred_path)
+                cred = credentials.Certificate(cred_path)
+                app = firebase_admin.initialize_app(cred, {"storageBucket": bucket})
+            else:
+                logger.info("🔑 Using default application credentials")
+                app = firebase_admin.initialize_app(options={"storageBucket": bucket})
 
         logger.info("✅ Firebase initialized successfully with bucket: %s", bucket)
         return app
@@ -47,6 +46,8 @@ def get_firestore() -> firestore.Client:
 def get_storage_bucket() -> Bucket:
     app = ensure_firebase_initialized()
     bucket_name = app.options.get("storageBucket")
+    logger.info("🔍 Firebase app storageBucket option = %s", bucket_name)
+    logger.info("🔍 Bucket repr = %r", bucket_name)
     if not bucket_name:
         raise RuntimeError("❌ Firebase app has no storageBucket configured")
     return storage.bucket(bucket_name)

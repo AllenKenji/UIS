@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api, endpoints, ComplaintsAPI } from "../services/api";
 import ComplaintForm from "../components/forms/ComplaintForm";
 import ComplaintEvaluationModal from "../components/staff/ComplaintEvaluationModal";
@@ -13,23 +13,20 @@ const Complaints = () => {
 
   const { getToken, role, can, isAuthenticated, loading: authLoading } = useUser();
 
-  // Modal state
   const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [showModal, setShowModal] = useState(false);
 
-  // ✅ Permission checks
-  const canViewAll = can("viewAllComplaints"); // admin + staff
-  const canViewOwn = can("viewOwnComplaints"); // resident
+  const canViewAll = can("viewAllComplaints"); 
+  const canViewOwn = can("viewOwnComplaints"); 
   const canView = canViewAll || canViewOwn;
 
   const canFile =
     (role === "resident" && can("fileComplaints")) ||
     ((role === "staff" || role === "admin") && can("fileComplaintsForResidents"));
 
-  const canEvaluate = can("manageComplaints"); // staff + admin
+  const canEvaluate = can("manageComplaints"); 
   const canDelete = can("manageComplaints");
 
-  // ✅ Fetch complaints
   const fetchComplaints = useCallback(async () => {
     if (!canView) {
       setError("❌ You do not have permission to view complaints.");
@@ -69,7 +66,6 @@ const Complaints = () => {
     }
   }, [authLoading, isAuthenticated, fetchComplaints]);
 
-  // ✅ Modal handlers
   const openEvaluationModal = (complaint) => {
     setSelectedComplaint(complaint);
     setShowModal(true);
@@ -91,7 +87,6 @@ const Complaints = () => {
     }
   };
 
-  // ✅ Delete handler
   const handleDeleteComplaint = async (id) => {
     if (!window.confirm("Are you sure you want to delete this complaint?")) return;
     try {
@@ -103,7 +98,6 @@ const Complaints = () => {
     }
   };
 
-  // 🚫 No access at all
   if (!isAuthenticated || (!canView && !canFile)) {
     return (
       <div className="complaints-page">
@@ -113,7 +107,6 @@ const Complaints = () => {
     );
   }
 
-  // ✅ Dashboard view
   const renderDashboard = () => (
     <>
       <div className="header">
@@ -187,7 +180,6 @@ const Complaints = () => {
     </>
   );
 
-  // ✅ Complaint form view
   const renderForm = () => (
     <>
       <div className="header">
@@ -211,7 +203,6 @@ const Complaints = () => {
     <div className="complaints-page" aria-busy={loading} aria-live="polite">
       {mode === "form" ? renderForm() : renderDashboard()}
 
-      {/* ✅ Evaluation Modal */}
       {showModal && selectedComplaint && (
         <ComplaintEvaluationModal
           complaint={selectedComplaint}

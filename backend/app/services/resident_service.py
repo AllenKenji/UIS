@@ -4,8 +4,7 @@ from typing import List, Dict, Optional, Any
 from google.cloud import firestore
 from fastapi.encoders import jsonable_encoder
 from firebase_admin import auth
-
-from backend.app.core.firebase import get_firestore
+from backend.app.utils.firestore_utils import get_db
 from backend.app.models import ResidentOut
 from backend.app.core.roles import ROLE_PERMISSIONS   # ✅ import role permissions
 
@@ -57,8 +56,7 @@ class ResidentError(Exception):
     pass
 
 def _get_resident_doc(id: str):
-    db = get_firestore()
-    snapshot = db.collection("residents").document(id).get()
+    snapshot = get_db().collection("residents").document(id).get()
     if not snapshot.exists:
         raise ResidentError(f"Resident {id} not found")
     return snapshot
@@ -77,7 +75,6 @@ def to_resident_out(doc: Dict[str, Any], id: Optional[str] = None) -> ResidentOu
 
 # ➕ Create (with Firebase Auth integration + claims)
 def add_resident(data: dict) -> ResidentOut:
-    db = get_firestore()
     payload = sanitize_resident_payload(data)
     payload = encode_for_firestore(payload)
 
@@ -98,18 +95,19 @@ def add_resident(data: dict) -> ResidentOut:
         logger.info("✅ Firebase Auth user created for %s", clean_email)
 
         # 🔑 Assign resident claims immediately
-        auth.set_custom_user_claims(user.uid, {
-            "role": "resident",
-            "permissions": ROLE_PERMISSIONS["resident"]
-        })
+        auth.set_custom_user_claims(user.uid, {"role": "resident"})
         logger.info("🔑 Claims set for resident UID %s", user.uid)
 
     except Exception as e:
         logger.error("❌ Failed to create Firebase Auth user for %s: %s", clean_email, str(e))
         raise ResidentError("Failed to create Firebase Auth user")
 
-    doc_ref = db.collection("residents").document(user.uid)
-    doc_ref.set(payload)
+    doc_ref = get_db().collection("residents").document(user.uid)
+    doc_ref.set({
+        **payload,
+        "role": "resident",
+        "permissions": ROLE_PERMISSIONS["resident"]  # safe in Firestore
+    })
 
     snapshot = doc_ref.get()
     logger.info("✅ Resident added with ID: %s (Barangay: %s)", doc_ref.id, payload.get("address", {}).get("barangay"))
@@ -120,12 +118,11 @@ def add_residents_bulk(residents: List[dict], householdId: Optional[str] = None)
     if not residents:
         raise ResidentError("No residents provided for bulk add")
 
-    db = get_firestore()
     if not householdId:
         barangay = residents[0].get("address", {}).get("barangay", "GEN")
         householdId = generate_household_id(barangay)
 
-    batch = db.batch()
+    batch = get_db().batch()
     created = []
 
     for data in residents:
@@ -140,6 +137,7 @@ def add_residents_bulk(residents: List[dict], householdId: Optional[str] = None)
         clean_email = data["email"].strip().lower()
 
         try:
+            # ✅ Create Firebase Auth user
             user = auth.create_user(
                 email=clean_email,
                 password="123456",
@@ -150,19 +148,21 @@ def add_residents_bulk(residents: List[dict], householdId: Optional[str] = None)
             payload["passwordResetRequired"] = True
             logger.info("✅ Firebase Auth user created for %s", clean_email)
 
-            # 🔑 Assign resident claims immediately
-            auth.set_custom_user_claims(user.uid, {
-                "role": "resident",
-                "permissions": ROLE_PERMISSIONS["resident"]
-            })
-            logger.info("🔑 Claims set for resident UID %s", user.uid)
+            # ✅ Assign only minimal claim
+            auth.set_custom_user_claims(user.uid, {"role": "resident"})
+            logger.info("🔑 Role claim set for resident UID %s", user.uid)
 
         except Exception as e:
             logger.error("❌ Failed to create Firebase Auth user for %s: %s", clean_email, str(e))
             continue
 
-        doc_ref = db.collection("residents").document(user.uid)
-        batch.set(doc_ref, payload)
+        # ✅ Store full profile + permissions in Firestore
+        doc_ref = get_db().collection("residents").document(user.uid)
+        batch.set(doc_ref, {
+            **payload,
+            "role": "resident",
+            "permissions": ROLE_PERMISSIONS["resident"]  # safe in Firestore
+        })
         created.append(to_resident_out(payload, id=user.uid))
 
     if not created:
@@ -172,7 +172,6 @@ def add_residents_bulk(residents: List[dict], householdId: Optional[str] = None)
     logger.info("✅ Bulk added %d residents to household %s", len(created), householdId)
     return {"householdId": householdId, "count": len(created), "items": created}
 
-
 # 📤 Read single resident by ID
 def get_resident_by_id(id: str) -> ResidentOut:
     snapshot = _get_resident_doc(id)
@@ -180,10 +179,9 @@ def get_resident_by_id(id: str) -> ResidentOut:
 
 # 📤 Read all residents
 def get_all_residents(limit: int = 50, start_after_id: Optional[str] = None) -> List[ResidentOut]:
-    db = get_firestore()
-    query = db.collection("residents").order_by("createdAt").limit(limit)
+    query = get_db().collection("residents").order_by("createdAt").limit(limit)
     if start_after_id:
-        last_doc = db.collection("residents").document(start_after_id).get()
+        last_doc = get_db().collection("residents").document(start_after_id).get()
         if last_doc.exists:
             query = query.start_after(last_doc)
         else:
@@ -194,8 +192,7 @@ def get_all_residents(limit: int = 50, start_after_id: Optional[str] = None) -> 
 
 # 🔄 Update (PUT)
 def update_resident(id: str, data: dict) -> ResidentOut:
-    db = get_firestore()
-    doc_ref = db.collection("residents").document(id)
+    doc_ref = get_db().collection("residents").document(id)
     snapshot = _get_resident_doc(id)  # returns snapshot
 
     payload = sanitize_resident_payload(data, is_update=True)
@@ -207,8 +204,7 @@ def update_resident(id: str, data: dict) -> ResidentOut:
 
 # ✂️ Patch (PATCH)
 def patch_resident(id: str, data: dict) -> ResidentOut:
-    db = get_firestore()
-    doc_ref = db.collection("residents").document(id)
+    doc_ref = get_db().collection("residents").document(id)
     snapshot = _get_resident_doc(id)
 
     payload = sanitize_resident_payload(
@@ -223,18 +219,26 @@ def patch_resident(id: str, data: dict) -> ResidentOut:
 
 # 🗑️ Delete single resident
 def delete_resident(id: str) -> Dict[str, str]:
-    db = get_firestore()
-    doc_ref = db.collection("residents").document(id)
+    doc_ref = get_db().collection("residents").document(id)
     snapshot = _get_resident_doc(id)
 
     logger.info("Deleting resident: %s", snapshot.to_dict())
+
+    # Delete Firestore document
     doc_ref.delete()
+
+    # Delete Firebase Auth user
+    try:
+        auth.delete_user(id)
+        logger.info("✅ Deleted Firebase Auth user with UID: %s", id)
+    except Exception as e:
+        logger.warning("⚠️ Failed to delete Firebase Auth user %s: %s", id, str(e))
+
     return {"id": id, "message": "Resident deleted successfully"}
 
 # 🔎 Duplicate check
 def find_duplicates(fullName: str, birthDate: str, middleName: Optional[str] = None, suffix: Optional[str] = None) -> List[ResidentOut]:
-    db = get_firestore()
-    query = db.collection("residents").where("fullName", "==", fullName.strip()).where("birthDate", "==", birthDate)
+    query = get_db().collection("residents").where("fullName", "==", fullName.strip()).where("birthDate", "==", birthDate)
     if middleName:
         query = query.where("middleName", "==", middleName.strip())
     if suffix:
@@ -245,8 +249,7 @@ def find_duplicates(fullName: str, birthDate: str, middleName: Optional[str] = N
 
 # 🗑️ Bulk Delete by household
 def delete_by_household(householdId: str) -> Dict[str, Any]:
-    db = get_firestore()
-    docs = db.collection("residents").where("householdId", "==", householdId).stream()
+    docs = get_db().collection("residents").where("householdId", "==", householdId).stream()
 
     deleted_count = 0
     for doc in docs:
@@ -260,11 +263,19 @@ def delete_by_household(householdId: str) -> Dict[str, Any]:
 
 # 📤 Bulk Fetch by household
 def get_residents_by_household(householdId: str) -> List[ResidentOut]:
-    db = get_firestore()
-    docs = db.collection("residents").where("householdId", "==", householdId).stream()
+    docs = get_db().collection("residents").where("householdId", "==", householdId).stream()
     residents = [to_resident_out(doc.to_dict(), id=doc.id) for doc in docs]
 
     if not residents:
         raise ResidentError(f"No residents found for householdId {householdId}")
 
     return residents
+
+def find_by_email(email: str) -> Optional[ResidentOut]:
+    clean_email = email.strip().lower()
+    docs = get_db().collection("residents").where("email", "==", clean_email).stream()
+
+    for doc in docs:
+        return to_resident_out(doc.to_dict(), id=doc.id)
+
+    return None

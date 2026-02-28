@@ -3,13 +3,13 @@ import SummaryCards from "../components/dashboard/SummaryCards";
 import IncidentQueue from "../components/dashboard/IncidentQueue";
 import ComplaintList from "../components/dashboard/ComplaintList";
 import ResidentForm from "../components/forms/ResidentForm";
-import { useUser } from "../context/UserContext"; // 👈 bring in role context
+import { useUser } from "../context/UserContext"; 
 import { Navigate } from "react-router-dom";
 import "./staff-dashboard.css";
 
 const StaffDashboard = ({ residents, loading }) => {
   const { role } = useUser();
-  const [activeForm, setActiveForm] = useState(null); // "resident" | "document" | null
+  const [activeForm, setActiveForm] = useState(null); 
 
   // 🚫 Redirect if not staff
   if (role !== "staff") {
@@ -40,7 +40,7 @@ const StaffDashboard = ({ residents, loading }) => {
         className={`staff-dashboard-content ${isOverlayActive ? "blurred" : ""}`}
         aria-hidden={isOverlayActive}
       >
-        <SummaryCards role={role} /> {/* 👈 use actual role */}
+        <SummaryCards role={role} /> 
         <IncidentQueue />
         <ComplaintList />
       </div>

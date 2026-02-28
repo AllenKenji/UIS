@@ -2,7 +2,6 @@ import logging
 from fastapi import APIRouter, Query, Body, HTTPException, status, Request
 from typing import Optional, List
 from starlette.concurrency import run_in_threadpool
-
 from backend.app.models import ResidentCreate, ResidentUpdate, ResidentOut
 from backend.app.services import resident_service
 from backend.app.services.resident_service import ResidentError

@@ -1,0 +1,55 @@
+/* notificationBell.css */
+/* .notification-bell {
+  position: relative;
+  display: inline-block;
+} */
+
+.bell-button {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  position: relative;
+  cursor: pointer;
+}
+
+.badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: red;
+  color: white;
+  border-radius: 50%;
+  padding: 2px 6px;
+  font-size: 0.8rem;
+}
+
+.dropdown {
+  position: absolute;
+  right: 0;
+  margin-top: 10px;
+  background: white;
+  border: 1px solid #ddd;
+  box-shadow: 0px 2px 6px rgba(0,0,0,0.2);
+  width: 250px;
+  overflow-y: auto;
+  
+}
+
+.notification-item {
+  padding: 8px;
+  /* border-bottom: 1px solid #ddd; */
+}
+.notification-item.unread {
+  font-weight: bold;
+  background-color: #f9f9f9;
+}
+.notification-item.read {
+  color: #666;
+}
+.actions {
+  margin-top: 4px;
+}
+.actions button {
+  margin-right: 6px;
+  font-size: 0.8rem;
+}

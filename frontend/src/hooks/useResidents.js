@@ -49,14 +49,17 @@ export const useResidents = () => {
 
   const deleteResident = async (id) => {
     if (!window.confirm("Are you sure you want to delete this resident?")) return;
+
     setResidents((prev) => prev.filter((r) => r.id !== id));
+
     try {
       await ResidentsAPI.delete(id);
       toast.success("🗑️ Resident deleted");
+      fetchResidents();
     } catch (err) {
       console.error("❌ Failed to delete resident:", err.message || err);
       toast.error("❌ Failed to delete resident");
-      fetchResidents(); // rollback
+      fetchResidents(); 
     }
   };
 

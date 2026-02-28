@@ -1,11 +1,9 @@
 // components/layout/DashboardSection.js
-import React from "react";
-
 const DashboardSection = ({
   title,
   icon,
-  accent = "accent", // "accent", "success", "danger"
-  layout = "grid-auto", // "grid-auto", "grid-2", "flex-wrap"
+  accent = "accent", 
+  layout = "grid-auto", 
   ariaLabel,
   children,
 }) => {

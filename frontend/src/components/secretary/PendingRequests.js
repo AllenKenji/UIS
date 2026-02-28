@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { DocumentsAPI } from "../../services/api";
 import { useEnrichedRequests } from "../../hooks/useEnrichedRequests";
 import RequestModal from "./RequestModal";
 import "../../styles/secretary/pending-requests.css";
+
 // 🔹 Main Component
 const PendingRequests = () => {
   const { pending, loading, fetchRequests } = useEnrichedRequests();

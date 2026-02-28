@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api, endpoints } from "../services/api";
 import IncidentForm from "../components/forms/IncidentForm";
 import IncidentEvaluation from "../components/staff/IncidentEvaluation";
@@ -6,16 +6,14 @@ import "./incidents.css";
 
 const Incidents = () => {
   const [incidents, setIncidents] = useState([]);
-  const [mode, setMode] = useState("dashboard"); // "dashboard" or "form"
+  const [mode, setMode] = useState("dashboard"); 
   const [selectedIncident, setSelectedIncident] = useState(null);
-
-  // ✅ Grab userInfo once from sessionStorage
   const userInfo = JSON.parse(sessionStorage.getItem("userInfo"));
-  const role = userInfo?.role || "resident"; // derive role directly
+  const role = userInfo?.role || "resident";
 
   const fetchIncidents = useCallback(async () => {
     try {
-      // ✅ Staff see all incidents, residents see only theirs (handled by API rules)
+      
       const url = endpoints.incidents;
       const { data } = await api.get(url);
       setIncidents(data);
@@ -72,7 +70,7 @@ const Incidents = () => {
                 <th>Description</th>
                 <th>Location</th>
                 <th>Reported By</th>
-                {/* Staff see assignment */}
+                
                 {role === "staff" && <th>Assigned To</th>}
                 {role === "resident" && <th>Logged By Officer</th>}
                 <th>Status</th>

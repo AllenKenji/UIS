@@ -1,11 +1,13 @@
-from fastapi import APIRouter
-from app.core.firebase import get_firestore
+import unittest
+from backend.app.main import app
 
-router = APIRouter(tags=["Test"])
+class TestRoutes(unittest.TestCase):
+    def test_health(self):
+        # Example: use TestClient from FastAPI
+        from fastapi.testclient import TestClient
+        client = TestClient(app)
+        response = client.get("/health")
+        self.assertEqual(response.status_code, 200)
 
-@router.get("/test/firestore")
-def test_firestore():
-    db = get_firestore()
-    doc = db.collection("test").document("ping")
-    doc.set({"message": "pong"})
-    return {"status": "ok", "message": "pong written"}
+if __name__ == "__main__":
+    unittest.main()

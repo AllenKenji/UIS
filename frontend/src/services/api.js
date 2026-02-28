@@ -1,14 +1,18 @@
 import axios from "axios";
 import { getAuth } from "firebase/auth";
 
+
 // 🌐 Base URL for Cloud Run backend
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+export const API_BASE_URL =
+  process.env.REACT_APP_API_BASE_URL ||
+  "https://asia-southeast1-barangay-1721d.cloudfunctions.net/sendEmailAsia";
 
-console.log("🌐 API Base URL:", process.env.REACT_APP_API_BASE_URL);
 
-if (process.env.NODE_ENV === "production" && API_BASE_URL.startsWith("http://")) { 
-  throw new Error("❌ Production API_BASE_URL must use HTTPS"); 
-}
+  console.log("🌐 API Base URL:", process.env.REACT_APP_API_BASE_URL);
+
+  if (process.env.NODE_ENV === "production" && API_BASE_URL.startsWith("http://")) { 
+    throw new Error("❌ Production API_BASE_URL must use HTTPS"); 
+  }
 
 // 📦 Centralized endpoint registry
 export const endpoints = {
@@ -24,10 +28,12 @@ export const endpoints = {
   businesses: "/api/businesses",
   audit: "/api/document_audit",
   dashboard: "/dashboard-summary",
+  disbursements: "/api/disbursements",
   accounts: {
     create: "/api/admin/create-account",
     updateRole: (uid) => `/api/admin/update-role/${uid}`,
     delete: (uid) => `/api/admin/delete-account/${uid}`,
+    list: "/api/admin/accounts",
   },
   settings: {
     permissions: "/api/settings/permissions",
@@ -37,6 +43,10 @@ export const endpoints = {
     businesses: "/api/fees/businesses",
     misc: "/api/fees/misc",
   },
+  password: { 
+    request: "/api/password/request", 
+    verify: (token) => `/api/password/verify/${token}`, 
+    apply: "/api/password/apply", },
 };
 
 // 🛡️ Axios instance
@@ -51,12 +61,12 @@ api.interceptors.request.use(async (config) => {
   const auth = getAuth();
   const user = auth.currentUser;
 
+  if (config.url?.includes("/api/password/")) { return config; }
+
   if (user) {
     try {
       const token = await user.getIdToken(true);
-      console.log("🔐 Attaching token:", token.substring(0, 20) + "...");
       config.headers.Authorization = `Bearer ${token}`;
-      
     } catch (err) {
       console.warn("⚠️ Failed to refresh Firebase token", err);
     }
@@ -251,6 +261,10 @@ export const AccountsAPI = {
     api.put(endpoints.accounts.updateRole(uid), { role })
       .then((res) => res.data)
       .catch((err) => handleError(err, "Account role update")),
+  list: (params = {}) => 
+    api.get("/api/admin/accounts", { params }) 
+      .then((res) => res.data) 
+      .catch((err) => handleError(err, "List accounts")),
 };
 
 // 📊 Dashboard APIs
@@ -259,6 +273,11 @@ export const DashboardAPI = {
     api.get(endpoints.dashboard)
       .then((res) => res.data)
       .catch((err) => handleError(err, "Dashboard summary fetch")),
+  
+  issuedCount: (documentType) => 
+    api.get("/api/documents/count/issued", { params: { documentType } }) 
+      .then((res) => res.data) 
+      .catch((err) => handleError(err, "Issued count fetch")),
 };
 
 // ⚙️ Settings APIs
@@ -323,3 +342,87 @@ export const FeesAPI = {
       .then((res) => res.data)
       .catch((err) => handleError(err, "Delete miscellaneous fee")),
 };
+
+// 💵 Disbursement APIs
+export const DisbursementsAPI = new BaseAPI(endpoints.disbursements);
+
+// 🔄 Extra helpers
+DisbursementsAPI.patchStatus = (id, payload) =>
+  api.patch(`${endpoints.disbursements}/${id}/status`, payload)
+    .then((res) => res.data)
+    .catch((err) => handleError(err, "PATCH disbursement status"));
+
+DisbursementsAPI.listByCategory = (category) =>
+  api.get(endpoints.disbursements, { params: { category } })
+    .then((res) => res.data)
+    .catch((err) => handleError(err, "List disbursements by category"));
+
+DisbursementsAPI.listByRecipient = (recipientId) =>
+  api.get(endpoints.disbursements, { params: { recipientId } })
+    .then((res) => res.data)
+    .catch((err) => handleError(err, "List disbursements by recipient"));
+
+// 🧑‍💼 Role APIs
+export const RolesAPI = {
+  assignRole: (uid, role) =>
+    api.post(`/api/users/${uid}/role`, { role })
+      .then((res) => res.data)
+      .catch((err) => handleError(err, "Assign role")),
+};
+
+export const PasswordAPI = {
+  requestReset: (email) =>
+    api.post(endpoints.password.request, { email })
+      .then((res) => res.data)
+      .catch((err) => handleError(err, "Password reset request")),
+
+  verifyToken: (token) =>
+    api.get(endpoints.password.verify(token))
+      .then((res) => res.data)
+      .catch((err) => handleError(err, "Password token verification")),
+
+  applyReset: (token, newPassword, confirmPassword) =>
+    api.post(endpoints.password.apply, { token, new_password: newPassword, confirm_password: confirmPassword })
+      .then((res) => res.data)
+      .catch((err) => handleError(err, "Password reset apply")),
+};
+
+// 📣 Notification APIs
+export const NotificationsAPI = {
+  list: () =>
+    api.get("/api/notifications")
+      .then((res) => res.data)
+      .catch((err) => handleError(err, "List notifications")),
+
+  markAsRead: (id) =>
+    api.patch(`/api/notifications/${id}/read`)
+      .then((res) => res.data)
+      .catch((err) => handleError(err, "Mark notification read")),
+
+  delete: (id) =>
+    api.delete(`/api/notifications/${id}`)
+      .then((res) => res.data)
+      .catch((err) => handleError(err, "Delete notification")),
+
+  bulkDelete: (onlyRead = true) =>
+    api.delete(`/api/notifications/bulk?only_read=${onlyRead}`)
+      .then((res) => res.data)
+      .catch((err) => handleError(err, "Bulk delete notifications")),
+  
+  createResidentLogin: (count) => 
+    api.post("/api/notifications/resident-login", { count }) 
+      .then((res) => res.data), 
+
+  createResidentLogOut: (count) => 
+    api.post("/api/notifications/resident-logout", { count }) 
+      .then((res) => res.data), 
+      
+  createOfficerLogin: (name) => 
+    api.post("/api/notifications/officer-login", { name }) 
+      .then((res) => res.data),
+  
+  createOfficerLogOut: (name) => 
+    api.post("/api/notifications/officer-logout", { name }) 
+      .then((res) => res.data),
+};
+

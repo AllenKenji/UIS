@@ -3,14 +3,14 @@ import { collection, getCountFromServer } from "firebase/firestore";
 import { db } from "../../services/firebase";
 import DashboardCard from "./DashboardCard";
 import { useUser } from "../../context/UserContext";
-import { COLLECTION_PERMISSIONS } from "../../config/roles"; // ✅ unified mapping
+import { COLLECTION_PERMISSIONS } from "../../config/roles"; 
 import "../../styles/dashboard/registry-overview.css";
 
 // 🔑 Static registry keys (avoid lint warning)
 const REGISTRY_KEYS = ["residents", "businesses", "youth"];
 
 const RegistryOverview = () => {
-  const { can } = useUser(); // centralized permission check
+  const { can } = useUser(); 
   const [counts, setCounts] = useState({
     residents: "N/A",
     businesses: "N/A",
@@ -43,7 +43,7 @@ const RegistryOverview = () => {
     };
 
     fetchCounts();
-  }, [can]); // ✅ only depends on can
+  }, [can]); 
 
   const registryData = [
     { label: "Resident Registry", value: counts.residents, variant: "accent", icon: "👥" },

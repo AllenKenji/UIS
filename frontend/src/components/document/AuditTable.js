@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../services/api";
 import "../../styles/dashboard/audit-table.css";
 
@@ -11,7 +11,7 @@ const AuditTable = () => {
     setLoading(true);
     setStatus("Fetching audit logs...");
     try {
-      const response = await api.get("/api/document_audit"); // ✅ include /api prefix
+      const response = await api.get("/api/document_audit"); 
       setLogs(response.data || []);
       setStatus("");
     } catch (err) {

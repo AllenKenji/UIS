@@ -1,6 +1,5 @@
-// src/hooks/usePublicFees.js
 import { useState, useEffect } from "react";
-
+import { API_BASE_URL } from "../services/api";
 /**
  * Hook for residents: fetches public business/document fees
  * from /api/fees/public/... endpoints and computes totals.
@@ -45,8 +44,8 @@ export function usePublicFees() {
 
       try {
         const [bizRes, docRes] = await Promise.allSettled([
-          fetch("/api/fees/public/businesses"),
-          fetch("/api/fees/public/documents"),
+          fetch(`${API_BASE_URL}/api/fees/public/businesses`),
+          fetch(`${API_BASE_URL}/api/fees/public/documents`),
         ]);
 
         // ✅ Handle businesses

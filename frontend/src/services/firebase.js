@@ -8,14 +8,14 @@ const firebaseConfig = {
   apiKey: "AIzaSyDX41U2aTmvhI7Fs4QbDRzCRHuExcKFF8g",
   authDomain: "barangay-1721d.firebaseapp.com",
   projectId: "barangay-1721d",
-  storageBucket: "barangay-1721d.firebasestorage.app",
+  storageBucket: "barangay-1721d.appspot.com",
   messagingSenderId: "397499309217",
   appId: "1:397499309217:web:38d393fea54dca6d6964e0",
   measurementId: "G-3G0PT7F4N5"
 };
 
 // 🚀 Safe app initialization
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 // 🔧 Firebase services
 export const auth = getAuth(app);

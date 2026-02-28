@@ -1,19 +1,49 @@
 /* ===============================
-📐 Dashboard Layout
+📐 Dashboard Layout (Grid)
 ================================ */
 .dashboard-layout {
-  display: flex;
+  display: grid;
+  grid-template-columns: 250px 1fr; /* sidebar, content */
   min-height: 100vh;
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-family-base);
+  transition: grid-template-columns 0.3s ease;
+}
+
+/* When notifications are active, expand to 3 columns */
+.dashboard-layout.with-notifications {
+  grid-template-columns: 250px 1fr 300px;
 }
 
 /* ===============================
-📂 Sidebar
+🎛 Header Actions (in header flow)
+================================ */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Style tweaks for buttons */
+.dark-mode-toggle {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: background 0.2s ease;
+}
+
+.header-actions button:hover {
+  background: var(--color-hover);
+}
+
+/* ===============================
+📂 Sidebar (Left)
 ================================ */
 .sidebar {
-  width: 250px;
   background: var(--gradient-card);
   border-right: 1px solid var(--color-border);
   padding: var(--space-md);
@@ -22,63 +52,17 @@
   flex-direction: column;
 }
 
-.sidebar h3 {
-  font-size: var(--font-size-lg);
-  font-weight: 600;
-  margin-bottom: var(--space-md);
-  color: var(--color-accent);
-}
-
-.sidebar ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-.sidebar a,
-.sidebar button {
-  display: block;
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--radius-sm);
-  text-decoration: none;
-  color: var(--color-text);
-  font-weight: 500;
-  transition: background-color 0.2s ease, transform 0.15s ease;
-}
-
-.sidebar a:hover,
-.sidebar button:hover {
-  background-color: var(--color-border-strong);
-  transform: translateX(2px);
-}
-
-.logout-btn {
-  background: var(--color-danger);
-  color: #fff;
-  border: none;
-  cursor: pointer;
-}
-
-.logout-btn:hover {
-  background: var(--color-danger-hover);
-}
-
 /* ===============================
-📊 Dashboard Content
+📊 Dashboard Content (Center)
 ================================ */
 .dashboard-content {
-  flex: 1;
   display: flex;
   flex-direction: column;
   padding: var(--space-lg);
+  transition: padding 0.3s ease;
+  overflow: auto;
 }
 
-/* ===============================
-🧭 Header
-================================ */
 .main-header {
   display: flex;
   justify-content: space-between;
@@ -87,51 +71,103 @@
 }
 
 .main-header h1 {
-  font-size: var(--font-size-xl);
-  font-weight: 700;
-  color: var(--color-accent);
-}
-
-.dark-mode-toggle {
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--radius-sm);
-  border: none;
-  background: var(--color-accent);
-  color: #fff;
-  cursor: pointer;
-  transition: background-color 0.25s ease, transform 0.15s ease;
-}
-
-.dark-mode-toggle:hover {
-  background: var(--color-accent-hover);
-  transform: translateY(-2px);
+  margin: 0;
 }
 
 /* ===============================
-📱 Responsive Adjustments
+🔔 Notification Panel (Right Sidebar)
 ================================ */
-@media (max-width: var(--bp-md)) {
-  .sidebar {
-    width: 200px;
-  }
-
-  .main-header h1 {
-    font-size: var(--font-size-lg);
-  }
+.notification-panel {
+  background: var(--color-card, #f9f9f9);
+  border-left: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
 }
 
-@media (max-width: var(--bp-sm)) {
-  .dashboard-layout {
-    flex-direction: column;
-  }
+.notification-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+}
 
-  .sidebar {
-    width: 100%;
-    border-right: none;
-    border-bottom: 1px solid var(--color-border);
-  }
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  color: var(--color-text);
+  transition: opacity 0.2s ease;
+}
 
-  .dashboard-content {
-    padding: var(--space-md);
-  }
+.close-btn:hover {
+  opacity: 0.7;
+}
+
+.notification-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-md);
+}
+
+.notification-item {
+  padding: var(--space-sm);
+  margin-bottom: var(--space-sm);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.notification-item.unread {
+  background: var(--color-highlight, #e3f2fd);
+  border-color: var(--color-primary);
+  font-weight: 500;
+}
+
+.notification-item .actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.notification-item button {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  border-radius: var(--radius-sm);
+  transition: background 0.2s ease;
+}
+
+.notification-item button:hover {
+  background: var(--color-hover);
+}
+
+.notification-footer {
+  display: flex;
+  gap: 0.5rem;
+  padding: var(--space-md);
+  border-top: 1px solid var(--color-border);
+}
+
+.notification-footer button {
+  flex: 1;
+  padding: 0.5rem;
+  cursor: pointer;
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  transition: opacity 0.2s ease;
+}
+
+.notification-footer button:hover {
+  opacity: 0.9;
 }

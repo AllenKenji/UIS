@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
@@ -7,7 +7,7 @@ import { auth, db } from "../../services/firebase";
 import { PARANAQUE } from "../../data/locations";
 import { usePublicFees } from "../../hooks/usePublicFees";
 import { useResidents } from "../../hooks/useResidents";
-import PaymentForm from "./PaymentForm"; // ✅ generic PaymentForm
+import PaymentForm from "./PaymentForm"; 
 import "./business-form.css";
 
 const StaffBusinessForm = ({ onBusinessAdded, onCancel }) => {

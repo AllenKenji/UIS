@@ -6,12 +6,12 @@ from backend.app.services.payment_service import log_payment_record, _next_recei
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from google.cloud import firestore
-from backend.app.core.firebase import get_firestore
 from fastapi.concurrency import run_in_threadpool
+from backend.app.utils.firestore_utils import get_db
 
 logger = logging.getLogger("uvicorn.error")
 router = APIRouter(prefix="/paymongo", tags=["Payments"])
-db = get_firestore()
+
 
 PAYMONGO_WEBHOOK_SECRET = os.getenv("PAYMONGO_WEBHOOK_SECRET", "")
 
@@ -46,8 +46,8 @@ def verify_signature(raw_body: bytes, header_signature: str) -> bool:
     return valid
 
 def _next_transaction_id():
-    counter_ref = db.collection("counters").document("transactions")
-    transaction = db.transaction()
+    counter_ref = get_db().collection("counters").document("transactions")
+    transaction = get_db().transaction()
 
     @firestore.transactional
     def increment_counter(transaction):
@@ -127,7 +127,7 @@ async def paymongo_webhook(request: Request):
 
         # --- Business update ---
         if "businessId" in metadata:
-            docs = db.collection("businesses").where("businessId", "==", metadata["businessId"]).limit(1).get()
+            docs = get_db().collection("businesses").where("businessId", "==", metadata["businessId"]).limit(1).get()
             if docs:
                 await run_in_threadpool(docs[0].reference.update, update_data)
                 logger.info("✅ Updated business=%s status=%s", metadata["businessId"], status)
@@ -150,7 +150,7 @@ async def paymongo_webhook(request: Request):
 
         # --- Document update via Firestore ID ---
         elif "documentId" in metadata:
-            docs = db.collection("documents").where("documentId", "==", metadata["documentId"]).limit(1).get()
+            docs = get_db().collection("documents").where("documentId", "==", metadata["documentId"]).limit(1).get()
             if docs:
                 await run_in_threadpool(docs[0].reference.update, update_data)
                 logger.info("✅ Updated document via documentId=%s status=%s", metadata["documentId"], status)
@@ -177,7 +177,7 @@ async def paymongo_webhook(request: Request):
         # --- Fallback: referenceNumber ---
         elif reference_number:
             # Try businesses first
-            docs = db.collection("businesses").where("referenceNumber", "==", reference_number).limit(1).get()
+            docs = get_db().collection("businesses").where("referenceNumber", "==", reference_number).limit(1).get()
             if docs:
                 await run_in_threadpool(docs[0].reference.update, update_data)
                 logger.info("✅ Updated business via referenceNumber=%s status=%s", reference_number, status)
@@ -199,7 +199,7 @@ async def paymongo_webhook(request: Request):
                 )
             else:
                 # Then try documents
-                docs = db.collection("documents").where("referenceNumber", "==", reference_number).limit(1).get()
+                docs = get_db().collection("documents").where("referenceNumber", "==", reference_number).limit(1).get()
                 if docs:
                     await run_in_threadpool(docs[0].reference.update, update_data)
                     logger.info("✅ Updated document via referenceNumber=%s status=%s", reference_number, status)
@@ -287,7 +287,7 @@ def record_document_payment(payload: dict):
         method = payload.get("method")
 
         # fetch document doc
-        doc_ref = db.collection("documents").document(document_id)
+        doc_ref = get_db().collection("documents").document(document_id)
         snapshot = doc_ref.get()
         if not snapshot.exists:
             return {"success": False, "message": "Document not found"}

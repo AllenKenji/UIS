@@ -1,5 +1,4 @@
-// pages/PaymentCancelPage.js
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 const PaymentCancelPage = () => {
@@ -9,11 +8,11 @@ const PaymentCancelPage = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       if (window.opener) {
-        // If checkout was opened in a popup
+       
         window.close();
       } else {
-        // If same tab, decide where to go
-        const type = params.get("type"); // "document" or "business"
+        
+        const type = params.get("type"); 
         if (type === "business") {
           navigate("/businesses/my");
         } else {

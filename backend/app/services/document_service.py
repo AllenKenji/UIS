@@ -7,7 +7,8 @@ from backend.app.models.document import Document, DocumentStatus
 import json
 from backend.app.services.resident_service import get_resident_by_id
 from backend.app.services.fee_service import resolve_document_fee
-from backend.app.core.firebase import get_firestore, upload_file, get_storage_bucket
+from backend.app.core.firebase import upload_file, get_storage_bucket
+from backend.app.utils.firestore_utils import get_db
 from backend.app.utils.barangay_documents import (
     generate_barangay_clearance_pdf,
     generate_residency_certificate_pdf,
@@ -21,7 +22,7 @@ from backend.app.utils.barangay_documents import (
 )
 
 logger = logging.getLogger("uvicorn.error")
-db = get_firestore()
+
 
 # 📦 Document type dispatch
 DOCUMENT_GENERATORS = {
@@ -262,7 +263,7 @@ def _serialize(snapshot) -> Document:
     return Document(id=snapshot.id, **data)
 
 def get_and_serialize(doc_id: str) -> Document:
-    snapshot = db.collection("documents").document(doc_id).get()
+    snapshot = get_db().collection("documents").document(doc_id).get()
     if not snapshot.exists:
         raise HTTPException(status_code=404, detail="Document not found")
     return _serialize(snapshot)
@@ -270,7 +271,7 @@ def get_and_serialize(doc_id: str) -> Document:
 async def update_document(doc_id: str, update_data: dict) -> Document:
     update_data["updatedAt"] = datetime.now(timezone.utc)
     await run_in_threadpool(
-        db.collection("documents").document(doc_id).update,
+        get_db().collection("documents").document(doc_id).update,
         update_data
     )
     return get_and_serialize(doc_id)
@@ -286,10 +287,10 @@ def list_documents(
     fromDate: Optional[datetime] = None,
     toDate: Optional[datetime] = None,
 ) -> list[Document]:
-    user_doc = db.collection("users").document(uid).get()
+    user_doc = get_db().collection("users").document(uid).get()
     role = user_doc.to_dict().get("role") if user_doc.exists else None
 
-    query = db.collection("documents")
+    query = get_db().collection("documents")
 
     # Role-based filtering
     if role in ("admin", "secretary") and residentId:
@@ -310,23 +311,36 @@ def list_documents(
     return [_serialize(s) for s in query.stream()]
 
 def list_my_documents(resident_id: str) -> list[Document]:
-    return [_serialize(s) for s in db.collection("documents")
+    return [_serialize(s) for s in get_db().collection("documents")
             .where("residentId", "==", resident_id).stream()]
 
 def list_active_documents(resident_id: str) -> list[Document]:
     active_statuses = {DocumentStatus.pending, DocumentStatus.for_payment, DocumentStatus.paid}
-    return [doc for s in db.collection("documents")
+    return [doc for s in get_db().collection("documents")
             .where("residentId", "==", resident_id).stream()
             if (doc := _serialize(s)).status in active_statuses]
 
 def list_history_documents(resident_id: str) -> list[Document]:
-    return [doc for s in db.collection("documents")
+    return [doc for s in get_db().collection("documents")
             .where("residentId", "==", resident_id).stream()
             if (doc := _serialize(s)).status == DocumentStatus.approved
             or (doc.status == DocumentStatus.rejected and doc.resubmitted)]
 
 def get_document(doc_id: str) -> Document:
     return get_and_serialize(doc_id)
+
+def count_issued_documents(document_type: Optional[str] = None) -> int:
+    """
+    Count how many documents have been issued (status = approved).
+    If document_type is provided, filter by that type.
+    """
+    query = get_db().collection("documents").where("status", "==", DocumentStatus.approved.value)
+
+    if document_type:
+        query = query.where("documentType", "==", document_type)
+
+    return len([s for s in query.stream()])
+
 
 # ===============================
 # 📝 Create Document with Type-Based Counter
@@ -358,7 +372,7 @@ async def create_document(
     businessPermit: UploadFile = None,            # NEW
 ) -> Document:
     try:
-        doc_ref = db.collection("documents").document()
+        doc_ref = get_db().collection("documents").document()
         now = datetime.now(timezone.utc)
 
         # Upload attachments if provided
@@ -389,17 +403,17 @@ async def create_document(
             )
 
         # 🔎 Fetch resident details
-        resident_snapshot = db.collection("residents").document(resident_id).get()
+        resident_snapshot = get_db().collection("residents").document(resident_id).get()
         if not resident_snapshot.exists:
             raise HTTPException(status_code=404, detail="Resident not found")
         resident_data = resident_snapshot.to_dict()
 
         # Counter for sequential IDs
-        counter_ref = db.collection("counters").document(document_type)
+        counter_ref = get_db().collection("counters").document(document_type)
         counter_snapshot = counter_ref.get()
 
         # Check if there are any existing documents of this type
-        docs_exist = db.collection("documents").where("documentType", "==", document_type).limit(1).get()
+        docs_exist = get_db().collection("documents").where("documentType", "==", document_type).limit(1).get()
 
         if not docs_exist:
             # Reset counter if no documents of this type exist
@@ -653,7 +667,7 @@ async def issue_document(doc_id: str, issued_by: str, file_url: Optional[str] = 
 
 async def delete_document(doc_id: str, uid: str):
     """Hard delete a document by ID, along with related payments and receipts."""
-    doc_ref = db.collection("documents").document(doc_id)
+    doc_ref = get_db().collection("documents").document(doc_id)
     snapshot = doc_ref.get()
 
     if not snapshot.exists:
@@ -667,12 +681,12 @@ async def delete_document(doc_id: str, uid: str):
     doc_ref.delete()
 
     # --- Delete related payments ---
-    payments = db.collection("payments").where("documentId", "==", doc_id).get()
+    payments = get_db().collection("payments").where("documentId", "==", doc_id).get()
     for pay in payments:
         pay.reference.delete()
 
     # --- Delete related receipts ---
-    receipts = db.collection("receipts").where("documentId", "==", doc_id).get()
+    receipts = get_db().collection("receipts").where("documentId", "==", doc_id).get()
     for rec in receipts:
         rec.reference.delete()
 

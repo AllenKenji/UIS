@@ -1,13 +1,8 @@
-// frontend/src/components/dashboard/SummaryCards.js
-
 import { useEffect, useState } from "react";
 import { getCountFromServer, collection } from "firebase/firestore";
 import { db } from "../../services/firebase";
 import DashboardCard from "./DashboardCard";
-import {
-  ALL_STATS,
-  ROLE_COLLECTIONS,   // ✅ use precomputed allowed collections per role
-} from "../../config/roles";
+import { ALL_STATS, ROLE_COLLECTIONS } from "../../config/roles";
 import { useUser } from "../../context/UserContext";
 import "../../styles/dashboard/summary-card.css";
 

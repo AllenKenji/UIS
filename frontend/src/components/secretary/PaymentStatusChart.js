@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { Pie } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 
@@ -15,7 +15,7 @@ const PaymentStatusChart = ({ documents = [] }) => {
       const status = doc.status || doc.documentStatus;
 
       if (amount === 0) {
-        free += 1; // separate bucket for free docs
+        free += 1; 
       } else if (status === "paid" || status === "approved") {
         paid += 1;
       } else if (status === "awaiting_payment" || status === "pending") {
@@ -31,7 +31,7 @@ const PaymentStatusChart = ({ documents = [] }) => {
     datasets: [
       {
         data: [free, paid, awaiting_payment],
-        backgroundColor: ["#3498db", "#2ecc71", "#f39c12"], // blue, green, orange
+        backgroundColor: ["#3498db", "#2ecc71", "#f39c12"], 
       },
     ],
   };

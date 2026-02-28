@@ -24,6 +24,11 @@ from backend.app.routes import (
     account_routes,
     audit_routes,
     fee_routes,
+    disbursement_routes,
+    role_routes,
+    password_routes,
+    ws_routes,
+    notification_routes,
 )
 
 logger = logging.getLogger("barangay")
@@ -32,6 +37,9 @@ logger = logging.getLogger("barangay")
 async def lifespan(app: FastAPI):
     # Startup logic
     try:
+        bucket_env = os.environ.get("FIREBASE_STORAGE_BUCKET") 
+        logger.info("🔍 FIREBASE_STORAGE_BUCKET env var = %s", bucket_env)
+        
         logger.info("🚀 Initializing Firebase...")
         ensure_firebase_initialized()
     except Exception as e:
@@ -82,6 +90,11 @@ def create_app() -> FastAPI:
     app.include_router(payment_routes.router, prefix=api_prefix, tags=["Payments"]) 
     app.include_router(paymongo_routes.router, prefix=f"{api_prefix}/paymongo", tags=["PayMongo"])
     app.include_router(fee_routes.router, prefix=f"{api_prefix}", tags=["Fees"])
+    app.include_router(disbursement_routes.router, prefix=f"{api_prefix}", tags=["Disbursements"])
+    app.include_router(role_routes.router, prefix=f"{api_prefix}", tags=["Roles"])
+    app.include_router(password_routes.router, prefix=f"{api_prefix}", tags=["Password Reset"])
+    app.include_router(ws_routes.router, prefix=f"{api_prefix}", tags=["websocket"])
+    app.include_router(notification_routes.router, prefix=f"{api_prefix}", tags=["notifications"])
 
     # 🧪 Health Check
     @app.get(f"{api_prefix}/status", tags=["Health"])
@@ -110,9 +123,3 @@ app = create_app()
 
 # 🔧 Override FastAPI's default bytes encoder
 ENCODERS_BY_TYPE[bytes] = lambda o: "<binary data>"
-
-if __name__ == "__main__":
-    logger.info("🚀 Starting FastAPI app...")
-    port = int(os.environ.get("PORT", 8080))
-    import uvicorn
-    uvicorn.run("backend.app.main:app", host="0.0.0.0", port=port, reload=True)

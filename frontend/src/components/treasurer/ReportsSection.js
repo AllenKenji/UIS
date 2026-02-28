@@ -1,4 +1,3 @@
-import React from "react";
 import { useReports } from "../../hooks/useReports";
 
 function ReportsSection() {

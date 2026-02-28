@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { api, endpoints } from "../../services/api";
 import { useUser } from "../../context/UserContext";
 import "../../styles/dashboard/incident-queue.css";

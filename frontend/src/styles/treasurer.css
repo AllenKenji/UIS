@@ -1,7 +1,7 @@
 .treasurer-dashboard {
   padding: 2rem;
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #f9fafb;
+  background-color: var(--color-bg);
   min-height: 100vh;
 }
 
@@ -9,7 +9,7 @@
   font-size: 2rem;
   font-weight: 600;
   margin-bottom: 1.5rem;
-  color: #1f2937; /* dark gray */
+  color: var(--color-accent);
 }
 
 /* Summary Cards */
@@ -21,18 +21,18 @@
 }
 
 .summary-cards .card {
-  background: #ffffff;
+  background: var(--color-card-bg);
   border-radius: 8px;
   padding: 1rem;
   box-shadow: 0 2px 6px rgba(0,0,0,0.08);
   font-size: 1rem;
   font-weight: 500;
-  color: #374151;
+  color: var(--color-text);
 }
 
 /* Revenue Chart */
 .revenue-chart {
-  background: #ffffff;
+  background: var(--color-card-bg);
   border-radius: 8px;
   padding: 1rem;
   margin-bottom: 2rem;
@@ -51,12 +51,12 @@
 .revenue-chart h2 {
   font-size: 1.25rem;
   margin-bottom: 1rem;
-  color: #111827;
+  color: var(--color-success);
 }
 
 /* Transactions Table */
 .transactions-table {
-  background: #ffffff;
+  background: var(--color-card-bg);
   border-radius: 8px;
   padding: 1rem;
   margin-bottom: 2rem;
@@ -77,22 +77,24 @@
 .transactions-table td {
   padding: 0.75rem;
   text-align: left;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .transactions-table th {
-  background-color: #f3f4f6;
+  background-color: var(--color-table-header);
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-strong);
 }
 
 .transactions-table tr:hover {
-  background-color: #f9fafb;
+  background-color: var(--color-accent-hover);
+  color: var(--color-text);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* Disbursement Table */
 .disbursement-table {
-  background: #ffffff;
+  background: var(--color-card-bg);
   border-radius: 8px;
   padding: 1rem;
   margin-bottom: 2rem;
@@ -102,6 +104,7 @@
 .disbursement-table h2 {
   font-size: 1.25rem;
   margin-bottom: 1rem;
+  color: var(--color-danger);
 }
 
 .disbursement-table table {
@@ -117,9 +120,9 @@
 }
 
 .disbursement-table th {
-  background-color: #f3f4f6;
+  background-color: var(--color-table-header);
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-strong);
 }
 
 .disbursement-table tr:hover {
@@ -128,7 +131,7 @@
 
 /* Reports Section */
 .reports-section {
-  background: #ffffff;
+  background: var(--color-card-bg);
   border-radius: 8px;
   padding: 1rem;
   box-shadow: 0 2px 6px rgba(0,0,0,0.08);

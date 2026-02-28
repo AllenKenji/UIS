@@ -9,10 +9,10 @@ export const ALL_STATS = Object.freeze({
   businesses: { label: "Businesses",          variant: "success",   icon: "💼" },
   complaints: { label: "Complaints",          variant: "danger",    icon: "🗣️" },
   incidents:  { label: "Incidents",           variant: "warning",   icon: "⚠️" },
-  documents:  { label: "Documents",           variant: "info",      icon: "📄" },
+  documents:  { label: "Documents",           variant: "dilg",      icon: "📄" },
   logins:     { label: "Login Records",       variant: "neutral",   icon: "📊" },
   youth:      { label: "Youth Registry",      variant: "youth",     icon: "🧒" },
-  fees:       { label: "Fees",                variant: "info", icon: "💰" },
+  fees:       { label: "Fees",                variant: "info",      icon: "💰" },
 });
 
 // 🛠️ Derived maps
@@ -94,10 +94,10 @@ export const ROLE_PERMISSIONS = Object.freeze(
 export const COLLECTION_PERMISSIONS = Object.freeze({
   residents:  ["manageResidents"],
   businesses: ["viewBusinesses"],
-  complaints: ["viewAllComplaints", "fileComplaints", "viewOwnComplaints", "manageComplaints"], // ✅ dual mapping
+  complaints: ["viewAllComplaints", "fileComplaints", "viewOwnComplaints", "manageComplaints"], 
   incidents:  ["viewIncidents", "reportIncidents"], 
   documents:  ["viewDocuments", "viewOwnDocuments", "requestDocuments"],
-  logins:     ["auditBarangayData"], // consider adding "viewUsers" if admins should see logins
+  logins:     ["auditBarangayData"], 
   youth:      ["youthRegistryAccess"],
   fees:       ["viewFinancialRecords"],
 });

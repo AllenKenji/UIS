@@ -1,38 +1,36 @@
 # backend/app/core/auth.py
-import firebase_admin
 from firebase_admin import auth, firestore
 from fastapi import Depends, HTTPException, Header, status
 from backend.app.core.roles import get_permissions
 from backend.app.core.firebase import ensure_firebase_initialized  # ✅ centralized init
+import logging
+
+logger = logging.getLogger("uvicorn.error")
 
 def get_db() -> firestore.Client:
     """Return Firestore client, ensuring Firebase is initialized."""
     ensure_firebase_initialized()
     return firestore.client()
 
-
 def _verify_token(authorization: str) -> dict:
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or malformed Bearer token"
-        )
+        raise HTTPException(status_code=401, detail="Missing or malformed Bearer token")
 
     token = authorization.removeprefix("Bearer ").strip()
 
     try:
         decoded = auth.verify_id_token(token)
-        # Debug: log claims
-        import logging
-        logging.getLogger("uvicorn.error").info("✅ Token verified: %s", decoded)
+        logger.info("✅ Token verified: uid=%s, role=%s, aud=%s, iss=%s",
+                    decoded.get("uid"), decoded.get("role"), decoded.get("aud"), decoded.get("iss"))
         return decoded
-    except auth.InvalidIdTokenError:
-        raise HTTPException(status_code=401, detail="Invalid ID token")
-    except auth.ExpiredIdTokenError:
-        raise HTTPException(status_code=401, detail="Token expired")
     except Exception as e:
-        import logging
-        logging.getLogger("uvicorn.error").error("❌ Token verification failed: %s", e)
+        # Log unverified claims for debugging
+        try:
+            import jwt
+            unverified = jwt.decode(token, options={"verify_signature": False})
+            logger.error("❌ Token verification failed: %s | Claims=%s", e, unverified)
+        except Exception:
+            logger.error("❌ Token verification failed: %s | Could not decode claims", e)
         raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
 
 async def get_current_user(authorization: str = Header(...)) -> dict:
@@ -44,9 +42,12 @@ async def get_current_user(authorization: str = Header(...)) -> dict:
 
     role = decoded.get("role")
 
+    logger.debug("🔍 Resolving role for uid=%s: token role=%s", uid, role)
+
     # 🔎 Derive role if not present in claims
     if not role:
-        db = get_db()  # ✅ ensure Firebase is initialized before using Firestore
+        logger.warning("⚠️ No role claim in token for uid=%s. Falling back to Firestore.", uid)
+        db = get_db()  
         user_doc = db.collection("users").document(uid).get()
         if user_doc.exists:
             role = user_doc.to_dict().get("role")
@@ -103,3 +104,7 @@ def require_permission(permission: str | list[str]):
         return uid
 
     return dependency
+
+def set_user_role(uid: str, role: str):
+    auth.set_custom_user_claims(uid, {"role": role})
+    return {"uid": uid, "role": role}

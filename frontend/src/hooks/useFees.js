@@ -1,4 +1,3 @@
-// src/hooks/useFees.js
 import { useState, useEffect, useCallback } from "react";
 import { FeesAPI } from "../services/api";
 import {
@@ -7,7 +6,7 @@ import {
   buildMiscPayload,
 } from "../utils/payloadBuilders";
 
-export function useFees(delayMs = 500) { // ⏱ allow configurable delay
+export function useFees(delayMs = 500) { 
   const [documentFees, setDocumentFees] = useState([]);
   const [businessFees, setBusinessFees] = useState([]);
   const [miscFees, setMiscFees] = useState([]);
@@ -44,7 +43,7 @@ export function useFees(delayMs = 500) { // ⏱ allow configurable delay
       refreshData();
     }, delayMs);
 
-    return () => clearTimeout(timer); // cleanup
+    return () => clearTimeout(timer); 
   }, [refreshData, delayMs]);
 
   return {

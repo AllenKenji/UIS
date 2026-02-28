@@ -108,7 +108,6 @@
 }
 
 
-
 /* Snap Variants */
 .badge-pill-group.scrollable.snap        { scroll-snap-type: x mandatory; }
 .badge-pill-group.scrollable.snap .badge { scroll-snap-align: center; }

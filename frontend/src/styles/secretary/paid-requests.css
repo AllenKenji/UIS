@@ -2,7 +2,7 @@
 .paid-requests {
   padding: 2rem;
   font-family: "Segoe UI", Arial, sans-serif;
-  background-color: #f9fafb;
+  background-color: var(--color-bg);
   min-height: 100vh;
 }
 
@@ -10,13 +10,13 @@
 .paid-requests h3 {
   margin-bottom: 1.5rem;
   font-size: 1.6rem;
-  color: #333;
+  color: var(--color-accent);
 }
 
 /* Status message */
 .status-message {
   font-size: 0.95rem;
-  color: #555;
+  color: var(--color-text);
   margin: 1rem 0;
 }
 

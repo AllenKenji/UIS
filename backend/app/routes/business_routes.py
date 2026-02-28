@@ -1,10 +1,10 @@
 from fastapi import APIRouter
-from backend.app.core.firebase import get_firestore, delete_file
+from backend.app.core.firebase import delete_file
 from backend.app.models.business import BusinessApplication
 from backend.app.services.business_service import create_business_application
 import logging
+from backend.app.utils.firestore_utils import get_db
 
-db = get_firestore()
 logger = logging.getLogger("uvicorn.error")
 
 router = APIRouter(prefix="/businesses", tags=["Business"])
@@ -15,7 +15,7 @@ def create_application(payload: BusinessApplication):
 
 @router.get("")
 def list_businesses(ownerUid: str = None, ownerName: str = None):
-    ref = db.collection("businesses")
+    ref = get_db().collection("businesses")
     if ownerUid:
         docs = ref.where("ownerUid", "==", ownerUid).stream()
     elif ownerName:
@@ -27,7 +27,7 @@ def list_businesses(ownerUid: str = None, ownerName: str = None):
 @router.delete("/{business_id}")
 def delete_business(business_id: str):
     """Delete a business, related payments/receipts, and attachments in Storage."""
-    business_docs = db.collection("businesses").where("businessId", "==", business_id).get()
+    business_docs = get_db().collection("businesses").where("businessId", "==", business_id).get()
     if not business_docs:
         return {"success": False, "message": "Business not found"}
 
@@ -56,13 +56,13 @@ def delete_business(business_id: str):
     logger.info("🗑️ Deleted business %s", business_id)
 
     # --- Delete related payments ---
-    payments = db.collection("payments").where("businessId", "==", business_id).get()
+    payments = get_db().collection("payments").where("businessId", "==", business_id).get()
     for pay in payments:
         pay.reference.delete()
         logger.info("🗑️ Deleted payment %s for business %s", pay.id, business_id)
 
     # --- Delete related receipts ---
-    receipts = db.collection("receipts").where("businessId", "==", business_id).get()
+    receipts = get_db().collection("receipts").where("businessId", "==", business_id).get()
     for rec in receipts:
         rec.reference.delete()
         logger.info("🗑️ Deleted receipt %s for business %s", rec.id, business_id)

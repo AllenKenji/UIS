@@ -44,7 +44,7 @@ const sidebarLinks = {
     links.businesses,
     links.documents,
     links.incidents,
-    links.viewAllComplaints,   // 👀 Admin oversight
+    links.viewAllComplaints,   
     links.fileComplaint,
     links.createAccount,
     links.treasurer,
@@ -84,8 +84,8 @@ const sidebarLinks = {
   ],
   resident: [
     links.dashboard("/resident"),
-    links.fileComplaint,     // ✍️ Resident filing
-    links.viewOwnComplaints,   // 👀 Resident tracking
+    links.fileComplaint,     
+    links.viewOwnComplaints,   
     links.ownDocuments,
     links.requestDocument,
     links.registerBusiness,

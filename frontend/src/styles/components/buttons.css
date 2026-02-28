@@ -10,7 +10,7 @@ button,
   border: none;
   cursor: pointer;
   background-color: var(--color-accent);
-  color: #fff;
+  color: var(--color-text);
   transition: background-color 0.3s ease, transform 0.2s ease;
 }
 

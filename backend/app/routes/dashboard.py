@@ -1,8 +1,8 @@
 import logging
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
+from backend.app.utils.firestore_utils import get_db  
 
-from backend.app.core.firebase import get_firestore  # ✅ Centralized Firestore access
 
 logger = logging.getLogger("uvicorn.error")
 router = APIRouter(tags=["Dashboard"])
@@ -17,14 +17,13 @@ class DashboardSummary(BaseModel):
 
 @router.get("/dashboard-summary", response_model=DashboardSummary)
 async def get_dashboard_summary():
-    db = get_firestore()
 
     try:
         collections = ["residents", "businesses", "complaints", "officials", "incidents"]
         counts = {}
 
         for col in collections:
-            docs = db.collection(col).get()
+            docs = get_db().collection(col).get()
             counts[col] = len(docs)
 
         logger.info("📊 Dashboard summary fetched successfully")

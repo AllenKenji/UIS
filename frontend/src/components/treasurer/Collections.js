@@ -1,4 +1,3 @@
-import React from "react";
 import { usePayments } from "../../hooks/usePayments";
 import SummaryCards from "./SummaryCards";
 import CategoryList from "./CategoryList";

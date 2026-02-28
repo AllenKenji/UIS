@@ -1,4 +1,3 @@
-// src/components/admin/FeeTable.jsx
 import "../../styles/fee-dashboard.css";
 
 export default function FeeTable({ title, columns, data, onUpdate, onDelete }) {

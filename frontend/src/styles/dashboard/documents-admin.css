@@ -3,23 +3,45 @@
 /* Page container */
 .documents-admin-page {
   padding: 2rem;
-  background-color: #f9fafb;
+  background-color: var(--color-bg);
   font-family: "Segoe UI", Roboto, sans-serif;
-  color: #333;
+  color: var(--color-text);
+}
+
+.header-row { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  margin-bottom: 1rem; 
+}
+
+.issue-document-btn { 
+  background-color: #007bff; 
+  color: white; 
+  border: none; 
+  padding: 0.5rem 1rem; 
+  font-size: 0.9rem; 
+  border-radius: 4px; 
+  cursor: pointer; 
+  transition: background-color 0.2s ease; 
+}
+
+.issue-document-btn:hover { 
+  background-color: #0056b3; 
 }
 
 /* Headings */
 .documents-admin-page h1 {
   font-size: 1.8rem;
   margin-bottom: 1.5rem;
-  color: #222;
+  color: var(--color-accent);
 }
 
 .documents-admin-page h2 {
   font-size: 1.4rem;
   margin-top: 2rem;
   margin-bottom: 1rem;
-  color: #444;
+  color: var(--color-success);
 }
 
 /* Status messages */
@@ -27,8 +49,8 @@
   margin: 0.5rem 0;
   padding: 0.75rem 1rem;
   border-radius: 4px;
-  background-color: #fff3cd;
-  color: #856404;
+  background-color: var(--color-neutral);
+  color: var(--color-text);
   font-size: 0.9rem;
 }
 
@@ -37,7 +59,7 @@
   width: 100%;
   border-collapse: collapse;
   margin-top: 1rem;
-  background-color: #fff;
+  background-color: var(--color-bg);
   border-radius: 6px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
@@ -47,17 +69,17 @@
 .document-table td {
   padding: 0.75rem 1rem;
   text-align: left;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .document-table th {
-  background-color: #f3f4f6;
+  background-color: var(--color-bg);
   font-weight: 600;
-  color: #111827;
+  color: var(--color-text-strong);
 }
 
 .document-table tr:hover {
-  background-color: #f9fafb;
+  background-color: var(--color-neutral);
 }
 
 /* Action links/buttons */
@@ -86,7 +108,7 @@
 /* Audit table styling (shared look) */
 .audit-table {
   margin-top: 1rem;
-  background-color: #fff;
+  background-color: var(--color-bg);
   border-radius: 6px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);

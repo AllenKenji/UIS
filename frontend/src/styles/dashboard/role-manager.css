@@ -44,13 +44,13 @@
   text-transform: capitalize;
 }
 
-.role-badge.admin { background: var(--color-danger); color: #fff; }
-.role-badge.staff { background: var(--color-success); color: #fff; }
-.role-badge.secretary { background: var(--color-info); color: #fff; }
-.role-badge.treasurer { background: var(--color-warning); color: #fff; }
+.role-badge.admin { background: var(--color-admin); color: #fff; }
+.role-badge.staff { background: var(--color-staff); color: #fff; }
+.role-badge.secretary { background: var(--color-secretary); color: #fff; }
+.role-badge.treasurer { background: var(--color-treasurer); color: #fff; }
 .role-badge.sk { background: var(--color-youth); color: #fff; }
-.role-badge.dilg { background: var(--color-neutral); color: #fff; }
-.role-badge.resident { background: var(--color-accent); color: #fff; }
+.role-badge.dilg { background: var(--color-dilg); color: #fff; }
+.role-badge.resident { background: var(--color-resident); color: #fff; }
 
 /* Actions */
 select {
@@ -58,6 +58,7 @@ select {
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
   background: var(--color-input-bg);
+  color: var(--color-text);
 }
 
 .delete-btn {

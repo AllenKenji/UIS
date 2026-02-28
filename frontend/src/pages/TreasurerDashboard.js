@@ -1,4 +1,3 @@
-import React from "react";
 import SummaryCards from "../components/treasurer/SummaryCards";
 import RevenueChart from "../components/treasurer/RevenueChart";
 import TransactionsTable from "../components/treasurer/TransactionsTable";

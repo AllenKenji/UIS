@@ -1,8 +1,7 @@
 import logging
 from typing import Optional, List
 from google.cloud import firestore
-
-from backend.app.core.firebase import get_firestore
+from backend.app.utils.firestore_utils import get_db
 from backend.app.models.incident import (
     IncidentCreate,
     Incident,
@@ -42,8 +41,7 @@ def _normalize_incident(doc) -> dict:
 
 # 📝 Create an incident
 def create_incident(data: IncidentCreate) -> Incident:
-    db = get_firestore()
-    doc_ref = db.collection(INCIDENT_COLLECTION).document()
+    doc_ref = get_db().collection(INCIDENT_COLLECTION).document()
 
     payload = data.dict()
     payload.update({
@@ -63,8 +61,7 @@ def create_incident(data: IncidentCreate) -> Incident:
 
 # 🔍 Get a specific incident
 def get_incident_by_id(incident_id: str) -> Optional[Incident]:
-    db = get_firestore()
-    doc = db.collection(INCIDENT_COLLECTION).document(incident_id).get()
+    doc = get_db().collection(INCIDENT_COLLECTION).document(incident_id).get()
     if not doc.exists:
         return None
     return Incident(**_normalize_incident(doc))
@@ -72,7 +69,6 @@ def get_incident_by_id(incident_id: str) -> Optional[Incident]:
 
 # 🔧 Helper: enrich with resident info
 def _enrich_with_resident(data: dict) -> IncidentWithResident:
-    db = get_firestore()
 
     resident_id = data.get("residentId") or data.get("authUid")
     data["residentId"] = resident_id
@@ -80,7 +76,7 @@ def _enrich_with_resident(data: dict) -> IncidentWithResident:
     reported_by_name = "Unknown"
     if resident_id:
         try:
-            resident_doc = db.collection("residents").document(resident_id).get()
+            resident_doc = get_db().collection("residents").document(resident_id).get()
             if resident_doc.exists:
                 reported_by_name = resident_doc.to_dict().get("fullName", "Unknown")
         except Exception as e:
@@ -90,7 +86,7 @@ def _enrich_with_resident(data: dict) -> IncidentWithResident:
     auth_uid = data.get("authUid")
     if auth_uid:
         try:
-            staff_doc = db.collection("users").document(auth_uid).get()
+            staff_doc = get_db().collection("users").document(auth_uid).get()
             if staff_doc.exists:
                 logged_by_officer = staff_doc.to_dict().get("full_name", "Unknown")
         except Exception as e:
@@ -99,7 +95,7 @@ def _enrich_with_resident(data: dict) -> IncidentWithResident:
     assigned_to_name = data.get("assigned_to_name") or "—"
     if assigned_to_name not in (None, "—"):
         try:
-            staff_doc = db.collection("users").document(assigned_to_name).get()
+            staff_doc = get_db().collection("users").document(assigned_to_name).get()
             if staff_doc.exists:
                 assigned_to_name = staff_doc.to_dict().get("full_name", assigned_to_name)
         except Exception:
@@ -117,8 +113,8 @@ def _enrich_with_resident(data: dict) -> IncidentWithResident:
 def list_incidents_with_residents(
     status: Optional[str] = None, limit: int = 50, start_after_id: Optional[str] = None
 ) -> List[IncidentWithResident]:
-    db = get_firestore()
-    query = db.collection(INCIDENT_COLLECTION)
+
+    query = get_db().collection(INCIDENT_COLLECTION)
 
     if status:
         query = query.where("status", "==", status)
@@ -126,7 +122,7 @@ def list_incidents_with_residents(
     query = query.order_by("createdAt").limit(limit)
 
     if start_after_id:
-        last_doc = db.collection(INCIDENT_COLLECTION).document(start_after_id).get()
+        last_doc = get_db().collection(INCIDENT_COLLECTION).document(start_after_id).get()
         if last_doc.exists:
             query = query.start_after(last_doc)
 
@@ -144,9 +140,8 @@ def list_incidents_with_residents(
 
 # 📋 List incidents assigned to a specific staff (staff view)
 def list_staff_incidents(staff_name: str, limit: int = 50) -> List[IncidentWithResident]:
-    db = get_firestore()
     query = (
-        db.collection(INCIDENT_COLLECTION)
+        get_db().collection(INCIDENT_COLLECTION)
         .where("assigned_to_name", "==", staff_name)
         .order_by("createdAt")
         .limit(limit)
@@ -165,8 +160,7 @@ def list_staff_incidents(staff_name: str, limit: int = 50) -> List[IncidentWithR
 def update_incident_status(
     incident_id: str, status: str, assigned_to: Optional[str] = None
 ) -> bool:
-    db = get_firestore()
-    doc_ref = db.collection(INCIDENT_COLLECTION).document(incident_id)
+    doc_ref = get_db().collection(INCIDENT_COLLECTION).document(incident_id)
     try:
         if not doc_ref.get().exists:
             return False
@@ -193,8 +187,7 @@ def update_incident_status(
 
 # 🗑️ Delete an incident
 def delete_incident(incident_id: str) -> bool:
-    db = get_firestore()
-    doc_ref = db.collection(INCIDENT_COLLECTION).document(incident_id)
+    doc_ref = get_db().collection(INCIDENT_COLLECTION).document(incident_id)
     if not doc_ref.get().exists:
         return False
 

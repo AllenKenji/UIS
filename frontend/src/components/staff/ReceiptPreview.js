@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from "react";
+import { useEffect, useCallback } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import jsPDF from "jspdf";
 import QRCode from "qrcode";
@@ -113,10 +113,17 @@ const ReceiptPreview = ({ receiptData, onGeneratePDF }) => {
     <div className="receipt-preview">
       <h3>✅ Receipt Preview</h3>
       <p><strong>Receipt #:</strong> {receiptData.receiptNumber}</p>
-      <p>
-        <strong>{receiptData.entityType === "document" ? "Document ID:" : "Business ID:"}</strong>{" "}
-        {receiptData.customEntityId || receiptData.entityId}
-      </p>
+      {receiptData.entityType === "document" && (
+        <p>
+          <strong>Document ID:</strong> {receiptData.customEntityId || receiptData.entityId}
+        </p>
+      )}
+
+      {receiptData.entityType === "business" && (
+        <p>
+          <strong>Business ID:</strong> {receiptData.entityId}
+        </p>
+      )}
       <p><strong>Type:</strong> {receiptData.description}</p>
       <p><strong>Amount:</strong> ₱{getCleanAmount(receiptData.amount).toFixed(2)}</p>
       <p><strong>Method:</strong> {receiptData.method}</p>

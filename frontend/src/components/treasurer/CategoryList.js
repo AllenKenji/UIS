@@ -1,4 +1,3 @@
-import React from "react";
 import "../../styles/treasurer/category-list.css";
 
 function CategoryList({ revenueByCategory }) {

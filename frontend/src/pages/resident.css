@@ -2,7 +2,7 @@
   max-width: 900px;
   margin: auto;
   padding: 2rem;
-  background: #fff;
+  background: var(--color-bg);
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0,0,0,0.08);
   font-family: system-ui, sans-serif;
@@ -24,7 +24,7 @@
 }
 
 .resume-occupation {
-  color: #666;
+  color: var(--color-text);
   margin-top: -8px;
 }
 

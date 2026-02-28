@@ -1,11 +1,12 @@
 import logging
+from typing import Optional
 from datetime import datetime, timezone
 from fastapi import HTTPException, status
 from firebase_admin import auth
 from firebase_admin.exceptions import FirebaseError
 from firebase_admin._auth_utils import UserNotFoundError
 from google.cloud import firestore
-
+from backend.app.utils.firestore_utils import get_db
 from backend.app.models.account import AccountCreate, AccountResponse, RoleEnum
 from backend.app.core.roles import ROLE_PERMISSIONS
 from backend.app.core.firebase import get_firestore
@@ -82,9 +83,8 @@ def delete_firebase_user(uid: str):
 
 def write_firestore_profile(uid: str, payload: dict):
     """Write user profile to Firestore."""
-    db = get_firestore()
     try:
-        db.collection("users").document(uid).set(payload, merge=True)
+        get_db().collection("users").document(uid).set(payload, merge=True)
         logger.info("✅ Firestore profile created for UID: %s", uid)
     except Exception as e:
         logger.error("❌ Firestore write failed: %s", str(e), exc_info=True)
@@ -96,12 +96,11 @@ def write_firestore_profile(uid: str, payload: dict):
 
 def delete_firestore_profile(uid: str, deleted_by: str):
     """Delete user profile from Firestore and log audit trail."""
-    db = get_firestore()
     try:
-        db.collection("users").document(uid).delete()
+        get_db().collection("users").document(uid).delete()
         logger.info("🗑️ Firestore profile deleted for UID: %s", uid)
 
-        db.collection("role_changes").add({
+        get_db().collection("role_changes").add({
             "action": "delete",
             "target_user": uid,
             "changed_by": deleted_by,
@@ -117,9 +116,8 @@ def delete_firestore_profile(uid: str, deleted_by: str):
 
 def update_user_role(uid: str, new_role: RoleEnum, changed_by: str) -> AccountResponse:
     """Update a user's role in Firestore and Firebase Auth, log the change."""
-    db = get_firestore()
     try:
-        user_ref = db.collection("users").document(uid)
+        user_ref = get_db().collection("users").document(uid)
         snapshot = user_ref.get()
 
         if not snapshot.exists:
@@ -142,7 +140,7 @@ def update_user_role(uid: str, new_role: RoleEnum, changed_by: str) -> AccountRe
         set_user_claims(uid, new_role)
 
         # 📝 Log role change
-        db.collection("role_changes").add({
+        get_db().collection("role_changes").add({
             "action": "update_role",
             "target_user": uid,
             "new_role": new_role.value,
@@ -179,9 +177,8 @@ async def create_barangay_account(data: AccountCreate, created_by: str) -> Accou
     set_user_claims(uid, data.role)
 
     # 📝 Log account creation in audit trail
-    db = get_firestore()
     try:
-        db.collection("role_changes").add({
+        get_db().collection("role_changes").add({
             "action": "create",
             "target_user": uid,
             "new_role": data.role.value,
@@ -216,9 +213,8 @@ async def list_barangay_accounts(
         order_by: str = "createdAt"
     ) -> list[AccountResponse]:
         """List all barangay accounts, optionally filtered by role."""
-        db = get_firestore()
         try:
-            query = db.collection("users").order_by(order_by)
+            query = get_db().collection("users").order_by(order_by)
             if role:
                 query = query.where("role", "==", role.value)
             snapshots = query.limit(limit).offset(offset).stream()
@@ -243,3 +239,11 @@ async def list_barangay_accounts(
                 detail=f"Failed to list accounts: {str(e)}"
             )
 
+def find_account_by_email(email: str) -> Optional[dict]:
+    clean_email = email.strip().lower()
+    docs = get_db().collection("users").where("email", "==", clean_email).stream()
+
+    for doc in docs:
+        return {**doc.to_dict(), "uid": doc.id}
+
+    return None

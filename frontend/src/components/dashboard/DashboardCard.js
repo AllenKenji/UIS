@@ -1,4 +1,3 @@
-import React from "react";
 import PropTypes from "prop-types";
 import "../../styles/dashboard/dashboard-card.css";
 
@@ -34,6 +33,7 @@ DashboardCard.propTypes = {
     "info",
     "danger",
     "warning",
+    "dilg",
     "neutral",
     "youth",
   ]),

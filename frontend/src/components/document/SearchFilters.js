@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import "../../styles/dashboard/search-filters.css";
 
 const SearchFilters = ({ onSearch }) => {

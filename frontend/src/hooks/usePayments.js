@@ -132,7 +132,6 @@ export function usePayments() {
   return { transactions, totals, revenueByCategory, dailySummary };
 }
 
-
 /* ----------------- Helper Functions ----------------- */
 function calculateTotals(data) {
   const collections = data

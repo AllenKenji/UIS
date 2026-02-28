@@ -9,7 +9,7 @@
 .fee-dashboard h1 {
   font-size: 1.8rem;
   margin-bottom: 1.5rem;
-  color: #2c3e50;
+  color: var(--color-accent);
 }
 
 /* Status messages */
@@ -31,7 +31,7 @@
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 2rem;
-  background: #fafafa;
+  background: var(--color-neutral);
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
@@ -43,19 +43,19 @@
 }
 
 .fee-table th {
-  background: #f0f0f0;
+  background: var(--color-table-header);
   font-weight: 600;
 }
 
 .fee-table tr:nth-child(even) {
-  background: #f9f9f9;
+  background: var(--color-table-row-even);
 }
 
 /* Inputs */
 .fee-table input[type="number"] {
   width: 100px;
   padding: 0.25rem;
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-border);
   border-radius: 4px;
 }
 

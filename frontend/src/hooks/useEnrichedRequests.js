@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { DocumentsAPI } from "../services/api";   // ✅ use centralized API
+import { DocumentsAPI } from "../services/api";   
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { getDoc, doc } from "firebase/firestore";
 import { db } from "../services/firebase";
@@ -12,7 +12,7 @@ const normalizeDoc = (doc) => ({
   created_at: doc.createdAt || doc.created_at,
   updated_at: doc.updatedAt || doc.updated_at,
   paymentStatus: doc.paymentStatus ?? doc.payment_status,
-  transactionId: doc.transactionId ?? doc.transaction_id,       // use ?? not ||
+  transactionId: doc.transactionId ?? doc.transaction_id,       
   paymentIntentId: doc.paymentIntentId ?? doc.payment_intent_id,
   referenceNumber: doc.referenceNumber ?? doc.reference_number,
   attachments: doc.attachments ?? {},
@@ -42,7 +42,7 @@ export const useEnrichedRequests = () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await DocumentsAPI.list();   // ✅ use centralized API
+      const data = await DocumentsAPI.list();  
       const normalized = data.map(normalizeDoc);
 
       const enrich = async (docs) =>

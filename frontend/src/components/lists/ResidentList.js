@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
 import { ResidentsAPI } from '../../services/api';
 import { toast } from 'react-toastify';

@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "../../services/firebase";
+import { useEffect, useState } from "react";
 import DashboardCard from "../dashboard/DashboardCard";
+import { DashboardAPI } from "../../services/api";   
 import "../../styles/dashboard/summary-card.css";
 
 const DOCUMENT_CATEGORIES = [
@@ -28,27 +27,18 @@ const DocumentSummaryCards = () => {
         const results = await Promise.all(
           DOCUMENT_CATEGORIES.map(async (cat) => {
             try {
-              const counterRef = doc(db, "counters", cat.type);
-              const snap = await getDoc(counterRef);
-
-              if (!snap.exists()) {
-                // No doc yet → treat as 0
-                return { ...cat, value: 0 };
-              }
-
-              const value = snap.data().last_number || 0;
-              return { ...cat, value };
+              const data = await DashboardAPI.issuedCount(cat.type);
+              return { ...cat, value: data.issuedCount || 0 };
             } catch (err) {
-              console.warn(`⚠️ Error fetching counter for ${cat.type}:`, err.message);
-              return { ...cat, value: 0 }; // fallback to 0 instead of "N/A"
+              console.warn(`⚠️ Error fetching issued count for ${cat.type}:`, err.message);
+              return { ...cat, value: 0 };
             }
           })
         );
-        if (!cancelled) { 
-          setStats(results); 
-          setLoading(false); 
+        if (!cancelled) {
+          setStats(results);
+          setLoading(false);
         }
-
       } catch (err) {
         if (!cancelled) {
           setStats([]);

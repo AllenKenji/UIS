@@ -1,9 +1,7 @@
-// frontend/src/components/dashboard/RoleManager.js
-
-import React, { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { auth, db } from "../../services/firebase";
-import { AccountsAPI } from "../../services/api";
+import { AccountsAPI, RolesAPI } from "../../services/api";
 import { useUser } from "../../context/UserContext";
 import { ROLE_OPTIONS } from "../../config/roles";
 import "../../styles/dashboard/role-manager.css";
@@ -16,7 +14,7 @@ const RoleManager = () => {
   const [pendingUserId, setPendingUserId] = useState(null);
 
   const { userInfo, isAdmin, can } = useUser();
-  const hasManagePermission = isAdmin || can("manageUsers"); // ✅ aligned with role_permissions.json
+  const hasManagePermission = isAdmin || can("manageUsers"); 
 
   // 🔍 Fetch users (only if allowed)
   const fetchUsers = useCallback(async () => {
@@ -159,6 +157,20 @@ const RoleManager = () => {
       (a.full_name || "").localeCompare(b.full_name || "")
   );
 
+  const bootstrapAdmin = async () => {
+    try { 
+      const result = await RolesAPI.assignRole(userInfo.uid, "admin"); 
+      setFeedback(`✅ Role '${result.role}' assigned to your account`); 
+      // Refresh token so claim is visible right away 
+      await auth.currentUser.getIdToken(true); 
+      const tokenResult = await auth.currentUser.getIdTokenResult(); 
+      console.log("Updated role claim:", tokenResult.claims.role); 
+    } catch (err) { 
+      console.error("❌ Failed to assign admin role:", err); 
+      setFeedback("❌ Failed to assign admin role"); 
+    } 
+  };
+
   return (
     <section className="role-manager" aria-busy={loading} aria-live="polite">
       <h3>🛂 Role Manager</h3>
@@ -204,6 +216,11 @@ const RoleManager = () => {
                       </option>
                     ))}
                   </select>
+                  {user.id === userInfo?.uid && user.role !== "admin" && (
+                    <button onClick={bootstrapAdmin}>
+                      🚀 Bootstrap My Admin Role
+                    </button>
+                  )}
                   <button
                     onClick={() => handleDeleteUser(user.id)}
                     disabled={!hasManagePermission || pendingUserId === user.id}

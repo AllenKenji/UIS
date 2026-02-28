@@ -1,0 +1,25 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+venv/
+.env*
+*.env
+
+# Node modules (frontend)
+node_modules/
+
+# Git and Firebase artifacts
+.git
+.gitignore
+firebase-debug.log
+firebase-debug.*.log
+
+# Local secrets (you already COPY serviceAccountKey.json explicitly)
+serviceAccountKey.json
+
+# OS files
+.DS_Store
+Thumbs.db

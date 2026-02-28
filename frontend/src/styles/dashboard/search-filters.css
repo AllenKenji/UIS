@@ -1,7 +1,7 @@
 /* search-filters.css */
 
 .search-filters {
-  background-color: #fff;
+  background-color: var(--color-bg);
   padding: 1.5rem;
   margin: 1.5rem 0;
   border-radius: 6px;
@@ -11,7 +11,7 @@
 .search-filters h3 {
   margin-bottom: 1rem;
   font-size: 1.2rem;
-  color: #111827;
+  color: var(--color-success);
 }
 
 .filter-row {
@@ -23,7 +23,7 @@
 .filter-row label {
   width: 100px;
   font-weight: 500;
-  color: #374151;
+  color: var(--color-text);
 }
 
 .filter-row input,
@@ -33,6 +33,8 @@
   border: 1px solid #d1d5db;
   border-radius: 4px;
   font-size: 0.9rem;
+  background: var(--color-bg);
+  color: var(--color-text);
 }
 
 .filter-actions {

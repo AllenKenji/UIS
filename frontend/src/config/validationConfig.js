@@ -53,7 +53,6 @@ const validationConfig = {
       },
     ],
   },
-  // 🆕 Add more modes here in the future
 };
 
 export default validationConfig;

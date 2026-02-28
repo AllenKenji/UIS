@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useOutletContext, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { ResidentsAPI } from "../../services/api";
@@ -8,6 +8,7 @@ import SignatureField from "./SignatureField";
 import { uploadFile, uploadBase64Image, uploadThumbprint } from "../../utils/fileUtils";
 import { PARANAQUE } from "../../data/locations";
 import { cleanPayload } from "../../utils/cleanPayload";
+import { sendEmail } from "../../services/email";
 import "./resident-form.css";
 
 const getAuthUid = () => {
@@ -16,7 +17,6 @@ const getAuthUid = () => {
   return uid;
 };
 
-// ✅ safer age calculation
 const calculateAge = (birthDate) => {
   const today = new Date();
   const dob = new Date(birthDate);
@@ -52,7 +52,6 @@ const ResidentForm = ({ onResidentAdded, onCancel, user: userProp }) => {
   const fullName = watch("fullName");
   const age = birthDate ? calculateAge(birthDate) : "";
 
-  // 🔧 File handler
   const handleFileChange = (e, setter, label) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -63,9 +62,11 @@ const ResidentForm = ({ onResidentAdded, onCancel, user: userProp }) => {
     setter({ file, preview: URL.createObjectURL(file) });
   };
 
-  // 🔧 Payload builder
   const buildPayload = async (data) => {
     const uid = getAuthUid();
+    await auth.currentUser.getIdToken(true);
+    const tokenResult = await auth.currentUser.getIdTokenResult();
+    console.log("🔑 Current role claim:", tokenResult.claims.role);
 
     let photoUrl = null;
     let leftThumbUrl = null;
@@ -73,18 +74,10 @@ const ResidentForm = ({ onResidentAdded, onCancel, user: userProp }) => {
     let signatureUrl = null;
 
     try {
-      if (photo.file) {
-        photoUrl = await uploadFile(uid, photo.file, "photos", true);
-      }
-      if (leftThumb.file) {
-        leftThumbUrl = await uploadThumbprint(uid, leftThumb.file, "left");
-      }
-      if (rightThumb.file) {
-        rightThumbUrl = await uploadThumbprint(uid, rightThumb.file, "right");
-      }
-      if (signatureDataUrl) {
-        signatureUrl = await uploadBase64Image(uid, signatureDataUrl, "signatures");
-      }
+      if (photo.file) photoUrl = await uploadFile(uid, photo.file, "photos", true);
+      if (leftThumb.file) leftThumbUrl = await uploadThumbprint(uid, leftThumb.file, "left");
+      if (rightThumb.file) rightThumbUrl = await uploadThumbprint(uid, rightThumb.file, "right");
+      if (signatureDataUrl) signatureUrl = await uploadBase64Image(uid, signatureDataUrl, "signatures");
     } catch (err) {
       console.error("❌ Upload failed:", err);
       throw new Error("❌ Upload failed. Please retry.");
@@ -92,10 +85,7 @@ const ResidentForm = ({ onResidentAdded, onCancel, user: userProp }) => {
 
     return cleanPayload(data, {
       photoUrl,
-      fingerprints: {
-        left: leftThumbUrl,
-        right: rightThumbUrl,
-      },
+      fingerprints: { left: leftThumbUrl, right: rightThumbUrl },
       signatureUrl,
     });
   };
@@ -125,6 +115,9 @@ const ResidentForm = ({ onResidentAdded, onCancel, user: userProp }) => {
 
       const payload = await buildPayload(data);
 
+      console.log("✅ Payload email before sendWelcomeEmail:", payload.email);
+
+
       if (
         (photo.file && !payload.photoUrl) ||
         (leftThumb.file && !payload.fingerprints.left) ||
@@ -136,29 +129,29 @@ const ResidentForm = ({ onResidentAdded, onCancel, user: userProp }) => {
       }
 
       console.log("🚀 Final payload:", payload);
-
-      // ✅ CAPTURE THE CREATED RESIDENT
       const created = await ResidentsAPI.create(payload);
-
-      // ✅ EXTRACT THE ID
       const residentId = created?.id || created?.uid;
+      if (!residentId) throw new Error("❌ Backend did not return a resident ID.");
 
-      if (!residentId) {
-        throw new Error("❌ Backend did not return a resident ID.");
+      // 🔔 Send welcome email 
+      try {
+        await sendEmail({ 
+          type: "welcome",
+          fullName: payload.fullName, 
+          email: payload.email, 
+          barangay: payload.address?.barangay || payload.barangay, 
+        });
+        console.log("📩 Function received payload:", payload);
+        console.log("📩 Sending email to:", payload.email);
+
+        toast.success("✅ Resident added and email sent!");
+      } catch (emailErr) {
+        console.error("❌ Failed to send welcome email:", emailErr);
+        toast.warning("✅ Resident added but failed to send welcome email.");
       }
-
-      toast.success("✅ Resident added!");
-
-      // ✅ CLEAR FORM
       clearForm();
-
-      // ✅ PASS ID TO PARENT OR NAVIGATE
-      if (onResidentAdded) {
-        onResidentAdded(residentId);
-      } else {
-        navigate(`/residents/${residentId}`);
-      }
-
+      if (onResidentAdded) onResidentAdded(residentId);
+      else navigate(`/residents`);
     } catch (error) {
       console.error("❌ Error adding resident:", error);
       toast.error(error?.response?.data?.message || error.message || "❌ Failed to add resident.");
@@ -172,65 +165,92 @@ const ResidentForm = ({ onResidentAdded, onCancel, user: userProp }) => {
     else navigate("/residents");
   };
 
-  if (!user) {
-    return <p className="auth-warning">❌ You must be logged in to add a resident.</p>;
-  }
+  if (!user) return <p className="auth-warning">❌ You must be logged in to add a resident.</p>;
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="resident-form">
-      {/* Basic fields */}
+      {/* Full Name */}
       <label htmlFor="fullName">Full Name</label>
-      <input id="fullName" {...register("fullName", { required: true })} />
-      {errors.fullName && <span className="error">Full name is required</span>}
+      <input id="fullName" {...register("fullName", { required: "Full name is required" })} className={errors.fullName ? "input-error" : ""} />
+      {errors.fullName && <span className="error">{errors.fullName.message}</span>}
 
+      {/* Birth Date */}
       <label htmlFor="birthDate">Birth Date</label>
-      <input id="birthDate" type="date" {...register("birthDate", { required: true })} />
-      {errors.birthDate && <span className="error">Birth date is required</span>}
+      <input id="birthDate" type="date" {...register("birthDate", { required: "Birth date is required" })} className={errors.birthDate ? "input-error" : ""} />
+      {errors.birthDate && <span className="error">{errors.birthDate.message}</span>}
       {age && <p>Age: {age}</p>}
 
+      {/* Gender */}
       <label htmlFor="gender">Gender</label>
-      <select id="gender" {...register("gender", { required: true })}>
+      <select id="gender" {...register("gender", { required: "Gender is required" })} className={errors.gender ? "input-error" : ""}>
         <option value="">Select Gender</option>
         <option value="Male">Male</option>
         <option value="Female">Female</option>
         <option value="Other">Other</option>
       </select>
+      {errors.gender && <span className="error">{errors.gender.message}</span>}
 
+      {/* Civil Status */}
       <label htmlFor="civilStatus">Civil Status</label>
-      <select id="civilStatus" {...register("civilStatus", { required: true })}>
+      <select id="civilStatus" {...register("civilStatus", { required: "Civil status is required" })} className={errors.civilStatus ? "input-error" : ""}>
         <option value="">Select Status</option>
         <option value="Single">Single</option>
         <option value="Married">Married</option>
         <option value="Widowed">Widowed</option>
         <option value="Separated">Separated</option>
       </select>
+      {errors.civilStatus && <span className="error">{errors.civilStatus.message}</span>}
 
+      {/* Contact Number */}
       <label htmlFor="contactNumber">Contact Number</label>
-      <input id="contactNumber" {...register("contactNumber", { required: true, pattern: /^09\d{9}$/ })} />
-      {errors.contactNumber && <span className="error">Must be a valid PH mobile number</span>}
+      <input id="contactNumber" {...register("contactNumber", { required: "Contact number is required", pattern: { value: /^09\d{9}$/, message: "Must be a valid PH mobile number" } })} className={errors.contactNumber ? "input-error" : ""} />
+      {errors.contactNumber && <span className="error">{errors.contactNumber.message}</span>}
 
+      {/* Email */}
       <label htmlFor="email">Email</label>
-      <input id="email" type="email" {...register("email")} />
+      <input id="email" type="email" {...register("email", { required: "Email is required" })} className={errors.email ? "input-error" : ""} />
+      {errors.email && <span className="error">{errors.email.message}</span>}
 
-      {/* Address */}
+            {/* Address */}
       <fieldset>
         <legend>Address</legend>
+
         <label htmlFor="houseNumber">House Number</label>
-        <input id="houseNumber" {...register("houseNumber", { required: true })} />
+        <input
+          id="houseNumber"
+          {...register("houseNumber", { required: "House number is required" })}
+          className={errors.houseNumber ? "input-error" : ""}
+        />
+        {errors.houseNumber && <span className="error">{errors.houseNumber.message}</span>}
 
         <label htmlFor="street">Street</label>
-        <input id="street" {...register("street", { required: true })} />
+        <input
+          id="street"
+          {...register("street", { required: "Street is required" })}
+          className={errors.street ? "input-error" : ""}
+        />
+        {errors.street && <span className="error">{errors.street.message}</span>}
 
         <label htmlFor="purok">Purok</label>
-        <input id="purok" {...register("purok", { required: true })} />
+        <input
+          id="purok"
+          {...register("purok", { required: "Purok is required" })}
+          className={errors.purok ? "input-error" : ""}
+        />
+        {errors.purok && <span className="error">{errors.purok.message}</span>}
 
         <label htmlFor="barangay">Barangay</label>
-        <select id="barangay" {...register("barangay", { required: true })}>
+        <select
+          id="barangay"
+          {...register("barangay", { required: "Barangay is required" })}
+          className={errors.barangay ? "input-error" : ""}
+        >
           <option value="">Select Barangay</option>
           {PARANAQUE.barangays.map((b) => (
             <option key={b} value={b}>{b}</option>
           ))}
         </select>
+        {errors.barangay && <span className="error">{errors.barangay.message}</span>}
 
         <label htmlFor="city">City</label>
         <input id="city" value={PARANAQUE.city} readOnly {...register("city")} />
@@ -239,27 +259,42 @@ const ResidentForm = ({ onResidentAdded, onCancel, user: userProp }) => {
         <input id="province" value={PARANAQUE.province} readOnly {...register("province")} />
 
         <label htmlFor="zipCode">Zip Code</label>
-        <input id="zipCode" {...register("zipCode")} />
+        <input id="zipCode" {...register("zipCode", { required: "Zip code is required" })} className={errors.zipCode ? "input-error" : ""} />
+        {errors.zipCode && <span className="error">{errors.zipCode.message}</span>}
       </fieldset>
 
+      {/* Head of Family */}
       <label htmlFor="isHeadOfFamily">Head of Family</label>
-      <select id="isHeadOfFamily" {...register("isHeadOfFamily", { required: true })}>
+      <select
+        id="isHeadOfFamily"
+        {...register("isHeadOfFamily", { required: "Head of family selection is required" })}
+        className={errors.isHeadOfFamily ? "input-error" : ""}
+      >
         <option value="">Select</option>
         <option value="true">Yes</option>
         <option value="false">No</option>
       </select>
+      {errors.isHeadOfFamily && <span className="error">{errors.isHeadOfFamily.message}</span>}
 
+      {/* Voter Status */}
       <label htmlFor="voterStatus">Voter Status</label>
-      <select id="voterStatus" {...register("voterStatus", { required: true })}>
+      <select
+        id="voterStatus"
+        {...register("voterStatus", { required: "Voter status is required" })}
+        className={errors.voterStatus ? "input-error" : ""}
+      >
         <option value="">Select</option>
         <option value="yes">Yes</option>
         <option value="no">No</option>
         <option value="unknown">Unknown</option>
       </select>
+      {errors.voterStatus && <span className="error">{errors.voterStatus.message}</span>}
 
+      {/* Occupation */}
       <label htmlFor="occupation">Occupation</label>
       <input id="occupation" {...register("occupation")} />
 
+      {/* Remarks */}
       <label htmlFor="remarks">Remarks</label>
       <textarea id="remarks" {...register("remarks")} />
 

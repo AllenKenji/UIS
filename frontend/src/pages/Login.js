@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   signInWithEmailAndPassword,
   setPersistence,
   browserSessionPersistence,
+  browserLocalPersistence,
 } from "firebase/auth";
 import { auth, db } from "../services/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { useNavigate, Link } from "react-router-dom";
 import { toast } from "react-toastify";
+import { NotificationsAPI } from "../services/api"; // 👈 import
 import "./login.css";
 
 const roleRedirects = {
@@ -20,10 +22,7 @@ const roleRedirects = {
   dilg: "/audit",
 };
 
-const normalizeRole = (role) => {
-  const normalized = role?.trim().toLowerCase();
-  return normalized || "resident";
-};
+const normalizeRole = (role) => (role?.trim().toLowerCase() || "resident");
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -33,6 +32,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
+  // Load remembered email
   useEffect(() => {
     const savedEmail = localStorage.getItem("rememberedEmail");
     if (savedEmail) {
@@ -60,30 +60,28 @@ const Login = () => {
     navigate(target, { replace: true });
   };
 
+ 
+
   const handleLogin = async (e) => {
     e.preventDefault();
     if (!validateInputs()) return;
 
     setLoading(true);
     try {
-      await setPersistence(auth, browserSessionPersistence);
+      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
       const { user } = await signInWithEmailAndPassword(auth, email, password);
 
       await user.getIdToken(true);
-
       const tokenResult = await user.getIdTokenResult();
       let role = normalizeRole(tokenResult.claims.role);
 
       let userData = null;
-      const userDocRef = doc(db, "users", user.uid);
-      const userDoc = await getDoc(userDocRef);
-
+      const userDoc = await getDoc(doc(db, "users", user.uid));
       if (userDoc.exists()) {
         userData = userDoc.data();
         role = normalizeRole(userData.role || role);
       } else {
-        const residentDocRef = doc(db, "residents", user.uid);
-        const residentDoc = await getDoc(residentDocRef);
+        const residentDoc = await getDoc(doc(db, "residents", user.uid));
         if (residentDoc.exists()) {
           userData = residentDoc.data();
           role = "resident";
@@ -91,7 +89,6 @@ const Login = () => {
       }
 
       if (!userData) {
-        console.warn("❌ No profile found for UID:", user.uid);
         toast.error("❌ Unauthorized account. Contact admin.");
         return;
       }
@@ -104,6 +101,13 @@ const Login = () => {
         localStorage.removeItem("rememberedEmail");
       }
 
+      // ✅ Trigger notification
+      if (role === "resident") {
+        await NotificationsAPI.createResidentLogin(1);
+      } else {
+        await NotificationsAPI.createOfficerLogin(userData.fullName || email);
+      }
+
       toast.success(`✅ Welcome, ${userData.fullName || email}`);
       redirectByRole(role);
     } catch (error) {
@@ -112,6 +116,9 @@ const Login = () => {
         case "auth/wrong-password":
         case "auth/user-not-found":
           toast.error("❌ Invalid credentials");
+          break;
+        case "auth/too-many-requests":
+          toast.error("❌ Too many attempts. Try again later.");
           break;
         case "permission-denied":
           toast.error("❌ Access denied. Contact admin.");
@@ -124,6 +131,7 @@ const Login = () => {
     }
   };
 
+
   return (
     <div className="login-container">
       <form
@@ -134,11 +142,11 @@ const Login = () => {
       >
         <h2>🔐 Barangay Login</h2>
 
+        {/* Email */}
         <div className="form-group">
           <label htmlFor="email">Email Address</label>
           <input
             id="email"
-            name="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -149,12 +157,12 @@ const Login = () => {
           />
         </div>
 
+        {/* Password */}
         <div className="form-group password-group">
           <label htmlFor="password">Password</label>
           <div className="password-wrapper">
             <input
               id="password"
-              name="password"
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -175,6 +183,7 @@ const Login = () => {
           </div>
         </div>
 
+        {/* Options */}
         <div className="form-options">
           <label className="remember-me">
             <input
@@ -185,12 +194,12 @@ const Login = () => {
             />
             Remember Me
           </label>
-
           <div className="forgot-password">
             <Link to="/reset-password">Forgot Password?</Link>
           </div>
         </div>
 
+        {/* Submit */}
         <button type="submit" className="login-button" disabled={loading}>
           {loading ? "Logging in…" : "Login"}
         </button>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { api, endpoints, BusinessesAPI } from "../../services/api";
 import { usePublicFees } from "../../hooks/usePublicFees";
 import documentConfig from "../../config/documentConfig";

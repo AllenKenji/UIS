@@ -1,7 +1,7 @@
 .transactions-table h2 { 
   margin-bottom: 12px; 
   font-size: 1.2rem; 
-  color: #333; 
+  color: var(--color-success); 
 } 
 
 .transactions-table table { 
@@ -23,13 +23,14 @@
 } 
 
 .transactions-table tr:nth-child(even) { 
-  background-color: #fafafa; 
+  background-color: var(--color-neutral); 
 } 
 
 .transactions-table tr:hover { 
-  background-color: #f0f8ff; 
+  background-color: var(--color-accent-hover); 
+  color: var(--color-text);
 } 
 
 .transactions-table td { 
-  color: #444; 
+  color: var(--color-text); 
 }

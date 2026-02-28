@@ -50,16 +50,21 @@
   padding: 0 0.5rem;
 }
 
+.input-error {
+  border: 2px solid var(--color-danger);
+  background-color: #ffe6e6;
+}
+
 .error {
-  color: #d93025;
+  color: var(--color-danger);
   font-size: 0.85rem;
-  margin-top: 0.25rem;
+  margin-top: 4px;
   display: block;
 }
 
 .auth-warning {
   text-align: center;
-  color: #d93025;
+  color: var(--color-warning);
   font-weight: 600;
   margin-top: 2rem;
 }

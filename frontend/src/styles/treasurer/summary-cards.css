@@ -19,7 +19,7 @@
 .card-content h3 {
   margin: 0;
   font-size: 1rem;
-  color: #333;
+  color: var(--color-text-muted);
 }
 
 .card-content p {

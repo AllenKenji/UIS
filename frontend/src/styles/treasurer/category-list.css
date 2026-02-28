@@ -12,20 +12,26 @@
 }
 
 .category-table th {
-  background-color: #f5f5f5;
+  background-color: var(--color-table-header);
   font-weight: bold;
 }
 
 .category-table tr:nth-child(even) {
-  background-color: #fafafa;
+  background-color: var(--color-table-row-even);
 }
 
 .category-table .paid {
-  color: #2e7d32; /* green */
+  color: var(--color-success); /* green */
   font-weight: 500;
 }
 
 .category-table .unpaid {
-  color: #c62828; /* red */
+  color: var(--color-danger); /* red */
   font-weight: 500;
 }
+
+.category-table tr:hover {
+  background-color: var(--color-accent-hover);
+  color: #fff;
+  transition: background-color 0.2s ease, color 0.2s ease;
+} 

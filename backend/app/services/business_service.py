@@ -1,11 +1,11 @@
 import uuid
 from datetime import datetime, timezone
 import logging
-from backend.app.core.firebase import get_firestore, delete_file
+from backend.app.core.firebase import delete_file
 from backend.app.services.paymongo_service import create_payment_link
 from backend.app.services.fee_service import resolve_business_fee, determine_business_fee_type
+from backend.app.utils.firestore_utils import get_db
 
-db = get_firestore()
 logger = logging.getLogger("uvicorn.error")
 
 def create_business_application(data):
@@ -17,7 +17,7 @@ def create_business_application(data):
     fee_breakdown = resolve_business_fee(business.type, fee_type)
     amount = fee_breakdown["totalFee"]
 
-    doc_ref = db.collection("businesses").document()
+    doc_ref = get_db().collection("businesses").document()
     year = datetime.now().year
     business_id = f"BIZ-{business.barangay.upper()}-{year}-{uuid.uuid4().hex[:4]}"
 
@@ -73,7 +73,7 @@ def create_business_application(data):
 def update_businesses_for_annual_renewal():
     """Scan businesses and move those past their anniversary into for_payment with annual fee."""
     now = datetime.now(timezone.utc)
-    businesses = db.collection("businesses").stream()
+    businesses = get_db().collection("businesses").stream()
 
     for biz in businesses:
         data = biz.to_dict()
@@ -95,7 +95,7 @@ def update_businesses_for_annual_renewal():
 
 def delete_business_and_related(business_id: str):
     """Delete a business and all related payments, receipts, and storage attachments."""
-    business_docs = db.collection("businesses").where("businessId", "==", business_id).limit(1).get()
+    business_docs = get_db().collection("businesses").where("businessId", "==", business_id).limit(1).get()
     if not business_docs:
         logger.warning("⚠️ No business found for businessId=%s", business_id)
         return {"success": False, "message": "Business not found"}
@@ -118,13 +118,13 @@ def delete_business_and_related(business_id: str):
     logger.info("🗑️ Deleted business %s", business_id)
 
     # --- Delete related payments ---
-    payments = db.collection("payments").where("businessId", "==", business_id).get()
+    payments = get_db().collection("payments").where("businessId", "==", business_id).get()
     for pay in payments:
         pay.reference.delete()
         logger.info("🗑️ Deleted payment %s for business %s", pay.id, business_id)
 
     # --- Delete related receipts ---
-    receipts = db.collection("receipts").where("businessId", "==", business_id).get()
+    receipts = get_db().collection("receipts").where("businessId", "==", business_id).get()
     for rec in receipts:
         rec.reference.delete()
         logger.info("🗑️ Deleted receipt %s for business %s", rec.id, business_id)

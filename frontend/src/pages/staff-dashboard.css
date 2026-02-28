@@ -5,14 +5,14 @@
 .staff-dashboard-content.blurred {
   filter: blur(4px);
   pointer-events: none;
-  -webkit-user-select: none; /* ✅ Safari/iOS support */
-  user-select: none;          /* ✅ Standard property */
+  -webkit-user-select: none; 
+  user-select: none;          
 }
 
 
 .form-overlay {
   position: fixed;
-  top: 0;   /* fallback for older Safari/iOS */
+  top: 0;  
   right: 0;
   bottom: 0;
   left: 0;
@@ -47,9 +47,9 @@
 }
 
 .dashboard-header {
-  display: flex;
-  justify-content: space-between; /* pushes buttons to far right */
-  align-items: center;
+  /* display: flex;
+  justify-content: space-between; 
+  align-items: center; */
   padding: var(--space-md);
 }
 

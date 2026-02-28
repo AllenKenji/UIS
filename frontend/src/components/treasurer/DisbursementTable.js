@@ -1,4 +1,3 @@
-import React from "react";
 import { useDisbursements } from "../../hooks/useDisbursements";
 
 function DisbursementTable() {

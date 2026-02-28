@@ -1,3 +1,4 @@
+// context/UserContext.js
 import {
   createContext,
   useState,
@@ -16,24 +17,26 @@ import { auth, db } from "../services/firebase";
 import { ROLE_PERMISSIONS, VALID_ROLES } from "../config/roles";
 
 const UserContext = createContext();
-const DEBUG = true;
+const DEBUG = process.env.NODE_ENV !== "production";
+const CACHE_TTL = 1000 * 60 * 30; // 30 minutes
 
 // ✅ Normalize role safely
 const normalizeRole = (role) => {
   const normalized = role?.trim().toLowerCase();
   if (!normalized || !VALID_ROLES.includes(normalized)) {
-    if (DEBUG) console.warn(`⚠️ Unknown or missing role "${role}", defaulting to resident`);
-    return "resident";
+    if (DEBUG) console.warn(`⚠️ Unknown or missing role "${role}"`);
+    return null; // invalid role → unauthorized
   }
   return normalized;
 };
 
 export const UserProvider = ({ children }) => {
   const [userInfo, setUserInfo] = useState(null);
-  const [role, setRole] = useState("resident");
+  const [role, setRole] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [token, setToken] = useState(null);
 
   const isAdmin = role === "admin";
 
@@ -42,14 +45,11 @@ export const UserProvider = ({ children }) => {
     (action) => {
       const rolePerms = ROLE_PERMISSIONS[role] || {};
       const allowed = Boolean(rolePerms[action]);
-
-      // ✅ Only warn if the action is defined for this role but set to false
       const actionExists = Object.prototype.hasOwnProperty.call(rolePerms, action);
 
       if (DEBUG && !allowed && actionExists && role !== "resident") {
         console.warn(`🚫 Role "${role}" lacks permission for "${action}"`);
       }
-
       return allowed;
     },
     [role]
@@ -62,8 +62,9 @@ export const UserProvider = ({ children }) => {
   );
 
   const updateUserInfo = useCallback((info) => {
-    setUserInfo(info);
-    sessionStorage.setItem("userInfo", JSON.stringify(info));
+    const enriched = { ...info, cachedAt: Date.now() };
+    setUserInfo(enriched);
+    sessionStorage.setItem("userInfo", JSON.stringify(enriched));
   }, []);
 
   const updateRole = useCallback((newRole) => {
@@ -72,26 +73,32 @@ export const UserProvider = ({ children }) => {
 
   const clearUserState = useCallback(() => {
     setUserInfo(null);
-    setRole("resident");
+    setRole(null);
     setIsAuthenticated(false);
     setError(null);
     sessionStorage.removeItem("userInfo");
+    sessionStorage.removeItem("authToken");
   }, []);
+
+  // ✅ Error helper
+  const safeSetError = (msg) => {
+    setError(msg);
+    setTimeout(() => setError(null), 5000);
+  };
 
   // ✅ Token helpers
   const getToken = useCallback(async (forceRefresh = true) => {
     if (!auth.currentUser) return null;
     try {
-      const token = await getIdToken(auth.currentUser, forceRefresh);
-      sessionStorage.setItem("authToken", token);
-      return token;
+      const freshToken = await getIdToken(auth.currentUser, forceRefresh);
+      sessionStorage.setItem("authToken", freshToken);
+      setToken(freshToken);
+      return freshToken;
     } catch (err) {
       console.error("❌ Failed to get ID token:", err);
-      setError("Token retrieval failed");
-      // fallback to cached token
+      safeSetError("Token retrieval failed");
       const cached = sessionStorage.getItem("authToken");
-      if (cached) return cached;
-      return null;
+      return cached || null;
     }
   }, []);
 
@@ -101,7 +108,7 @@ export const UserProvider = ({ children }) => {
       return await getIdTokenResult(auth.currentUser, forceRefresh);
     } catch (err) {
       console.error("❌ Failed to get ID token result:", err);
-      setError("Token result retrieval failed");
+      safeSetError("Token result retrieval failed");
       return null;
     }
   }, []);
@@ -112,7 +119,7 @@ export const UserProvider = ({ children }) => {
       await signOut(auth);
     } catch (err) {
       console.error("❌ Sign-out failed:", err);
-      setError("Sign-out failed");
+      safeSetError("Sign-out failed");
     }
   }, [clearUserState]);
 
@@ -132,21 +139,21 @@ export const UserProvider = ({ children }) => {
         return null;
       }
 
-      return { ...snapshot.data(), uid, cachedAt: Date.now() };
+      return { ...snapshot.data(), uid };
     } catch (err) {
       console.error("❌ Error fetching user profile:", err);
-      setError("Failed to load user profile");
+      safeSetError("Failed to load user profile");
       return null;
     }
   }, []);
 
-  // ✅ Restore session from cache
+  // ✅ Restore session from cache with expiry
   useEffect(() => {
     try {
       const cached = sessionStorage.getItem("userInfo");
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (parsed?.role) {
+        if (parsed?.cachedAt && Date.now() - parsed.cachedAt < CACHE_TTL) {
           setUserInfo(parsed);
           setRole(normalizeRole(parsed.role));
           setIsAuthenticated(true);
@@ -163,7 +170,7 @@ export const UserProvider = ({ children }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        clearUserState();
+        if (!loading) clearUserState();
         setLoading(false);
         return;
       }
@@ -175,39 +182,42 @@ export const UserProvider = ({ children }) => {
           : null;
 
         const profile = await fetchUserProfile(user.uid);
+        const effectiveRole = claimRole || normalizeRole(profile?.role);
 
-        // ✅ Determine role safely
-        let effectiveRole = claimRole;
-        if (!effectiveRole && profile?.role) {
-          effectiveRole = normalizeRole(profile.role);
-        }
         if (!effectiveRole) {
-          effectiveRole = "resident";
-        }
-
-        if (DEBUG) {
-          console.debug("🔍 Token claims:", tokenResult.claims);
-          console.debug("👤 Firestore profile:", profile);
-          console.debug("🎭 Effective role:", effectiveRole);
-          console.debug("Auth currentUser:", user);
+          clearUserState();
+          safeSetError("Unauthorized role");
+          setLoading(false);
+          return;
         }
 
         const enriched = { ...(profile || {}), uid: user.uid, role: effectiveRole };
-
         updateRole(effectiveRole);
         updateUserInfo(enriched);
         setIsAuthenticated(true);
         setError(null);
+
+        const freshToken = await getToken(true);
+        setToken(freshToken);
       } catch (err) {
         console.error("❌ Error during auth state handling:", err);
-        // ✅ Do NOT log out the user on transient errors
+        safeSetError("Authentication error");
       }
 
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [fetchUserProfile, clearUserState, updateRole, updateUserInfo]);
+  }, [fetchUserProfile, clearUserState, updateRole, updateUserInfo, getToken, loading]);
+
+  // ✅ Token auto-refresh every 55 minutes
+  useEffect(() => {
+    if (!auth.currentUser) return;
+    const interval = setInterval(() => {
+      getToken(true);
+    }, 55 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [getToken]);
 
   // ✅ Safety timeout
   useEffect(() => {
@@ -219,6 +229,16 @@ export const UserProvider = ({ children }) => {
     }, 5000);
     return () => clearTimeout(timeout);
   }, [loading]);
+
+  // ✅ Manual refresh
+  const refreshProfile = useCallback(async () => {
+    if (!auth.currentUser) return;
+    const profile = await fetchUserProfile(auth.currentUser.uid);
+    if (profile) {
+      updateUserInfo(profile);
+      updateRole(profile.role);
+    }
+  }, [fetchUserProfile, updateUserInfo, updateRole]);
 
   return (
     <UserContext.Provider
@@ -236,6 +256,8 @@ export const UserProvider = ({ children }) => {
         can,
         updateUserInfo,
         updateRole,
+        refreshProfile,
+        token,
       }}
     >
       {children}

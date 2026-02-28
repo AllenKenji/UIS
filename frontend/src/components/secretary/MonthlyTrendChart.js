@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -24,7 +24,7 @@ const MonthlyTrendChart = ({ documents = [] }) => {
       if (!createdAt) return;
 
       const date = new Date(createdAt);
-      const monthIndex = date.getMonth(); // 0 = Jan, 11 = Dec
+      const monthIndex = date.getMonth(); 
       map[monthIndex] += 1;
     });
 

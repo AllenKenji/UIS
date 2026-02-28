@@ -8,18 +8,12 @@ WORKDIR /app
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of your backend code
+# Copy backend code and config
 COPY backend ./backend
-
 COPY config ./config
 
-# Copy Firebase credentials
-COPY backend/serviceAccountKey.json ./serviceAccountKey.json
-ENV GOOGLE_APPLICATION_CREDENTIALS=/app/serviceAccountKey.json
-
-# Set environment variables
+# Environment variables
 ENV PYTHONPATH=/app
 
-# ✅ Correct import path for main.py inside /app
+# ✅ Entrypoint for Cloud Run
 CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers", "--forwarded-allow-ips", "*"]
-

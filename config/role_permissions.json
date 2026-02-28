@@ -12,6 +12,8 @@
     "auditBarangayData",
     "documentRequest",
     "manageDocuments",
+    "issuedDocuments",
+    "rejectedRequests",
     "viewDocuments",
     "viewBusinesses",
     "viewAllComplaints",
@@ -62,7 +64,8 @@
     "incomingPayments",
     "barangayExpenses",
     "financialReports",
-    "settings"
+    "settings",
+    "manageUsers"
   ],
   "sk": [
     "viewDashboard",

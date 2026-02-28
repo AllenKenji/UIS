@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { ComplaintsAPI } from "../../services/api";
 import { useUser } from "../../context/UserContext";
 import { getAuth, onAuthStateChanged } from "firebase/auth";

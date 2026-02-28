@@ -1,10 +1,10 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { api } from "../../services/api";
 import "../../styles/resident/resubmission-form.css";
 
 const ResubmissionForm = ({ doc, onSuccess }) => {
   const [purpose, setPurpose] = useState(doc.purpose || "");
-  const [documentType] = useState(doc.document_type); // locked to original type
+  const [documentType] = useState(doc.document_type); 
   const [idAttachment, setIdAttachment] = useState(null);
   const [residencyAttachment, setResidencyAttachment] = useState(null);
   const [remarks, setRemarks] = useState("");

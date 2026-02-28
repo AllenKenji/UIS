@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import './business-dashboard.css';
 import { collection, query, where, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { getStorage, ref, deleteObject } from "firebase/storage";
@@ -70,7 +70,6 @@ const BusinessDashboard = () => {
     }
   };
 
-  // helper to delete storage files using stored paths
   const deleteStorageFiles = async (docs = {}) => {
     for (const [key, docInfo] of Object.entries(docs)) {
       if (docInfo?.path) {
@@ -94,7 +93,6 @@ const BusinessDashboard = () => {
         await deleteCollectionDocs("payments", "businessId", business.businessId);
         await deleteCollectionDocs("receipts", "businessId", business.businessId);
 
-        // delete attachments from storage using stored paths
         if (business.documents) {
           await deleteStorageFiles(business.documents);
         }

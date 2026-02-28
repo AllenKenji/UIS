@@ -6,6 +6,7 @@ import { doc, getDoc } from "firebase/firestore";
 import PaymentForm from "./PaymentForm";
 import documentConfig from "../../config/documentConfig";
 import { resolveLocation } from "../../utils/resolveLocation"
+import { API_BASE_URL, BusinessesAPI } from "../../services/api";
 import "../../styles/secretary/secretary-document-form.css";
 
 const SecretaryDocumentWorkflow = ({ onCompleted }) => {
@@ -52,11 +53,14 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
   }, [documentTypes]);
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/businesses")
-      .then(res => res.json())
+    BusinessesAPI.listAll()
       .then(data => {
         // If backend returns { businesses: [...] }
-        const list = Array.isArray(data.businesses) ? data.businesses : Array.isArray(data) ? data : [];
+        const list = Array.isArray(data.businesses)
+          ? data.businesses
+          : Array.isArray(data)
+          ? data
+          : [];
         setRegisteredBusinesses(list);
       })
       .catch(() => setRegisteredBusinesses([]));
@@ -219,7 +223,7 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
         }
       });
 
-      const response = await fetch("http://localhost:8000/api/documents", {
+      const response = await fetch(`${API_BASE_URL}/api/documents`, {
         method: "POST",
         body: payload,
       });
@@ -237,7 +241,7 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
   const handlePaymentCompleted = async () => {
     try {
       // Re-fetch document to ensure payment status is updated
-      const refreshedDoc = await fetch(`http://localhost:8000/api/documents/${newDoc.id}`);
+      const refreshedDoc = await fetch(`${API_BASE_URL}/api/documents/${newDoc.id}`);
       const docData = await refreshedDoc.json();
 
       if (docData.status !== "paid" && docData.status !== "payment_submitted") {
@@ -245,12 +249,12 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
         return;
       }
 
-      const issueResponse = await fetch(`http://localhost:8000/api/documents/${newDoc.id}/issue`, {
+      const issueResponse = await fetch(`${API_BASE_URL}/api/documents/${newDoc.id}/issue`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          issuedBy: currentSecretary.full_name, 
-          remarks: issueRemarks || `Issued by ${currentSecretary.full_name}`, 
+          issued_by: currentSecretary.full_name || currentSecretary.fullName, 
+          remarks: issueRemarks || `Issued by ${currentSecretary.full_name}` || `Issued by ${currentSecretary.fullName}`, 
         }),
       });
 
@@ -485,6 +489,7 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
           entityId={newDoc.id}
           entityType="document"
           resident={residents.find(r => r.id === formData.resident_id)}
+          entityCategory={formData.document_type}
           description={newDoc.documentType}
           fee={newDoc.amount}
           customEntityId={newDoc.documentId}
