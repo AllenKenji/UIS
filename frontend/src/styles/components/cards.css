@@ -22,15 +22,6 @@
 }
 
 /* ===============================
-🎨 Variants
-================================ */
-.dashboard-card.accent  { border-left: 6px solid var(--accent); }
-.dashboard-card.success { border-left: 6px solid var(--success); }
-.dashboard-card.danger  { border-left: 6px solid var(--danger); }
-.dashboard-card.warning { border-left: 6px solid #e67e22; }
-.dashboard-card.info    { border-left: 6px solid #9b59b6; }
-
-/* ===============================
 🔤 Typography & Icons
 ================================ */
 .dashboard-card h3,

@@ -1,6 +1,7 @@
 import logging
 from typing import Dict
 from fastapi import WebSocket
+from starlette.websockets import WebSocketState
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -14,7 +15,8 @@ class ConnectionManager:
         Accept and store a new WebSocket connection with user metadata.
         user_info should include: uid, role, user_id, and optionally auth_method.
         """
-        await websocket.accept()
+        if websocket.client_state == WebSocketState.CONNECTING:
+            await websocket.accept()
         self.active_connections[websocket] = user_info
         logger.info(
             "🔌 WebSocket connected (role=%s, user_id=%s, auth=%s). Total connections: %d",
@@ -65,3 +67,6 @@ class ConnectionManager:
             except Exception as e:
                 logger.error("⚠️ Failed to send message to client: %s", e)
                 self.disconnect(connection)
+
+
+manager = ConnectionManager()

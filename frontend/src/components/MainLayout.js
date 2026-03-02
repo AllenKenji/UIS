@@ -88,42 +88,37 @@ const MainLayout = () => {
         <Outlet context={{ user: userInfo }} />
       </div>
 
-      {/* Notification Panel - MOVED OUTSIDE dashboard-content */}
-      {showNotifications && (
-        <aside className="notification-panel">
-          <header className="notification-header">
-            <h2>Notifications</h2>
-            <button className="close-btn" onClick={() => setShowNotifications((prev) => !prev)}>
-              ✖ Close
-            </button>
-          </header>
-          <div className="notification-body">
-            {notifications.length === 0 ? (
-              <p>No notifications</p>
-            ) : (
-              notifications.map((n) => (
-                <div
-                  key={n.id}
-                  className={`notification-item ${n.read ? "read" : "unread"}`}
-                >
-                  <span>{n.message}</span>
-                  <small>{new Date(n.timestamp).toLocaleString()}</small>
-                  <div className="actions">
-                    {!n.read && (
-                      <button onClick={() => markAsRead(n.id)}>Mark read</button>
-                    )}
-                    <button onClick={() => deleteNotification(n.id)}>Delete</button>
-                  </div>
+      {/* Notification Panel - third column that slides in */}
+      <aside className="notification-panel">
+        <header className="notification-header">
+          <h2>Notifications</h2>
+        </header>
+        <div className="notification-body">
+          {notifications.length === 0 ? (
+            <p>No notifications</p>
+          ) : (
+            notifications.map((n) => (
+              <div
+                key={n.id}
+                className={`notification-item ${n.read ? "read" : "unread"}`}
+              >
+                <span>{n.message}</span>
+                <small>{new Date(n.timestamp).toLocaleString()}</small>
+                <div className="actions">
+                  {!n.read && (
+                    <button onClick={() => markAsRead(n.id)}>Mark read</button>
+                  )}
+                  <button onClick={() => deleteNotification(n.id)}>Delete</button>
                 </div>
-              ))
-            )}
-          </div>
-          <footer className="notification-footer">
-            <button onClick={() => bulkDeleteNotifications(true)}>🗑 Clear Read</button>
-            <button onClick={() => bulkDeleteNotifications(false)}>🗑 Clear All</button>
-          </footer>
-        </aside>
-      )}
+              </div>
+            ))
+          )}
+        </div>
+        <footer className="notification-footer">
+          <button onClick={() => bulkDeleteNotifications(true)}>🗑 Clear Read</button>
+          <button onClick={() => bulkDeleteNotifications(false)}>🗑 Delete All</button>
+        </footer>
+      </aside>
     </div>
   );
 };

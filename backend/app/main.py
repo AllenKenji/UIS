@@ -93,7 +93,7 @@ def create_app() -> FastAPI:
     app.include_router(disbursement_routes.router, prefix=f"{api_prefix}", tags=["Disbursements"])
     app.include_router(role_routes.router, prefix=f"{api_prefix}", tags=["Roles"])
     app.include_router(password_routes.router, prefix=f"{api_prefix}", tags=["Password Reset"])
-    app.include_router(ws_routes.router, prefix=f"{api_prefix}", tags=["websocket"])
+    app.include_router(ws_routes.router, tags=["websocket"])
     app.include_router(notification_routes.router, prefix=f"{api_prefix}", tags=["notifications"])
 
     # 🧪 Health Check

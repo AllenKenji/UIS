@@ -1,14 +1,23 @@
 import axios from "axios";
 import { getAuth } from "firebase/auth";
 
+const isDevelopment = process.env.NODE_ENV !== "production";
+const rawEnvApiBaseUrl = process.env.REACT_APP_API_BASE_URL || "";
 
-// 🌐 Base URL for Cloud Run backend
+const normalizeDevBaseUrl = (url) => {
+  if (!url) return "";
+  return url.replace("http://localhost:", "http://127.0.0.1:");
+};
+
+// 🌐 API base URL strategy:
+// - If env var exists, use it (normalized in dev)
+// - In development without env var, use local backend
+// - In production without env var, use deployed API
 export const API_BASE_URL =
-  process.env.REACT_APP_API_BASE_URL ||
-  "https://asia-southeast1-barangay-1721d.cloudfunctions.net/sendEmailAsia";
+  (isDevelopment ? normalizeDevBaseUrl(rawEnvApiBaseUrl) : rawEnvApiBaseUrl) ||
+  (isDevelopment ? "http://127.0.0.1:8000" : "https://asia-southeast1-barangay-1721d.cloudfunctions.net/sendEmailAsia");
 
-
-  console.log("🌐 API Base URL:", process.env.REACT_APP_API_BASE_URL);
+console.log("🌐 API Base URL:", API_BASE_URL);
 
   if (process.env.NODE_ENV === "production" && API_BASE_URL.startsWith("http://")) { 
     throw new Error("❌ Production API_BASE_URL must use HTTPS"); 
@@ -70,8 +79,6 @@ api.interceptors.request.use(async (config) => {
     } catch (err) {
       console.warn("⚠️ Failed to refresh Firebase token", err);
     }
-  } else {
-    console.warn("⚠️ No Firebase user, skipping Authorization header");
   }
 
   return config;
@@ -390,7 +397,7 @@ export const PasswordAPI = {
 // 📣 Notification APIs
 export const NotificationsAPI = {
   list: () =>
-    api.get("/api/notifications")
+    api.get("/api/notifications/")
       .then((res) => res.data)
       .catch((err) => handleError(err, "List notifications")),
 
@@ -405,9 +412,14 @@ export const NotificationsAPI = {
       .catch((err) => handleError(err, "Delete notification")),
 
   bulkDelete: (onlyRead = true) =>
-    api.delete(`/api/notifications/bulk?only_read=${onlyRead}`)
+    api.delete(`/api/notifications/actions/bulk-delete?only_read=${onlyRead}`)
       .then((res) => res.data)
       .catch((err) => handleError(err, "Bulk delete notifications")),
+
+  deleteAll: () =>
+    api.delete(`/api/notifications/actions/delete-all`)
+      .then((res) => res.data)
+      .catch((err) => handleError(err, "Delete all notifications")),
   
   createResidentLogin: (count) => 
     api.post("/api/notifications/resident-login", { count }) 

@@ -177,6 +177,70 @@ async def document_request(resident_name: str, user: dict = Depends(get_current_
         {"role": "secretary", "type": "document", "message": "New document request submitted"},
     ])
 
+@router.delete("/actions/bulk-delete", response_model=dict)
+async def bulk_delete_notifications_actions(
+    only_read: bool = Query(False, description="Delete only read notifications"),
+    user: dict = Depends(get_current_user)
+):
+    """
+    Bulk delete notifications.
+    - Residents can only delete their own notifications.
+    - Admin/staff/secretary can delete any notifications.
+    - Optionally restrict to only read notifications.
+    """
+    role = user.get("role")
+    uid = user.get("uid")
+
+    try:
+        query = get_db().collection("notifications")
+
+        if role == "resident":
+            query = query.where("user_id", "==", uid)
+        if only_read:
+            query = query.where("read", "==", True)
+
+        docs = query.stream()
+        deleted_ids = []
+        for doc in docs:
+            doc_ref = get_db().collection("notifications").document(doc.id)
+            doc_ref.delete()
+            deleted_ids.append(doc.id)
+
+        return {"status": "bulk_deleted", "count": len(deleted_ids), "deleted_ids": deleted_ids}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to bulk delete notifications: {str(e)}")
+
+@router.delete("/actions/delete-all", response_model=dict)
+async def delete_all_notifications_actions(
+    user: dict = Depends(get_current_user)
+):
+    """
+    Delete all notifications from Firestore for the allowed scope.
+    - Residents: delete only their own notifications.
+    - Admin/staff/secretary: delete all notifications.
+    """
+    role = user.get("role")
+    uid = user.get("uid")
+
+    try:
+        query = get_db().collection("notifications")
+
+        if role == "resident":
+            query = query.where("user_id", "==", uid)
+
+        docs = query.stream()
+        deleted_ids = []
+        for doc in docs:
+            doc_ref = get_db().collection("notifications").document(doc.id)
+            doc_ref.delete()
+            deleted_ids.append(doc.id)
+
+        return {"status": "all_deleted", "count": len(deleted_ids), "deleted_ids": deleted_ids}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete all notifications: {str(e)}")
+
 @router.delete("/{notification_id}", response_model=dict)
 async def delete_notification(
     notification_id: str = Path(..., description="Notification ID"),

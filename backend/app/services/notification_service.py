@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from backend.app.models.notification import Notification
 from backend.app.utils.firestore_utils import get_db
-from backend.app.routes.ws_routes import manager  
+from backend.app.core.websocket_manager import manager
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -56,7 +56,11 @@ class NotificationService:
     async def broadcast(notification: Notification):
         """Send notification to all connected WebSocket clients."""
         try:
-            await manager.broadcast(notification.model_dump())  
+            await manager.broadcast(
+                notification.model_dump(),
+                role=notification.role,
+                user_id=notification.user_id,
+            )
             logger.info("📢 Notification broadcasted: %s", notification.message)
         except Exception as e:
             logger.error("❌ Failed to broadcast notification: %s", e)
