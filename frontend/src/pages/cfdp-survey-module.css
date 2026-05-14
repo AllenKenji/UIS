@@ -1,0 +1,72 @@
+.cfdp-module-page {
+  padding: 1rem;
+  min-height: calc(100vh - 6rem);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 1rem;
+}
+
+.cfdp-module-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+}
+
+.cfdp-module-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.cfdp-module-header p {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+
+.cfdp-open-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid #0f172a;
+  background: #0f172a;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.cfdp-open-tab-btn:hover {
+  opacity: 0.92;
+}
+
+.cfdp-iframe-shell {
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  border-radius: 12px;
+  overflow: hidden;
+  min-height: 70vh;
+}
+
+.cfdp-survey-iframe {
+  width: 100%;
+  min-height: 70vh;
+  height: calc(100vh - 13.5rem);
+  border: 0;
+}
+
+@media (max-width: 768px) {
+  .cfdp-module-page {
+    padding: 0.75rem;
+  }
+
+  .cfdp-survey-iframe {
+    height: calc(100vh - 16rem);
+  }
+}

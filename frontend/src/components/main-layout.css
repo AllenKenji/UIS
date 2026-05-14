@@ -1,6 +1,10 @@
 /* ===============================
 📐 Dashboard Layout (Grid)
 ================================ */
+body.dashboard-scroll-lock {
+  overflow: hidden;
+}
+
 .dashboard-layout {
   display: grid;
   grid-template-columns: 250px 1fr 0px; /* sidebar, content, hidden notifications */
@@ -87,6 +91,7 @@
   flex-direction: column;
   min-width: 0;
   height: 100vh;
+  min-height: 0;
   padding: var(--space-lg);
   transition: padding 0.3s ease;
   overflow-y: auto;
@@ -139,23 +144,27 @@
   background: var(--color-card-bg);
 }
 
-.close-btn {
+.notification-close-btn {
   background: none;
   border: none;
-  font-size: 1.25rem;
+  font-size: 1.1rem;
+  line-height: 1;
   cursor: pointer;
   color: var(--color-text);
-  transition: opacity 0.2s ease;
+  padding: 0.25rem;
+  border-radius: var(--radius-sm);
+  transition: background 0.2s ease, opacity 0.2s ease;
 }
 
-.close-btn:hover {
-  opacity: 0.7;
+.notification-close-btn:hover {
+  background: var(--color-hover);
+  opacity: 0.9;
 }
 
 .notification-body {
   flex: 1;
   min-height: 0;
-  overflow-y: hidden;
+  overflow-y: auto;
   padding: var(--space-md);
 }
 
@@ -230,4 +239,90 @@
 
 .notification-footer button:last-child:hover {
   background: var(--color-danger-hover);
+}
+
+@media (max-width: 1024px) {
+  .dashboard-layout,
+  .dashboard-layout.with-notifications {
+    grid-template-columns: 220px 1fr;
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  .sidebar,
+  .dashboard-content {
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  .notification-panel {
+    position: fixed;
+    right: 0;
+    top: 0;
+    height: 100dvh;
+    width: min(92vw, 360px);
+    z-index: 1200;
+    transform: translateX(100%);
+    opacity: 1;
+    pointer-events: none;
+  }
+
+  .dashboard-layout.with-notifications .notification-panel {
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-layout,
+  .dashboard-layout.with-notifications {
+    grid-template-columns: 1fr;
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow-y: hidden;
+  }
+
+  .sidebar {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    gap: 1rem;
+    padding: 0.75rem;
+  }
+
+  .sidebar ul {
+    gap: 0.5rem;
+  }
+
+  .main-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .main-header h1 {
+    font-size: 1.2rem;
+    line-height: 1.3;
+  }
+
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .header-actions > * {
+    width: 100%;
+  }
+
+  .dark-mode-toggle {
+    width: 100%;
+  }
+
+  .dashboard-content {
+    height: 100dvh;
+    min-height: 0;
+    padding: 0.75rem;
+    overflow-y: auto;
+  }
 }

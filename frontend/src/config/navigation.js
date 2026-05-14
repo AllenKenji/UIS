@@ -21,6 +21,7 @@ const links = {
   createAccount: { path: "/accounts/new", label: "➕ Create Account", action: "createAccount" },
   treasurer: { path: "/treasurer", label: "💰 Finance", action: "viewFinancialRecords" },
   audit: { path: "/audit", label: "📊 Audit", action: "auditBarangayData" },
+  cfdpSurvey: { path: "/cfdp-survey", label: "🧭 CFDP Survey", action: "viewCfdpSurvey" },
   youth: { path: "/youth", label: "🏠 Dashboard", action: "viewDashboard" },
   home: { path: "/", label: "🏠 Home", action: "viewDashboard" },
 
@@ -40,6 +41,7 @@ const links = {
 const sidebarLinks = {
   admin: [
     links.dashboard("/admin"),
+    links.cfdpSurvey,
     links.residents,
     links.businesses,
     links.documents,
@@ -52,6 +54,7 @@ const sidebarLinks = {
   ],
   staff: [
     links.dashboard("/staff"),
+    links.cfdpSurvey,
     links.residents,
     links.addResident,
     links.businesses,
@@ -60,8 +63,15 @@ const sidebarLinks = {
     links.viewAllComplaints,
     links.fileComplaint,
   ],
+  surveyor: [
+    links.cfdpSurvey,
+  ],
+  supervisor: [
+    links.cfdpSurvey,
+  ],
   secretary: [
     links.dashboard("/secretary"),
+    links.cfdpSurvey,
     links.requestForDocuments,
     links.pendingRequests,
     links.paidRequests,
@@ -71,6 +81,7 @@ const sidebarLinks = {
   ],
   treasurer: [
     links.dashboard("/treasurer"),
+    links.cfdpSurvey,
     links.incomingPayments,
     links.expenses,
     links.reports,
@@ -78,12 +89,15 @@ const sidebarLinks = {
   ],
   sk: [
     links.youth,
+    links.cfdpSurvey,
   ],
   dilg: [
     links.audit,
+    links.cfdpSurvey,
   ],
   resident: [
     links.dashboard("/resident"),
+    links.cfdpSurvey,
     links.fileComplaint,     
     links.viewOwnComplaints,   
     links.ownDocuments,

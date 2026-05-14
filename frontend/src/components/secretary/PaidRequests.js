@@ -7,15 +7,18 @@ const PaidRequests = () => {
   const { toVerify, readyToIssue, loading, fetchRequests } = useEnrichedRequests();
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [issueRemarks, setIssueRemarks] = useState("");
 
   const userInfo = JSON.parse(sessionStorage.getItem("userInfo") || "{}");
 
   const issueDocument = async (firestoreId) => {
     try {
       await DocumentsAPI.issue(firestoreId, {
-        issuedBy: userInfo?.full_name || userInfo?.uid || "Unknown User",
+        issued_by: userInfo?.full_name || userInfo?.uid || "Unknown User",
+        remarks: issueRemarks.trim() || undefined,
       });
       setSelectedDoc(null);
+      setIssueRemarks("");
       fetchRequests();
     } catch (err) {
       console.error("❌ Error issuing document:", err.message);
@@ -29,6 +32,7 @@ const PaidRequests = () => {
         remarks: `Payment verified by ${userInfo?.full_name}`,
       });
       setSelectedDoc(null);
+      setIssueRemarks("");
       fetchRequests();
     } catch (err) {
       console.error("❌ Error verifying payment:", err.message);
@@ -43,6 +47,7 @@ const PaidRequests = () => {
       });
       setSelectedDoc(null);
       setRejectionReason("");
+      setIssueRemarks("");
       fetchRequests();
     } catch (err) {
       console.error("❌ Error rejecting document:", err.message);
@@ -99,7 +104,7 @@ const PaidRequests = () => {
 
       {/* Modal */}
       {selectedDoc && (
-        <div className="modal-overlay" onClick={() => setSelectedDoc(null)}>
+        <div className="modal-overlay" onClick={() => { setSelectedDoc(null); setIssueRemarks(""); }}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <header>
               <h4>{selectedDoc.resident_name || selectedDoc.resident_id}</h4>
@@ -130,9 +135,17 @@ const PaidRequests = () => {
                 </button>
               )}
               {(selectedDoc.status === "paid" || selectedDoc.amount === 0) && (
-                <button className="btn-approve" onClick={() => issueDocument(selectedDoc.id)}>
-                  ✅ Issue Document
-                </button>
+                <div className="reject-section">
+                  <textarea
+                    className="reject-textarea"
+                    placeholder="Enter issuance remarks (optional)..."
+                    value={issueRemarks}
+                    onChange={(e) => setIssueRemarks(e.target.value)}
+                  />
+                  <button className="btn-approve" onClick={() => issueDocument(selectedDoc.id)}>
+                    ✅ Issue Document
+                  </button>
+                </div>
               )}
 
               <div className="reject-section">
@@ -156,7 +169,7 @@ const PaidRequests = () => {
                 </button>
               </div>
 
-              <button className="btn-close" onClick={() => setSelectedDoc(null)}>⬅️ Close</button>
+              <button className="btn-close" onClick={() => { setSelectedDoc(null); setIssueRemarks(""); }}>⬅️ Close</button>
             </section>
           </div>
         </div>

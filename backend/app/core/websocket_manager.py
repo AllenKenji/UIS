@@ -1,6 +1,7 @@
 import logging
 from typing import Dict
 from fastapi import WebSocket
+from fastapi.encoders import jsonable_encoder
 from starlette.websockets import WebSocketState
 
 logger = logging.getLogger("uvicorn.error")
@@ -41,7 +42,7 @@ class ConnectionManager:
     async def send_personal_message(self, message: dict, websocket: WebSocket):
         """Send a message to a specific WebSocket client."""
         try:
-            await websocket.send_json(message)
+            await websocket.send_json(jsonable_encoder(message))
         except Exception as e:
             logger.error("⚠️ Failed to send personal message: %s", e)
 
@@ -63,7 +64,7 @@ class ConnectionManager:
                     continue
                 if user_id and info.get("user_id") != user_id:
                     continue
-                await connection.send_json(message)
+                await connection.send_json(jsonable_encoder(message))
             except Exception as e:
                 logger.error("⚠️ Failed to send message to client: %s", e)
                 self.disconnect(connection)

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getCountFromServer, collection } from "firebase/firestore";
+import { getCountFromServer, collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../services/firebase";
 import DashboardCard from "./DashboardCard";
 import { ALL_STATS, ROLE_COLLECTIONS } from "../../config/roles";
@@ -14,8 +14,76 @@ const SummaryCards = () => {
   useEffect(() => {
     let cancelled = false;
 
+    const parseTimestamp = (value) => {
+      if (!value) return null;
+      if (value?.toDate && typeof value.toDate === "function") {
+        return value.toDate();
+      }
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date;
+    };
+
+    const startOfToday = () => {
+      const now = new Date();
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    };
+
+    const getLoginRecordsCount = async () => {
+      const loginQuery = query(collection(db, "logins"), where("timestamp", ">=", startOfToday()));
+      const snapshot = await getDocs(loginQuery);
+      return snapshot.docs.reduce((total, item) => {
+        const data = item.data() || {};
+        const count = Number(data.count);
+        const timestamp = parseTimestamp(data.timestamp);
+        if (!timestamp) {
+          return total;
+        }
+        return total + (Number.isFinite(count) && count > 0 ? count : 1);
+      }, 0);
+    };
+
+    const parseAmount = (value) => {
+      const num = Number(value);
+      if (Number.isFinite(num)) return num;
+
+      const cleaned = String(value ?? "").replace(/[^\d.-]/g, "");
+      const parsed = Number(cleaned);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const getCollectionsAmount = async () => {
+      const paidPaymentsQuery = query(collection(db, "payments"), where("status", "==", "paid"));
+      const snapshot = await getDocs(paidPaymentsQuery);
+      const today = startOfToday();
+
+      const totalAmount = snapshot.docs.reduce((sum, item) => {
+        const data = item.data() || {};
+        const paidDate = parseTimestamp(data.datePaid || data.paymentDate || data.timestamp || data.createdAt);
+        if (!paidDate || paidDate < today) {
+          return sum;
+        }
+        const amount = parseAmount(data.amount);
+        return sum + amount;
+      }, 0);
+
+      return new Intl.NumberFormat("en-PH", {
+        style: "currency",
+        currency: "PHP",
+      }).format(totalAmount);
+    };
+
     const safeQuery = async (key) => {
       try {
+        if (key === "logins") {
+          const value = await getLoginRecordsCount();
+          return { key, value };
+        }
+
+        if (key === "collections") {
+          const value = await getCollectionsAmount();
+          return { key, value };
+        }
+
         const snap = await getCountFromServer(collection(db, key));
         return { key, value: snap.data().count };
       } catch (err) {

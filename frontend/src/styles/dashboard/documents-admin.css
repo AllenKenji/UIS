@@ -6,6 +6,7 @@
   background-color: var(--color-bg);
   font-family: "Segoe UI", Roboto, sans-serif;
   color: var(--color-text);
+  margin-bottom: 3rem;
 }
 
 .header-row { 

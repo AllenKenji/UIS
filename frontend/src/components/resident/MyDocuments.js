@@ -130,7 +130,11 @@ const MyDocuments = ({ residentId }) => {
           )}
         </div>
 
-        {doc.remarks && <p className="doc-remarks">Remarks: {doc.remarks}</p>}
+        {doc.status === "approved" && doc.remarks ? (
+          <p className="doc-remarks">Issuance Remarks: {doc.remarks}</p>
+        ) : (
+          doc.remarks && <p className="doc-remarks">Remarks: {doc.remarks}</p>
+        )}
 
         {doc.status === "rejected" && tab === "needsAttention" && (
           <button className="btn-resubmit" onClick={() => handleResubmit(docId)}>

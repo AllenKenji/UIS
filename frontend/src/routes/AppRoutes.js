@@ -37,6 +37,7 @@ import SecretaryDashboard from "../pages/SecretaryDashboard";
 import TreasurerDashboard from "../pages/TreasurerDashboard";
 import SKDashboard from "../pages/SKDashboard";
 import AuditView from "../pages/AuditView";
+import CfdpSurveyModule from "../pages/CfdpSurveyModule";
 
 import ComplaintList from "../components/dashboard/ComplaintList";
 
@@ -65,6 +66,8 @@ const AppRoutes = ({ isDarkMode, toggleDarkMode }) => {
 
   const roleRedirects = {
     admin: "/admin",
+    surveyor: "/cfdp-survey",
+    supervisor: "/cfdp-survey",
     staff: "/staff",
     resident: "/resident",
     secretary: "/secretary",
@@ -164,6 +167,16 @@ const AppRoutes = ({ isDarkMode, toggleDarkMode }) => {
 
             {/* DILG Auditor */}
             <Route path="/audit" element={<ProtectedRoute allowedRoles={["dilg"]}><AuditView /></ProtectedRoute>} />
+
+            {/* Embedded CFDP Survey System */}
+            <Route
+              path="/cfdp-survey"
+              element={
+                <ProtectedRoute allowedRoles={["admin", "surveyor", "supervisor"]} allowAdminOverride={false}>
+                  <CfdpSurveyModule />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Admin + Staff shared */}
             <Route path="/residents" element={<ProtectedRoute allowedRoles={["admin","staff"]}><ResidentRegistry /></ProtectedRoute>} />

@@ -5,7 +5,7 @@ import { toast } from "react-toastify";
 import { QRCodeCanvas } from "qrcode.react";
 import "./business-eval-modal.css";
 
-const BusinessEvaluationModal = ({ business, onClose, onUpdated }) => {
+const BusinessEvaluationModal = ({ business, onClose, onUpdated, onSubmit }) => {
   const isApproved = business.status === "approved";
   const [status, setStatus] = useState(
     business.status === "payment_submitted" ? "approved" : (business.status || "pending_evaluation")
@@ -15,6 +15,12 @@ const BusinessEvaluationModal = ({ business, onClose, onUpdated }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      if (typeof onSubmit === "function") {
+        await onSubmit({ status, notes });
+        toast.success("✅ Status updated!");
+        return;
+      }
+
       const businessRef = doc(db, "businesses", business.id);
       await updateDoc(businessRef, {
         status,

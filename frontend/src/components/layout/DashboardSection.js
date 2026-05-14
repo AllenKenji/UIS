@@ -7,7 +7,7 @@ const DashboardSection = ({
   ariaLabel,
   children,
 }) => {
-  const sectionClass = `dashboard-section ${layout} ${accent}-section`;
+  const sectionClass = `dashboard-section ${layout} ${accent}`;
 
   return (
     <section className={sectionClass} aria-label={ariaLabel}>

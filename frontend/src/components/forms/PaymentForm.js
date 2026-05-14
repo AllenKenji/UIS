@@ -107,6 +107,8 @@ const PaymentForm = ({
           entityType === "business"
             ? {
                 ...receiptBase,
+                entityId: result.businessId,
+                customEntityId: result.businessId,
                 businessId: result.businessId,
                 businessName: result.businessName,
                 ownerName: result.ownerName,

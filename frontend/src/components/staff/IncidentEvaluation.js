@@ -1,15 +1,43 @@
 import { useState } from "react";
 import { IncidentsAPI } from "../../services/api"; 
 
+const normalizeStatus = (value) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "in-progress" || normalized === "in_progress" || normalized === "inreview") {
+    return "pending";
+  }
+  if (normalized === "pending" || normalized === "resolved" || normalized === "escalated") {
+    return normalized;
+  }
+  return "pending";
+};
+
+const formatDateTime = (value) => {
+  if (!value) return "—";
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? "—" : value.toLocaleString();
+  if (typeof value === "string" || typeof value === "number") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? "—" : parsed.toLocaleString();
+  }
+  if (typeof value === "object") {
+    const seconds = value.seconds ?? value._seconds;
+    if (typeof seconds === "number") {
+      const parsed = new Date(seconds * 1000);
+      return Number.isNaN(parsed.getTime()) ? "—" : parsed.toLocaleString();
+    }
+  }
+  return "—";
+};
+
 const IncidentEvaluation = ({ incident, role, onClose, onUpdate }) => {
-  const [status, setStatus] = useState(incident.status);
+  const [status, setStatus] = useState(normalizeStatus(incident.status));
   const [assignedTo, setAssignedTo] = useState(incident.assigned_to_name || "");
 
   const handleUpdate = async () => {
     try {
       
       const payload = {
-        status,
+        status: normalizeStatus(status),
         assigned_to: assignedTo || undefined,
       };
 
@@ -35,15 +63,14 @@ const IncidentEvaluation = ({ incident, role, onClose, onUpdate }) => {
         <p><strong>Location:</strong> {incident.location}</p>
         <p><strong>Reported By:</strong> {incident.reported_by_name}</p>
         <p><strong>Current Status:</strong> {incident.status}</p>
-        <p><strong>Created At:</strong> {new Date(incident.createdAt).toLocaleString()}</p>
+        <p><strong>Created At:</strong> {formatDateTime(incident.timestamp || incident.createdAt)}</p>
       </div>
 
       <div className="evaluation-actions">
         <label>
           Status:
-          <select value={status} onChange={(e) => setStatus(e.target.value)}>
+          <select value={status} onChange={(e) => setStatus(normalizeStatus(e.target.value))}>
             <option value="pending">Pending</option>
-            <option value="in-progress">In Progress</option>
             <option value="resolved">Resolved</option>
             <option value="escalated">Escalated</option>
           </select>

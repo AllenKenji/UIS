@@ -51,9 +51,17 @@ async def safe_service_call(context: str, func, *args, **kwargs):
 async def list_residents(
     limit: int = Query(50, ge=1, le=100),
     start_after_id: Optional[str] = Query(None),
+    email: Optional[str] = Query(None),
     full_name: Optional[str] = Query(None, alias="fullName"),
     birth_date: Optional[str] = Query(None, alias="birthDate")
 ):
+    if email:
+        resident = await safe_service_call(
+            "find resident by email",
+            resident_service.find_by_email,
+            email,
+        )
+        return [resident] if resident else []
     if full_name and birth_date:
         return await safe_service_call(
             "find duplicates",

@@ -53,10 +53,7 @@ def create_incident(data: IncidentCreate) -> Incident:
 
     doc_ref.set(payload)
     snapshot = doc_ref.get()
-
-    data = _convert_timestamps(snapshot.to_dict())
-    data["id"] = doc_ref.id
-    return Incident(**data)
+    return Incident(**_normalize_incident(snapshot))
 
 
 # 🔍 Get a specific incident

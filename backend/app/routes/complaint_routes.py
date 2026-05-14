@@ -19,6 +19,7 @@ from backend.app.services.complaint_service import (
     delete_complaint,
 )
 from backend.app.core.auth import require_permission
+from backend.app.services.notification_service import NotificationService
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -36,6 +37,7 @@ class ActionResponse(BaseModel):
 class StatusUpdateRequest(BaseModel):
     status: ComplaintStatus
     notes: Optional[str] = None
+    resolution_notes: Optional[str] = None
 
 
 # ---------------------------------------------------------
@@ -48,7 +50,7 @@ class StatusUpdateRequest(BaseModel):
     status_code=status.HTTP_201_CREATED,
     summary="File a new complaint (resident or staff on behalf of resident)",
 )
-def submit_complaint(
+async def submit_complaint(
     complaint: ComplaintCreate,
     current_user=Depends(require_permission(["fileComplaints", "fileComplaintsForResidents"])),
 ):
@@ -75,6 +77,21 @@ def submit_complaint(
             complaint.filed_by,
             complaint.filed_for,
         )
+
+        try:
+            await NotificationService.notify(
+                role="admin",
+                type="complaint",
+                message=f"New complaint filed ({created.category.value})",
+            )
+            await NotificationService.notify(
+                role="staff",
+                type="complaint",
+                message=f"New complaint filed ({created.category.value})",
+            )
+        except Exception as notify_err:
+            logger.warning("⚠️ Complaint submit notification failed: %s", notify_err)
+
         return created
 
     except HTTPException:
@@ -154,17 +171,46 @@ def get_complaint(
     response_model=ComplaintWithResident,
     summary="Admin updates complaint status",
 )
-def update_status(
+async def update_status(
     complaint_id: str,
     payload: StatusUpdateRequest,
     _: None = Depends(require_permission("manageComplaints")),
 ):
-    updated = update_complaint_status(complaint_id, payload.status, payload.notes)
+    effective_notes = payload.notes
+    if effective_notes is None:
+        effective_notes = payload.resolution_notes
+
+    updated = update_complaint_status(complaint_id, payload.status, effective_notes)
     if updated is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Complaint not found",
         )
+
+    try:
+        status_label = payload.status.value.replace("_", " ")
+        await NotificationService.notify(
+            role="admin",
+            type="complaint_update",
+            message=f"Complaint status updated to {status_label}",
+        )
+        await NotificationService.notify(
+            role="staff",
+            type="complaint_update",
+            message=f"Complaint status updated to {status_label}",
+        )
+
+        resident_uid = getattr(updated, "filed_for", None) or getattr(updated, "filed_by", None)
+        if resident_uid:
+            await NotificationService.notify(
+                role="resident",
+                type="complaint_update",
+                message=f"Your complaint status was updated to {status_label}",
+                user_id=resident_uid,
+            )
+    except Exception as notify_err:
+        logger.warning("⚠️ Complaint status notification failed: %s", notify_err)
+
     return updated
 
 # ---------------------------------------------------------

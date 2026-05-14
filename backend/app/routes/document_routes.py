@@ -5,8 +5,57 @@ from datetime import datetime
 from backend.app.models.document import Document, DocumentStatus
 from backend.app.core.auth import require_permission
 from backend.app.services import document_service
+from backend.app.services.notification_service import NotificationService
+import logging
+
+logger = logging.getLogger("uvicorn.error")
 
 router = APIRouter(tags=["Documents"])
+
+
+async def _notify_document_submitted(doc: Document):
+    try:
+        suffix = f" ({doc.documentType})" if doc.documentType else ""
+        await NotificationService.notify(
+            role="admin",
+            type="document",
+            message=f"New document request submitted{suffix}",
+        )
+        await NotificationService.notify(
+            role="secretary",
+            type="document",
+            message=f"New document request submitted{suffix}",
+        )
+    except Exception as notify_err:
+        logger.warning("⚠️ Document submit notification failed: %s", notify_err)
+
+
+async def _notify_document_status_change(doc: Document):
+    try:
+        status_value = doc.status.value if hasattr(doc.status, "value") else str(doc.status)
+        status_label = str(status_value).replace("_", " ")
+        suffix = f" ({doc.documentType})" if doc.documentType else ""
+
+        await NotificationService.notify(
+            role="admin",
+            type="document_update",
+            message=f"Document status updated to {status_label}{suffix}",
+        )
+        await NotificationService.notify(
+            role="secretary",
+            type="document_update",
+            message=f"Document status updated to {status_label}{suffix}",
+        )
+
+        if doc.residentId:
+            await NotificationService.notify(
+                role="resident",
+                type="document_update",
+                message=f"Your document status was updated to {status_label}{suffix}",
+                user_id=doc.residentId,
+            )
+    except Exception as notify_err:
+        logger.warning("⚠️ Document status notification failed: %s", notify_err)
 
 # ===============================
 # 📤 List Documents
@@ -91,7 +140,7 @@ async def create_document(
     locationCity: Optional[str] = Form(None),
     locationProvince: Optional[str] = Form(None),
 ) -> Document:
-    return await document_service.create_document(
+    created = await document_service.create_document(
         resident_id=resident_id,
         resident_name=None,  # Will be populated in service layer based on residentId
         document_type=document_type,
@@ -117,6 +166,8 @@ async def create_document(
         locationCity=locationCity,
         locationProvince=locationProvince,
     )
+    await _notify_document_submitted(created)
+    return created
 
 # ===============================
 # 🔄 Update Status
@@ -127,14 +178,18 @@ class StatusUpdatePayload(BaseModel):
 
 @router.patch("/{doc_id}/status", response_model=Document)
 async def update_document_status(doc_id: str, payload: StatusUpdatePayload) -> Document:
-    return await document_service.update_status(doc_id, payload.newStatus, payload.remarks)
+    updated = await document_service.update_status(doc_id, payload.newStatus, payload.remarks)
+    await _notify_document_status_change(updated)
+    return updated
 
 # ===============================
 # 💳 Confirm Payment
 # ===============================
 @router.patch("/{doc_id}/payment", response_model=Document)
 async def confirm_payment(doc_id: str) -> Document:
-    return await document_service.confirm_payment(doc_id)
+    updated = await document_service.confirm_payment(doc_id)
+    await _notify_document_status_change(updated)
+    return updated
 
 # ===============================
 # 📜 Issue Document
@@ -146,12 +201,14 @@ class IssuePayload(BaseModel):
 
 @router.patch("/{doc_id}/issue", response_model=Document)
 async def issue_document(doc_id: str, payload: IssuePayload) -> Document:
-    return await document_service.issue_document(
+    updated = await document_service.issue_document(
         doc_id, 
         payload.issued_by, 
         payload.file_url, 
         payload.remarks
     )
+    await _notify_document_status_change(updated)
+    return updated
 
 @router.delete("/{doc_id}", response_model=Document)
 async def delete_document(doc_id: str, uid: str = Depends(require_permission("manageDocuments"))) -> Document:

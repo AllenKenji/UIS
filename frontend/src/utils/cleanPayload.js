@@ -1,5 +1,15 @@
 import { PARANAQUE } from "../data/locations";
 
+const LEGACY_BARANGAY_ALIASES = {
+  "Sto. Niño": "Santo Niño",
+};
+
+const normalizeBarangay = (value) => {
+  const trimmed = (value || "").trim();
+  const normalized = LEGACY_BARANGAY_ALIASES[trimmed] || trimmed;
+  return PARANAQUE.barangays.includes(normalized) ? normalized : null;
+};
+
 /**
  * Normalize and sanitize resident form data before submission.
  * - Removes forbidden top-level fields (city, province, etc.)
@@ -32,7 +42,7 @@ export const cleanPayload = (data, uploads = {}) => {
       houseNumber: houseNumber || null,
       street: street || null,
       purok: purok || null,
-      barangay: barangay || null,
+      barangay: normalizeBarangay(barangay),
       city: PARANAQUE.city,
       province: PARANAQUE.province,
       zipCode: zipCode || null,

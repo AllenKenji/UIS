@@ -653,12 +653,26 @@ async def issue_document(doc_id: str, issued_by: str, file_url: Optional[str] = 
             logger.exception("❌ PDF generation/upload failed: %s", e)
             raise HTTPException(status_code=500, detail="Failed to generate or upload PDF")
 
+    def _clean_text(value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        if text.lower() in {"undefined", "null", "none", "nan"}:
+            return None
+        return text
+
+    normalized_remarks = _clean_text(remarks)
+    existing_remarks = _clean_text(getattr(doc, "remarks", None))
+    final_remarks = normalized_remarks or existing_remarks or f"Issued by {issued_by}"
+
     update_data = {
         "status": DocumentStatus.approved.value,
         "issuedBy": issued_by,
         "issuedAt": issued_at,
         "fileUrl": file_url,
-        "remarks": remarks,
+        "remarks": final_remarks,
     }
     if doc.referenceNumber:
         update_data["referenceNumber"] = doc.referenceNumber

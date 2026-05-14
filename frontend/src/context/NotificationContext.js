@@ -30,6 +30,33 @@ function normalizeWsBase(url) {
     .replace("wss://localhost:", "wss://127.0.0.1:");
 }
 
+function toMillis(value) {
+  if (!value) return 0;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "number") return value;
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+  if (typeof value === "object") {
+    const seconds = value.seconds ?? value._seconds;
+    if (typeof seconds === "number") return seconds * 1000;
+    if (value.toDate && typeof value.toDate === "function") {
+      const date = value.toDate();
+      return date instanceof Date ? date.getTime() : 0;
+    }
+  }
+  return 0;
+}
+
+function sortByNewest(list) {
+  return [...list].sort((a, b) => {
+    const left = toMillis(a.timestamp);
+    const right = toMillis(b.timestamp);
+    return right - left;
+  });
+}
+
 export const NotificationProvider = ({ children, token }) => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -49,7 +76,7 @@ export const NotificationProvider = ({ children, token }) => {
     const loadHistory = async () => {
       try {
         const history = await NotificationsAPI.list();
-        setNotifications(history);
+        setNotifications(sortByNewest(history));
         setUnreadCount(countUnread(history));
       } catch (err) {
         console.error("⚠️ Failed to load notifications", err);
@@ -92,8 +119,17 @@ export const NotificationProvider = ({ children, token }) => {
       };
 
       ws.onmessage = (event) => {
-        console.log("📩 Notification received:", event.data);
-        // TODO: optionally update state with new notification
+        try {
+          const incoming = JSON.parse(event.data);
+          setNotifications((prev) => {
+            const deduped = prev.filter((n) => n.id !== incoming.id);
+            const updated = sortByNewest([incoming, ...deduped]);
+            setUnreadCount(countUnread(updated));
+            return updated;
+          });
+        } catch (err) {
+          console.error("⚠️ Failed to parse notification payload", err);
+        }
       };
 
       ws.onerror = (err) => {
@@ -194,10 +230,20 @@ export const NotificationProvider = ({ children, token }) => {
     }
   };
 
+  const markAllAsRead = async () => {
+    updateState((prev) => prev.map((n) => ({ ...n, read: true })));
+    try {
+      await NotificationsAPI.markAllAsRead();
+    } catch (err) {
+      console.error("⚠️ Failed to mark all notifications as read", err);
+      refreshNotifications();
+    }
+  };
+
   const refreshNotifications = async () => {
     try {
       const history = await NotificationsAPI.list();
-      setNotifications(history);
+      setNotifications(sortByNewest(history));
       setUnreadCount(countUnread(history));
     } catch (err) {
       console.error("⚠️ Failed to refresh notifications", err);
@@ -213,6 +259,7 @@ export const NotificationProvider = ({ children, token }) => {
         markAsRead,
         deleteNotification,
         bulkDeleteNotifications,
+        markAllAsRead,
         refreshNotifications,
       }}
     >

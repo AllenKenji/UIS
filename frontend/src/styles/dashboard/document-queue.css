@@ -7,6 +7,9 @@
   padding: var(--space-md);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .document-queue h3 {
@@ -165,4 +168,31 @@
 @keyframes fadeIn {
   from { opacity: 0; transform: scale(0.95); }
   to   { opacity: 1; transform: scale(1); }
+}
+
+@media (max-width: 768px) {
+  .document-queue {
+    padding: 0.75rem;
+  }
+
+  .document-queue h3 {
+    font-size: 1rem;
+  }
+
+  .queue-table {
+    display: table;
+    min-width: 640px;
+    white-space: nowrap;
+  }
+
+  .queue-table th,
+  .queue-table td {
+    padding: 0.5rem 0.625rem;
+    font-size: 0.875rem;
+  }
+
+  .modal {
+    width: 100%;
+    max-width: 100%;
+  }
 }

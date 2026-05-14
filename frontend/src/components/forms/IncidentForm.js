@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { api, endpoints } from "../../services/api";
-import { auth, db } from "../../services/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { auth } from "../../services/firebase";
 import { toast } from "react-toastify";
 import "./incident-form.css";
 
 const IncidentForm = ({ role = "resident", userInfo, onSubmitSuccess }) => {
   const [residents, setResidents] = useState([]);
   const [loading, setLoading] = useState(false);
+  const canLogForResident = role === "staff" || role === "admin";
 
   const initialForm = {
     type: "",
@@ -55,32 +55,17 @@ const IncidentForm = ({ role = "resident", userInfo, onSubmitSuccess }) => {
           return;
         }
 
-        // Resident self-report → Firestore
-        const incidentAt = new Date(`${formData.date}T${formData.time}`);
-        const docRef = await addDoc(collection(db, "incidents"), {
+        // Resident self-report → backend API (triggers notification logic)
+        await api.post(endpoints.incidents, {
           type: formData.type,
           description: formData.description,
           location: formData.location,
-          witness: formData.witness,
           authUid: currentUser.uid,     // ✅ always from Firebase Auth
           residentId: currentUser.uid,  // ✅ same for self-report
-          status: "pending",
-          incidentAt,
-          createdAt: serverTimestamp(),
-        });
-
-        // Notification for admins/staff
-        await addDoc(collection(db, "notifications"), {
-          type: "incident",
-          refId: docRef.id,
-          message: `New incident reported: ${formData.type} at ${formData.location}`,
-          notifyRoles: ["staff"], // ✅ only staff now
-          createdAt: serverTimestamp(),
-          readBy: [],
         });
 
         toast.success("✅ Incident report submitted!");
-      } else if (role === "staff") {
+      } else if (canLogForResident) {
         // Staff reporting → Firestore directly
         if (!formData.residentId) {
           toast.error("Please select a resident.");
@@ -91,31 +76,18 @@ const IncidentForm = ({ role = "resident", userInfo, onSubmitSuccess }) => {
         // 🔐 Ensure we have a logged-in Firebase user
         const currentUser = auth.currentUser;
         if (!currentUser) {
-          toast.error("You must be logged in as staff to log an incident.");
+          toast.error("You must be logged in to log an incident.");
           setLoading(false);
           return;
         }
 
-        // Staff logs incident on behalf of a resident
-        const docRef = await addDoc(collection(db, "incidents"), {
+        // Staff logs incident on behalf of a resident via backend API
+        await api.post(endpoints.incidents, {
           type: formData.type,
           description: formData.description,
           location: formData.location,
           authUid: currentUser.uid,       // ✅ staff UID
           residentId: formData.residentId, // ✅ resident selected
-          status: "pending",
-          incidentAt: new Date().toISOString(), // staff logs current time
-          createdAt: serverTimestamp(),
-        });
-
-        // Notification for staff
-        await addDoc(collection(db, "notifications"), {
-          type: "incident",
-          refId: docRef.id,
-          message: `Incident logged: ${formData.type} at ${formData.location}`,
-          notifyRoles: ["staff"],
-          createdAt: serverTimestamp(),
-          readBy: [],
         });
 
         toast.success("✅ Incident logged on behalf of resident!");
@@ -132,9 +104,9 @@ const IncidentForm = ({ role = "resident", userInfo, onSubmitSuccess }) => {
     }
   };
 
-  // Staff only: fetch resident list
+  // Staff/Admin: fetch resident list
   useEffect(() => {
-    if (role === "staff") {
+    if (canLogForResident) {
       api.get(endpoints.residents, { params: { limit: 100 } })
         .then((res) => {
           const raw = res.data;
@@ -153,11 +125,11 @@ const IncidentForm = ({ role = "resident", userInfo, onSubmitSuccess }) => {
           console.error("❌ Failed to load residents:", err.response?.data || err.message);
         });
     }
-  }, [role]);
+  }, [canLogForResident]);
 
   return (
     <form className="incident-form" onSubmit={handleSubmit}>
-      <h2>{role === "staff" ? "Log Incident (on behalf of resident)" : "Report Incident"}</h2>
+      <h2>{canLogForResident ? "Log Incident (on behalf of resident)" : "Report Incident"}</h2>
 
       <label>Type</label>
       <select name="type" value={formData.type} onChange={handleChange} required>
@@ -193,7 +165,7 @@ const IncidentForm = ({ role = "resident", userInfo, onSubmitSuccess }) => {
         </>
       )}
 
-      {role === "staff" && (
+      {canLogForResident && (
         <>
           <label>Reported Resident</label>
           <select

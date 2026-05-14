@@ -30,6 +30,58 @@
   gap: var(--space-sm);
 }
 
+.chart-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.chart-controls label {
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.category-select {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-card-muted);
+  padding: var(--space-xs) var(--space-sm);
+  color: var(--color-text-strong);
+}
+
+.period-input {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-card-muted);
+  padding: var(--space-xs) var(--space-sm);
+  color: var(--color-text-strong);
+}
+
+.period-toggle {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.compare-controls {
+  display: flex;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.compare-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 260px;
+}
+
+.compare-title {
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
 .trend-toggle button {
   padding: var(--space-xs) var(--space-sm);
   border-radius: var(--radius-sm);
@@ -39,6 +91,27 @@
   font-weight: 600;
   transition: background-color 0.2s ease, color 0.2s ease;
   color: var(--color-text-strong); /* ✅ ensures visibility in light mode */
+}
+
+.period-toggle button {
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-card-muted);
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  color: var(--color-text-strong);
+}
+
+.period-toggle button:hover {
+  background: var(--color-table-row-hover);
+}
+
+.period-toggle button.active {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
 }
 
 .trend-toggle button:hover {
@@ -87,6 +160,21 @@
   box-shadow: var(--shadow-sm);
 }
 
+.metric-card-wrap {
+  border-radius: var(--radius-md);
+  outline: 2px solid transparent;
+  transition: outline-color 0.2s ease;
+  cursor: pointer;
+}
+
+.metric-card-wrap.selected {
+  outline-color: var(--color-accent);
+}
+
+.metric-card-wrap:focus-visible {
+  outline-color: var(--color-accent);
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .analytics-header {
@@ -98,6 +186,15 @@
   .trend-toggle {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .period-toggle {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .compare-block {
+    min-width: 100%;
   }
 
   .analytics-chart {

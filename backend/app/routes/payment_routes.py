@@ -3,6 +3,7 @@ import hmac
 import hashlib
 import os
 from backend.app.services.payment_service import log_payment_record, _next_receipt_number, _get_business_doc
+from backend.app.services.notification_service import NotificationService
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from google.cloud import firestore
@@ -14,6 +15,18 @@ router = APIRouter(prefix="/paymongo", tags=["Payments"])
 
 
 PAYMONGO_WEBHOOK_SECRET = os.getenv("PAYMONGO_WEBHOOK_SECRET", "")
+
+
+async def _notify_payment_roles(message: str, event_type: str = "payment_update"):
+    for target_role in ("admin", "treasurer", "staff"):
+        try:
+            await NotificationService.notify(
+                role=target_role,
+                type=event_type,
+                message=message,
+            )
+        except Exception as notify_err:
+            logger.warning("⚠️ Payment notification failed for role=%s: %s", target_role, notify_err)
 
 def verify_signature(raw_body: bytes, header_signature: str) -> bool:
     if not PAYMONGO_WEBHOOK_SECRET:
@@ -148,6 +161,11 @@ async def paymongo_webhook(request: Request):
                     method="paymongo"
                 )
 
+                await _notify_payment_roles(
+                    f"Business payment {status} ({metadata.get('businessId')})",
+                    "payment_update",
+                )
+
         # --- Document update via Firestore ID ---
         elif "documentId" in metadata:
             docs = get_db().collection("documents").where("documentId", "==", metadata["documentId"]).limit(1).get()
@@ -170,6 +188,10 @@ async def paymongo_webhook(request: Request):
                     event_type=event_type, 
                     paid_at=paid_at,
                     method="paymongo"
+                )
+                await _notify_payment_roles(
+                    f"Document payment {status} ({metadata.get('documentId')})",
+                    "payment_update",
                 )
             else:
                 logger.warning("⚠️ No document found for documentId=%s", metadata["documentId"])
@@ -197,6 +219,10 @@ async def paymongo_webhook(request: Request):
                     paid_at=paid_at,
                     method="paymongo" 
                 )
+                await _notify_payment_roles(
+                    f"Business payment {status} ({business_data.get('businessId') or reference_number})",
+                    "payment_update",
+                )
             else:
                 # Then try documents
                 docs = get_db().collection("documents").where("referenceNumber", "==", reference_number).limit(1).get()
@@ -219,6 +245,10 @@ async def paymongo_webhook(request: Request):
                         paid_at=paid_at,
                         method="paymongo"
                     )
+                    await _notify_payment_roles(
+                        f"Document payment {status} ({doc_data.get('documentId') or reference_number})",
+                        "payment_update",
+                    )
                 else:
                     logger.warning("⚠️ No record found for referenceNumber=%s", reference_number)
                     return JSONResponse(status_code=200, content={"success": False, "message": "Unmatched webhook"})
@@ -234,7 +264,7 @@ async def paymongo_webhook(request: Request):
         return JSONResponse(status_code=500, content={"success": False, "message": "Webhook error"})
     
 @router.post("/payments/business")
-def record_business_payment(payload: dict):
+async def record_business_payment(payload: dict):
     business_id = payload["businessId"]
     amount = payload["amount"]
     method = payload.get("method")
@@ -276,11 +306,15 @@ def record_business_payment(payload: dict):
         "barangay": business_data.get("barangay"), 
         "method": method
     } 
+    await _notify_payment_roles(
+        f"Business payment paid ({business_id})",
+        "payment",
+    )
     
     return response
 
 @router.post("/payments/document")
-def record_document_payment(payload: dict):
+async def record_document_payment(payload: dict):
     try:
         document_id = payload["documentId"]
         amount = payload["amount"]
@@ -335,6 +369,10 @@ def record_document_payment(payload: dict):
             "businessName": doc_data.get("businessName"),
             "method": method
         }
+        await _notify_payment_roles(
+            f"Document payment paid ({document_id})",
+            "payment",
+        )
         return response
 
     except Exception as e:

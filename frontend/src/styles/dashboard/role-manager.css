@@ -52,6 +52,28 @@
 .role-badge.dilg { background: var(--color-dilg); color: #fff; }
 .role-badge.resident { background: var(--color-resident); color: #fff; }
 
+/* Role presence indicator */
+.presence-indicator {
+  display: inline-flex;
+  align-items: center;
+}
+
+.presence-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+  border: 1px solid var(--color-border);
+}
+
+.presence-dot.online {
+  background: #22c55e;
+}
+
+.presence-dot.offline {
+  background: #9ca3af;
+}
+
 /* Actions */
 select {
   padding: var(--space-xs) var(--space-sm);

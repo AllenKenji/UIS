@@ -7,7 +7,7 @@ class Notification(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))  # unique per instance
     
     # Who should see this notification
-    role: Literal["admin", "staff", "secretary", "resident"]
+    role: Literal["admin", "staff", "secretary", "treasurer", "resident"]
     
     # What type of event triggered it
     type: Literal[
@@ -15,7 +15,8 @@ class Notification(BaseModel):
         "incident", "incident_update",
         "complaint", "complaint_update",
         "business", "business_update",
-        "document", "document_update"
+        "document", "document_update",
+        "payment", "payment_update"
     ]
     
     # Scope clarifies login/logout context

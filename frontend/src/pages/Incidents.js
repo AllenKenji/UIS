@@ -4,12 +4,37 @@ import IncidentForm from "../components/forms/IncidentForm";
 import IncidentEvaluation from "../components/staff/IncidentEvaluation";
 import "./incidents.css";
 
+const formatDateTime = (value) => {
+  if (!value) return "—";
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? "—" : value.toLocaleString();
+  }
+
+  if (typeof value === "string" || typeof value === "number") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? "—" : parsed.toLocaleString();
+  }
+
+  if (typeof value === "object") {
+    const seconds = value.seconds ?? value._seconds;
+    if (typeof seconds === "number") {
+      const parsed = new Date(seconds * 1000);
+      return Number.isNaN(parsed.getTime()) ? "—" : parsed.toLocaleString();
+    }
+  }
+
+  return "—";
+};
+
 const Incidents = () => {
   const [incidents, setIncidents] = useState([]);
   const [mode, setMode] = useState("dashboard"); 
   const [selectedIncident, setSelectedIncident] = useState(null);
   const userInfo = JSON.parse(sessionStorage.getItem("userInfo"));
   const role = userInfo?.role || "resident";
+  const canDelete = role === "staff" || role === "admin";
+  const canLogForResident = role === "staff" || role === "admin";
 
   const fetchIncidents = useCallback(async () => {
     try {
@@ -27,6 +52,20 @@ const Incidents = () => {
     fetchIncidents();
   }, [fetchIncidents]);
 
+  const handleDeleteIncident = async (incidentId, event) => {
+    event.stopPropagation();
+    if (!window.confirm("Are you sure you want to delete this incident?")) return;
+
+    try {
+      await api.delete(`${endpoints.incidents}/${incidentId}`);
+      fetchIncidents();
+    } catch (err) {
+      const errorMsg = err.response?.data?.detail || err.message;
+      console.error("❌ Failed to delete incident:", errorMsg);
+      alert("Failed to delete incident.");
+    }
+  };
+
   return (
     <div className="incidents-page">
       {selectedIncident ? (
@@ -40,7 +79,7 @@ const Incidents = () => {
         <>
           <div className="header">
             <h2>
-              {role === "staff"
+              {canLogForResident
                 ? "Report / Log Incident"
                 : "Report Incident"}
             </h2>
@@ -59,7 +98,7 @@ const Incidents = () => {
         <>
           <div className="header">
             <h2>
-              {role === "staff" ? "Incident Dashboard" : "Incidents Dashboard"}
+              {canLogForResident ? "Incident Dashboard" : "Incidents Dashboard"}
             </h2>
             <button onClick={() => setMode("form")}>+ Report Incident</button>
           </div>
@@ -75,6 +114,7 @@ const Incidents = () => {
                 {role === "resident" && <th>Logged By Officer</th>}
                 <th>Status</th>
                 <th>Timestamp</th>
+                {canDelete && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -93,7 +133,17 @@ const Incidents = () => {
                   )}
 
                   <td>{incident.status}</td>
-                  <td>{new Date(incident.createdAt).toLocaleString()}</td>
+                  <td>{formatDateTime(incident.timestamp || incident.createdAt)}</td>
+                  {canDelete && (
+                    <td>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteIncident(incident.id, e)}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

@@ -54,7 +54,7 @@ async def get_current_user(authorization: str = Header(...)) -> dict:
         elif db.collection("residents").document(uid).get().exists:
             role = "resident"
 
-    decoded["role"] = role
+    decoded["role"] = str(role or "resident").strip().lower()
     return decoded
 
 

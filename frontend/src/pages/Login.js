@@ -24,6 +24,21 @@ const roleRedirects = {
 
 const normalizeRole = (role) => (role?.trim().toLowerCase() || "resident");
 
+const getDisplayName = (profile = {}, fallbackEmail = "") => {
+  const firstLast = [profile.firstName || profile.first_name, profile.lastName || profile.last_name]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  return (
+    profile.fullName ||
+    profile.full_name ||
+    profile.name ||
+    firstLast ||
+    fallbackEmail
+  );
+};
+
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -105,10 +120,11 @@ const Login = () => {
       if (role === "resident") {
         await NotificationsAPI.createResidentLogin(1);
       } else {
-        await NotificationsAPI.createOfficerLogin(userData.fullName || email);
+        const officerName = getDisplayName(userData, email);
+        await NotificationsAPI.createOfficerLogin(officerName, role);
       }
 
-      toast.success(`✅ Welcome, ${userData.fullName || email}`);
+      toast.success(`✅ Welcome, ${getDisplayName(userData, email)}`);
       redirectByRole(role);
     } catch (error) {
       console.error("❌ Login error:", error);

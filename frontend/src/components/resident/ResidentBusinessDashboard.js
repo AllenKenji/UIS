@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "../../services/firebase";
 import { useUser } from "../../context/UserContext";
 import { QRCodeCanvas } from "qrcode.react";
@@ -13,21 +13,29 @@ const ResidentBusinessDashboard = () => {
   const [activeTab, setActiveTab] = useState("inProgress");
 
   useEffect(() => {
-    const fetchMyBusinesses = async () => {
-      if (!user?.email) return;
-      try {
-        const q = query(collection(db, "businesses"), where("email", "==", user.email));
-        const snapshot = await getDocs(q);
+    if (!user?.email) {
+      setBusinesses([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const q = query(collection(db, "businesses"), where("email", "==", user.email));
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
         const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
         setBusinesses(data);
-      } catch (error) {
+        setLoading(false);
+      },
+      (error) => {
         console.error("❌ Firebase fetch error:", error);
-      } finally {
         setLoading(false);
       }
-    };
+    );
 
-    fetchMyBusinesses();
+    return () => unsubscribe();
   }, [user]);
 
   const renderStatus = (b) => {
@@ -51,6 +59,7 @@ const ResidentBusinessDashboard = () => {
       case "pending_evaluation":
         return <p className="pending-text">⏳ Application submitted. Awaiting staff evaluation.</p>;
       case "for_payment":
+      case "awaiting_payment":
         return (
           <div className="payment-section">
             <p>💳 Your application is ready for payment.</p>

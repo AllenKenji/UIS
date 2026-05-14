@@ -1,6 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
 import { api } from "../services/api";
 
+const cleanText = (value) => {
+  if (value === undefined || value === null) return null;
+  const text = String(value).trim();
+  if (!text) return null;
+  if (["undefined", "null", "none", "nan"].includes(text.toLowerCase())) return null;
+  return text;
+};
+
 // 🔧 Normalize Firestore/API field names to consistent snake_case
 const normalizeDoc = (doc) => ({
   ...doc,
@@ -11,6 +19,19 @@ const normalizeDoc = (doc) => ({
   updated_at: doc.updatedAt || doc.updated_at,
   reference_number: doc.referenceNumber ?? doc.reference_number,
   paymentStatus: doc.paymentStatus ?? doc.payment_status,
+  issuedAt: doc.issuedAt ?? doc.issued_at,
+  issuedBy: doc.issuedBy ?? doc.issued_by,
+  fileUrl: doc.fileUrl ?? doc.file_url,
+  transactionId: doc.transactionId ?? doc.transaction_id,
+  paymentIntentId: doc.paymentIntentId ?? doc.payment_intent_id,
+  remarks: cleanText(
+    doc.remarks ??
+    doc.remark ??
+    doc.issueRemarks ??
+    doc.issue_remarks ??
+    doc.extraFields?.remarks ??
+    null
+  ),
 });
 
 export const useMyDocuments = (residentId) => {

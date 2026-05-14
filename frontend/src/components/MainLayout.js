@@ -5,9 +5,24 @@ import SecureNavLink from "./auth/SecureNavLink";
 import NotificationBell from "../components/NotificationBell";
 import { useNotifications } from "../context/NotificationContext";
 import { NotificationsAPI } from "../services/api";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import sidebarLinks from "../config/navigation";
 import "./main-layout.css";
+
+const getDisplayName = (profile = {}, fallbackEmail = "") => {
+  const firstLast = [profile.firstName || profile.first_name, profile.lastName || profile.last_name]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  return (
+    profile.fullName ||
+    profile.full_name ||
+    profile.name ||
+    firstLast ||
+    fallbackEmail
+  );
+};
 
 const MainLayout = () => {
   const navigate = useNavigate();
@@ -23,13 +38,27 @@ const MainLayout = () => {
 
   const [showNotifications, setShowNotifications] = useState(false);
 
+  useEffect(() => {
+    document.body.classList.add("dashboard-scroll-lock");
+    return () => {
+      document.body.classList.remove("dashboard-scroll-lock");
+    };
+  }, []);
+
   const linksToRender = sidebarLinks[role] || sidebarLinks.default || [];
+
+  const handleBellClick = () => {
+    setShowNotifications((prev) => !prev);
+  };
 
   const handleLogout = async () => {
     try {
       // 🔔 Trigger logout notification
       if (role === "staff" || role === "admin") {
-        await NotificationsAPI.createOfficerLogOut(userInfo.fullName || userInfo.email);
+        await NotificationsAPI.createOfficerLogOut(
+          getDisplayName(userInfo, userInfo?.email || ""),
+          role
+        );
       } else if (role === "resident") {
         await NotificationsAPI.createResidentLogOut(1);
       }
@@ -80,7 +109,7 @@ const MainLayout = () => {
               {isDarkMode ? "🌞 Light Mode" : "🌙 Dark Mode"}
             </button>
             <NotificationBell
-              onClick={() => setShowNotifications((prev) => !prev)}
+              onClick={handleBellClick}
               count={unreadCount}
             />
           </div>
@@ -92,6 +121,14 @@ const MainLayout = () => {
       <aside className="notification-panel">
         <header className="notification-header">
           <h2>Notifications</h2>
+          <button
+            type="button"
+            className="notification-close-btn"
+            onClick={() => setShowNotifications(false)}
+            aria-label="Close notifications"
+          >
+            ✕
+          </button>
         </header>
         <div className="notification-body">
           {notifications.length === 0 ? (

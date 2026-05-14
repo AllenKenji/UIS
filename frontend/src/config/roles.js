@@ -12,7 +12,7 @@ export const ALL_STATS = Object.freeze({
   documents:  { label: "Documents",           variant: "dilg",      icon: "📄" },
   logins:     { label: "Login Records",       variant: "neutral",   icon: "📊" },
   youth:      { label: "Youth Registry",      variant: "youth",     icon: "🧒" },
-  fees:       { label: "Fees",                variant: "info",      icon: "💰" },
+  collections:{ label: "Collections",         variant: "info",      icon: "💰" },
 });
 
 // 🛠️ Derived maps
@@ -35,6 +35,7 @@ export const ROLE_OPTIONS = Object.freeze(
 // 🚦 Base permissions template (all possible actions)
 export const BASE_PERMISSIONS = Object.freeze({
   viewDashboard: true,
+  viewCfdpSurvey: false,
   manageResidents: false,
   fileComplaints: false,
   fileComplaintsForResidents: false,
@@ -99,7 +100,7 @@ export const COLLECTION_PERMISSIONS = Object.freeze({
   documents:  ["viewDocuments", "viewOwnDocuments", "requestDocuments"],
   logins:     ["auditBarangayData"], 
   youth:      ["youthRegistryAccess"],
-  fees:       ["viewFinancialRecords"],
+  collections:["viewFinancialRecords"],
 });
 
 // 🔄 Auto-derived ROLE_COLLECTIONS (handles arrays of permissions)

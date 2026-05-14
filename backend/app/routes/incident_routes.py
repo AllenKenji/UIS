@@ -16,6 +16,8 @@ from backend.app.services.incident_service import (
     update_incident_status,
     delete_incident,
 )
+from backend.app.services.notification_service import NotificationService
+from backend.app.utils.firestore_utils import get_db
 
 logger = logging.getLogger("uvicorn.error")
 router = APIRouter(tags=["Incidents"])
@@ -30,12 +32,45 @@ class AdminStatusUpdateRequest(BaseModel):
     assigned_to: Optional[str] = None
 
 
+def _resolve_incident_owner_resident_uid(incident_obj: Incident) -> Optional[str]:
+    resident_uid = getattr(incident_obj, "residentId", None)
+    if resident_uid:
+        return resident_uid
+
+    auth_uid = getattr(incident_obj, "authUid", None)
+    if not auth_uid:
+        return None
+
+    try:
+        if get_db().collection("residents").document(auth_uid).get().exists:
+            return auth_uid
+    except Exception:
+        return None
+
+    return None
+
+
 # 📝 Report a new incident
 @router.post("", response_model=Incident, status_code=status.HTTP_201_CREATED)
-def report_incident(incident: IncidentCreate):
+async def report_incident(incident: IncidentCreate):
     try:
         created = create_incident(incident)
         logger.info("📝 Incident reported with ID: %s by resident %s", created.id, incident.authUid)
+
+        try:
+            await NotificationService.notify(
+                role="admin",
+                type="incident",
+                message=f"New incident filed ({created.type.value})",
+            )
+            await NotificationService.notify(
+                role="staff",
+                type="incident",
+                message=f"New incident filed ({created.type.value})",
+            )
+        except Exception as notify_err:
+            logger.warning("⚠️ Incident submit notification failed: %s", notify_err)
+
         return created
     except Exception as e:
         logger.error("❌ Failed to create incident: %s", e, exc_info=True)
@@ -72,8 +107,12 @@ def get_all_incidents(status: Optional[str] = None):
 
 # 🔧 Admin: update incident status + assignment
 @router.patch("/{incident_id}/status", response_model=ActionResponse)
-def admin_update_status(incident_id: str, payload: AdminStatusUpdateRequest):
+async def admin_update_status(incident_id: str, payload: AdminStatusUpdateRequest):
     try:
+        existing = get_incident_by_id(incident_id)
+        if not existing:
+            raise HTTPException(status_code=404, detail="Incident not found")
+
         success = update_incident_status(
             incident_id,
             payload.status.value,
@@ -87,6 +126,31 @@ def admin_update_status(incident_id: str, payload: AdminStatusUpdateRequest):
             payload.status.value,
             payload.assigned_to,
         )
+
+        try:
+            status_label = payload.status.value.replace("_", " ")
+            await NotificationService.notify(
+                role="admin",
+                type="incident_update",
+                message=f"Incident status updated to {status_label}",
+            )
+            await NotificationService.notify(
+                role="staff",
+                type="incident_update",
+                message=f"Incident status updated to {status_label}",
+            )
+
+            resident_uid = _resolve_incident_owner_resident_uid(existing)
+            if resident_uid:
+                await NotificationService.notify(
+                    role="resident",
+                    type="incident_update",
+                    message=f"Your incident status was updated to {status_label}",
+                    user_id=resident_uid,
+                )
+        except Exception as notify_err:
+            logger.warning("⚠️ Incident status notification failed: %s", notify_err)
+
         return ActionResponse(message="Incident updated successfully")
     except HTTPException:
         raise

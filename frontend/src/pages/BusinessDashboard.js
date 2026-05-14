@@ -3,9 +3,12 @@ import './business-dashboard.css';
 import { collection, query, where, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { getStorage, ref, deleteObject } from "firebase/storage";
 import { db } from '../services/firebase';
+import { useNavigate } from 'react-router-dom';
 import BusinessEvaluationModal from '../components/staff/BusinessEvaluationModal';
+import { NotificationsAPI } from '../services/api';
 
 const BusinessDashboard = () => {
+  const navigate = useNavigate();
   const [businesses, setBusinesses] = useState([]);
   const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(true);
@@ -37,6 +40,15 @@ const BusinessDashboard = () => {
         notes,
         evaluatedAt: new Date().toISOString(),
       });
+
+      await NotificationsAPI.createBusinessStatusUpdate(
+        status,
+        selectedBusiness?.ownerUid || null,
+        selectedBusiness?.businessName,
+        selectedBusiness?.businessId,
+        selectedBusiness?.id
+      );
+
       setSelectedBusiness(null);
       fetchBusinesses();
     } catch (err) {
@@ -107,7 +119,16 @@ const BusinessDashboard = () => {
 
   return (
     <div className="business-dashboard">
-      <h2>📊 Business Registry</h2>
+      <div className="business-dashboard-header">
+        <h2>📊 Business Registry</h2>
+        <button
+          type="button"
+          className="register-business-btn"
+          onClick={() => navigate('/residentBusinesses')}
+        >
+          Register Business
+        </button>
+      </div>
 
       <div className="filters">
         <label htmlFor="barangay-filter">Filter by Barangay:</label>

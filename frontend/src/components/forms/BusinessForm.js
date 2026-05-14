@@ -10,6 +10,7 @@ import { storage, db } from '../../services/firebase';
 import { useUser } from "../../context/UserContext";
 import { PARANAQUE } from "../../data/locations";
 import { usePublicFees } from "../../hooks/usePublicFees";   
+import { NotificationsAPI } from "../../services/api";
 import './business-form.css';
 
 const BusinessForm = ({ onBusinessAdded, onCancel }) => {
@@ -125,6 +126,7 @@ const BusinessForm = ({ onBusinessAdded, onCancel }) => {
       const payload = {
         ...data,
         address: fullAddress,
+        ownerUid: user.uid,
         ownerName: user.fullName,
         contactNumber: user.contactNumber,
         email: user.email,
@@ -137,6 +139,10 @@ const BusinessForm = ({ onBusinessAdded, onCancel }) => {
       };
 
       await addDoc(collection(db, "businesses"), payload);
+      await NotificationsAPI.createBusinessSubmitted(
+        user?.fullName || user?.name || user?.email || "Resident",
+        data.businessName
+      );
       toast.success("📌 Application submitted for staff evaluation.");
 
       reset();
@@ -201,8 +207,12 @@ const BusinessForm = ({ onBusinessAdded, onCancel }) => {
           <label htmlFor="barangay">Barangay
             <select id="barangay" {...register("barangay", { required: "Barangay is required" })}>
               <option value="">Select Barangay</option>
-              {PARANAQUE.barangays.map(brgy => (
-                <option key={brgy} value={brgy}>{brgy}</option>
+              {Object.entries(PARANAQUE.districts || {}).map(([district, barangays]) => (
+                <optgroup key={district} label={`District ${district}`}>
+                  {barangays.map((brgy) => (
+                    <option key={brgy} value={brgy}>{brgy}</option>
+                  ))}
+                </optgroup>
               ))}
             </select>
             {errors.barangay && <span className="error-text">{errors.barangay.message}</span>}

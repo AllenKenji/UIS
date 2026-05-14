@@ -1,5 +1,5 @@
 import axios from "axios";
-import { getAuth } from "firebase/auth";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
 const rawEnvApiBaseUrl = process.env.REACT_APP_API_BASE_URL || "";
@@ -65,20 +65,53 @@ export const api = axios.create({
   timeout: 30000,
 });
 
+const waitForAuthUser = (auth, timeoutMs = 1200) =>
+  new Promise((resolve) => {
+    if (auth.currentUser) {
+      resolve(auth.currentUser);
+      return;
+    }
+
+    let settled = false;
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (settled) return;
+      settled = true;
+      unsubscribe();
+      resolve(user || null);
+    });
+
+    setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      unsubscribe();
+      resolve(auth.currentUser || null);
+    }, timeoutMs);
+  });
+
 // 🔐 Always inject a fresh token 
 api.interceptors.request.use(async (config) => {
   const auth = getAuth();
-  const user = auth.currentUser;
+  const cachedToken = sessionStorage.getItem("authToken");
 
   if (config.url?.includes("/api/password/")) { return config; }
 
+  let tokenToUse = cachedToken;
+  const user = auth.currentUser || await waitForAuthUser(auth);
+
   if (user) {
     try {
-      const token = await user.getIdToken(true);
-      config.headers.Authorization = `Bearer ${token}`;
+      const freshToken = await user.getIdToken(false);
+      tokenToUse = freshToken || tokenToUse;
+      if (freshToken) {
+        sessionStorage.setItem("authToken", freshToken);
+      }
     } catch (err) {
       console.warn("⚠️ Failed to refresh Firebase token", err);
     }
+  }
+
+  if (tokenToUse) {
+    config.headers.Authorization = `Bearer ${tokenToUse}`;
   }
 
   return config;
@@ -216,10 +249,17 @@ DocumentsAPI.confirmPayment = (id, payload = {}) =>
     .catch((err) => handleError(err, "Confirm payment"));
 
 // 📜 Issue document
-DocumentsAPI.issue = (id, payload) =>
-  api.patch(`${endpoints.documents}/${id}/issue`, payload)
+DocumentsAPI.issue = (id, payload = {}) => {
+  const normalizedPayload = {
+    ...payload,
+    issued_by: payload.issued_by || payload.issuedBy,
+  };
+  delete normalizedPayload.issuedBy;
+
+  return api.patch(`${endpoints.documents}/${id}/issue`, normalizedPayload)
     .then((res) => res.data)
     .catch((err) => handleError(err, "Issue document"));
+};
 
 // 🔄 Mark resubmitted
 DocumentsAPI.markResubmitted = (id) =>
@@ -420,6 +460,11 @@ export const NotificationsAPI = {
     api.delete(`/api/notifications/actions/delete-all`)
       .then((res) => res.data)
       .catch((err) => handleError(err, "Delete all notifications")),
+
+  markAllAsRead: () =>
+    api.patch(`/api/notifications/actions/mark-all-read`)
+      .then((res) => res.data)
+      .catch((err) => handleError(err, "Mark all notifications read")),
   
   createResidentLogin: (count) => 
     api.post("/api/notifications/resident-login", { count }) 
@@ -429,12 +474,31 @@ export const NotificationsAPI = {
     api.post("/api/notifications/resident-logout", { count }) 
       .then((res) => res.data), 
       
-  createOfficerLogin: (name) => 
-    api.post("/api/notifications/officer-login", { name }) 
+  createOfficerLogin: (name, role) => 
+    api.post("/api/notifications/officer-login", { name, role }) 
       .then((res) => res.data),
   
-  createOfficerLogOut: (name) => 
-    api.post("/api/notifications/officer-logout", { name }) 
+  createOfficerLogOut: (name, role) => 
+    api.post("/api/notifications/officer-logout", { name, role }) 
       .then((res) => res.data),
+
+  createBusinessSubmitted: (residentName, businessName) =>
+    api.post("/api/notifications/business-submitted", {
+      resident_name: residentName,
+      business_name: businessName,
+    }).then((res) => res.data),
+
+  createBusinessStatusUpdate: (status, residentUid, businessName, businessId, firestoreId) => {
+    const payload = {
+      status,
+      business_name: businessName,
+    };
+    if (residentUid) payload.resident_uid = residentUid;
+    if (businessId) payload.business_id = businessId;
+    if (firestoreId) payload.firestore_id = firestoreId;
+
+    return api.post("/api/notifications/business-status-update", payload)
+      .then((res) => res.data);
+  },
 };
 

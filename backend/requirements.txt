@@ -3,6 +3,7 @@ pytest
 python-decouple
 fastapi==0.129.0
 uvicorn==0.41.0
+wsproto==1.2.0
 firebase-admin==7.1.0
 google-cloud-firestore==2.23.0
 google-cloud-storage==3.9.0

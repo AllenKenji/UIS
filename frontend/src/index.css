@@ -1,6 +1,6 @@
 body {
   margin: 0;
-  overflow-y: hidden;
+  overflow-y: auto;
   overflow-x: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
@@ -10,19 +10,21 @@ body {
 }
 
 html {
-  height: 100%;
-  overflow-y: hidden;
+  min-height: 100%;
+  overflow-y: auto;
   overflow-x: hidden;
 }
 
 #root {
-  height: 100%;
-  overflow: hidden;
+  min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .app-wrapper {
-  height: 100%;
-  overflow: hidden;
+  min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 code {

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { auth, db } from "../../services/firebase";
-import { AccountsAPI, RolesAPI } from "../../services/api";
+import { AccountsAPI, RolesAPI, api } from "../../services/api";
 import { useUser } from "../../context/UserContext";
 import { ROLE_OPTIONS } from "../../config/roles";
 import "../../styles/dashboard/role-manager.css";
@@ -12,9 +12,22 @@ const RoleManager = () => {
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState(null);
   const [pendingUserId, setPendingUserId] = useState(null);
+  const [rolePresence, setRolePresence] = useState({});
 
   const { userInfo, isAdmin, can } = useUser();
   const hasManagePermission = isAdmin || can("manageUsers"); 
+
+  const fetchRolePresence = useCallback(async () => {
+    if (!hasManagePermission) return;
+
+    try {
+      const { data } = await api.get("/api/ws/presence/roles");
+      setRolePresence(data?.roles || {});
+    } catch (err) {
+      console.warn("⚠️ Failed to load role presence:", err?.message || err);
+      setRolePresence({});
+    }
+  }, [hasManagePermission]);
 
   // 🔍 Fetch users (only if allowed)
   const fetchUsers = useCallback(async () => {
@@ -47,17 +60,28 @@ const RoleManager = () => {
       });
       setUsers(data);
       setError(null);
+      await fetchRolePresence();
     } catch (err) {
       console.error("❌ Failed to load users:", err);
       setError("Failed to load users.");
     } finally {
       setLoading(false);
     }
-  }, [hasManagePermission]);
+  }, [hasManagePermission, fetchRolePresence]);
 
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+
+  useEffect(() => {
+    if (!hasManagePermission) return;
+
+    const interval = setInterval(() => {
+      fetchRolePresence();
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [hasManagePermission, fetchRolePresence]);
 
   // 🔧 Unified safe API call
   const safeApiCall = useCallback(
@@ -157,6 +181,8 @@ const RoleManager = () => {
       (a.full_name || "").localeCompare(b.full_name || "")
   );
 
+  const getRoleOnline = (role) => Boolean(rolePresence?.[role]?.online);
+
   const bootstrapAdmin = async () => {
     try { 
       const result = await RolesAPI.assignRole(userInfo.uid, "admin"); 
@@ -190,6 +216,7 @@ const RoleManager = () => {
             <tr>
               <th>Name</th>
               <th>Current Role</th>
+              <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -202,6 +229,14 @@ const RoleManager = () => {
                 <td>{user.full_name || "Unnamed User"}</td>
                 <td>
                   <span className={`role-badge ${user.role}`}>{user.role}</span>
+                </td>
+                <td>
+                  <span className="presence-indicator" title={getRoleOnline(user.role) ? "Online" : "Offline"}>
+                    <span
+                      className={`presence-dot ${getRoleOnline(user.role) ? "online" : "offline"}`}
+                      aria-label={getRoleOnline(user.role) ? "Online" : "Offline"}
+                    />
+                  </span>
                 </td>
                 <td>
                   <select

@@ -7,10 +7,33 @@
 }
 
 /* Heading */
-.business-dashboard h2 {
+.business-dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
   margin-bottom: 1.5rem;
+}
+
+.business-dashboard h2 {
+  margin-bottom: 0;
   font-size: 1.8rem;
   color: #333;
+}
+
+.register-business-btn {
+  padding: 0.6rem 1rem;
+  border: 1px solid #0078d4;
+  background-color: #0078d4;
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.register-business-btn:hover {
+  background-color: #005fa3;
+  border-color: #005fa3;
 }
 
 /* Filters */

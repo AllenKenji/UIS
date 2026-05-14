@@ -11,6 +11,15 @@ import { cleanPayload } from "../../utils/cleanPayload";
 import { sendEmail } from "../../services/email";
 import "./resident-form.css";
 
+const LEGACY_BARANGAY_ALIASES = {
+  "Sto. Niño": "Santo Niño",
+};
+
+const normalizeBarangayName = (value) => {
+  const trimmed = (value || "").trim();
+  return LEGACY_BARANGAY_ALIASES[trimmed] || trimmed;
+};
+
 const getAuthUid = () => {
   const uid = auth.currentUser?.uid;
   if (!uid) throw new Error("❌ Missing Firebase Auth UID. User may not be authenticated.");
@@ -114,6 +123,9 @@ const ResidentForm = ({ onResidentAdded, onCancel, user: userProp }) => {
       }
 
       const payload = await buildPayload(data);
+      if (payload.address?.barangay) {
+        payload.address.barangay = normalizeBarangayName(payload.address.barangay);
+      }
 
       console.log("✅ Payload email before sendWelcomeEmail:", payload.email);
 
@@ -246,8 +258,12 @@ const ResidentForm = ({ onResidentAdded, onCancel, user: userProp }) => {
           className={errors.barangay ? "input-error" : ""}
         >
           <option value="">Select Barangay</option>
-          {PARANAQUE.barangays.map((b) => (
-            <option key={b} value={b}>{b}</option>
+          {Object.entries(PARANAQUE.districts || {}).map(([district, barangays]) => (
+            <optgroup key={district} label={`District ${district}`}>
+              {barangays.map((b) => (
+                <option key={b} value={b}>{b}</option>
+              ))}
+            </optgroup>
           ))}
         </select>
         {errors.barangay && <span className="error">{errors.barangay.message}</span>}

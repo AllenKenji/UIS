@@ -7,8 +7,24 @@ import { auth, db } from "../../services/firebase";
 import { PARANAQUE } from "../../data/locations";
 import { usePublicFees } from "../../hooks/usePublicFees";
 import { useResidents } from "../../hooks/useResidents";
+import { NotificationsAPI } from "../../services/api";
 import PaymentForm from "./PaymentForm"; 
 import "./business-form.css";
+
+const getDisplayName = (profile = {}, fallbackEmail = "") => {
+  const firstLast = [profile.firstName || profile.first_name, profile.lastName || profile.last_name]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  return (
+    profile.fullName ||
+    profile.full_name ||
+    profile.name ||
+    firstLast ||
+    fallbackEmail
+  );
+};
 
 const StaffBusinessForm = ({ onBusinessAdded, onCancel }) => {
   const { register, handleSubmit, trigger, reset } = useForm();
@@ -68,6 +84,8 @@ const StaffBusinessForm = ({ onBusinessAdded, onCancel }) => {
     setIsSubmitting(true);
     try {
       const customBusinessId = generateBusinessId(data.barangay);
+      const staffEmail = currentStaff.email || auth.currentUser?.email || "";
+      const staffName = getDisplayName(currentStaff, staffEmail) || "Unknown Staff";
 
       const payload = {
         ...data,
@@ -79,13 +97,31 @@ const StaffBusinessForm = ({ onBusinessAdded, onCancel }) => {
         permitNumber: generatePermitNumber(data.barangay),
         submittedAt: new Date().toISOString(),
         createdBy: {
-          uid: currentStaff.uid,
-          name: currentStaff.full_name,
-          email: currentStaff.email,
+          uid: currentStaff.uid || auth.currentUser?.uid || "",
+          name: staffName,
+          email: staffEmail,
         },
       };
 
       const docRef = await addDoc(collection(db, "businesses"), payload);
+
+      await NotificationsAPI.createBusinessSubmitted(
+        selectedResident.fullName || selectedResident.name || selectedResident.email || "Resident",
+        data.businessName
+      ).catch((notifyError) => {
+        console.warn("⚠️ Business registration notification failed:", notifyError);
+      });
+
+      await NotificationsAPI.createBusinessStatusUpdate(
+        "approved",
+        null,
+        data.businessName,
+        customBusinessId,
+        docRef.id
+      ).catch((notifyError) => {
+        console.warn("⚠️ Business owner notification failed:", notifyError);
+      });
+
       setDocId(docRef.id);
       setBusinessId(customBusinessId);
 
@@ -206,7 +242,7 @@ const StaffBusinessForm = ({ onBusinessAdded, onCancel }) => {
       {step === 4 && docId && businessId && (
         <PaymentForm
           docId={docId}                     // Firestore UID
-          entityId={docId}                  // keep UID for internal reference
+          entityId={businessId}             // use generated businessId for backend payment lookup
           entityType="business"
           resident={selectedResident}
           entityCategory={selectedBusinessType}
