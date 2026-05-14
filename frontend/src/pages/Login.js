@@ -116,12 +116,16 @@ const Login = () => {
         localStorage.removeItem("rememberedEmail");
       }
 
-      // ✅ Trigger notification
-      if (role === "resident") {
-        await NotificationsAPI.createResidentLogin(1);
-      } else {
-        const officerName = getDisplayName(userData, email);
-        await NotificationsAPI.createOfficerLogin(officerName, role);
+      // Do not block login on telemetry/notification failures.
+      try {
+        if (role === "resident") {
+          await NotificationsAPI.createResidentLogin(1);
+        } else {
+          const officerName = getDisplayName(userData, email);
+          await NotificationsAPI.createOfficerLogin(officerName, role);
+        }
+      } catch (notifyErr) {
+        console.warn("Notification logging failed, continuing login:", notifyErr);
       }
 
       toast.success(`✅ Welcome, ${getDisplayName(userData, email)}`);
