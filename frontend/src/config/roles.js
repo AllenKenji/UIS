@@ -1,6 +1,4 @@
-// Load role permissions from the config file
-// In Render, root directory is 'frontend', so the file is in src/config/
-import roleOverrides from './role_permissions.json';
+import roleOverrides from "./rolePermissions";
 
 // 🔑 Valid roles (shared across frontend + Firestore)
 export const VALID_ROLES = Object.freeze(Object.keys(roleOverrides));
