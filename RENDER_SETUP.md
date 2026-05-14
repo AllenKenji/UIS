@@ -1,5 +1,17 @@
 # BIS Render Setup
 
+## Fast path (Render Blueprint)
+
+This repository now includes [render.yaml](render.yaml).
+
+In Render, use New + Blueprint and point it to this repo/branch.
+Render will create:
+
+1. bis-backend web service
+2. bis-frontend static site
+
+Then fill all environment variables marked sync: false.
+
 ## Services to create
 
 Create two Render services for BIS:
