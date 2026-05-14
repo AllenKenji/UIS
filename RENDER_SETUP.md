@@ -1,16 +1,31 @@
 # BIS Render Setup
 
+# BIS Render Setup
+
 ## Fast path (Render Blueprint)
 
-This repository now includes [render.yaml](render.yaml).
+This repository includes [render.yaml](render.yaml) that deploys the BIS backend.
 
-In Render, use New + Blueprint and point it to this repo/branch.
-Render will create:
+In Render, use New → Blueprint and select `AllenKenji/UIS`.
 
-1. bis-backend web service
-2. bis-frontend static site
+It will create the **bis-backend** web service.
 
-Then fill all environment variables marked sync: false.
+The **bis-frontend** is deployed separately (see below).
+
+## Frontend deployment (manual)
+
+Frontend is a static React site. Deploy separately:
+
+1. Render → New → Static Site
+2. Connect repo `AllenKenji/UIS`
+3. Set Publish directory: `frontend/build`
+4. Build command: `npm ci && npm run build`
+5. Root directory: `frontend`
+6. Add environment variables:
+   - REACT_APP_API_BASE_URL
+   - REACT_APP_WS_BASE_URL
+   - REACT_APP_MAIL_URL
+   - REACT_APP_CFDP_SURVEY_URL
 
 ## Services to create
 

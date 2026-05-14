@@ -23,18 +23,3 @@ services:
         sync: false
       - key: CORS_ORIGINS
         sync: false
-
-  - type: static
-    name: bis-frontend
-    rootDir: frontend
-    buildCommand: npm ci && npm run build
-    staticPublishPath: build
-    envVars:
-      - key: REACT_APP_API_BASE_URL
-        sync: false
-      - key: REACT_APP_WS_BASE_URL
-        sync: false
-      - key: REACT_APP_MAIL_URL
-        sync: false
-      - key: REACT_APP_CFDP_SURVEY_URL
-        sync: false
