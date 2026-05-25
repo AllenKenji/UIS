@@ -76,6 +76,43 @@ def _normalize_role(value: str | None) -> str:
     return str(value or "").strip().lower()
 
 
+def _resolve_actor_identity(user: dict, fallback_name: str = "Officer", fallback_role: str = "officer") -> tuple[str, str]:
+    uid = user.get("uid")
+    if not uid:
+        return fallback_name, fallback_role
+
+    try:
+        db = get_db()
+        user_doc = db.collection("users").document(uid).get()
+        if user_doc.exists:
+            data = user_doc.to_dict() or {}
+            name = (
+                data.get("fullName")
+                or data.get("full_name")
+                or data.get("name")
+                or data.get("email")
+                or fallback_name
+            )
+            role = _normalize_role(data.get("role")) or fallback_role
+            return str(name), str(role)
+
+        resident_doc = db.collection("residents").document(uid).get()
+        if resident_doc.exists:
+            data = resident_doc.to_dict() or {}
+            name = (
+                data.get("fullName")
+                or data.get("full_name")
+                or data.get("name")
+                or data.get("email")
+                or fallback_name
+            )
+            return str(name), "resident"
+    except Exception as err:
+        logger.warning("⚠️ Failed to resolve actor identity for %s: %s", uid, err)
+
+    return fallback_name, fallback_role
+
+
 def _resolve_audience_user_ids(data: dict) -> Set[str]:
     """
     Resolve intended recipient UIDs for a notification document.
@@ -386,8 +423,9 @@ async def resident_logout(payload: ResidentLoginPayload, user: dict = Depends(ge
 @router.post("/officer-login", response_model=Notification)
 async def officer_login(payload: OfficerLoginPayload, user: dict = Depends(get_current_user)):
     """Admin receives officer login notifications with names."""
-    resolved_role = payload.role or user.get("role") or "officer"
-    resolved_name = payload.name or user.get("fullName") or user.get("name") or user.get("email") or "Officer"
+    fallback_role = _normalize_role(payload.role or user.get("role") or "officer") or "officer"
+    fallback_name = payload.name or user.get("fullName") or user.get("name") or user.get("email") or "Officer"
+    resolved_name, resolved_role = _resolve_actor_identity(user, fallback_name, fallback_role)
     officer_role = resolved_role.replace("_", " ").title()
     _record_login_event(
         scope="officer",
@@ -407,9 +445,17 @@ async def officer_login(payload: OfficerLoginPayload, user: dict = Depends(get_c
 @router.post("/officer-logout", response_model=Notification)
 async def officer_logout(payload: OfficerLoginPayload, user: dict = Depends(get_current_user)):
     """Admin receives officer logout notifications with names."""
-    resolved_role = payload.role or user.get("role") or "officer"
-    resolved_name = payload.name or user.get("fullName") or user.get("name") or user.get("email") or "Officer"
+    fallback_role = _normalize_role(payload.role or user.get("role") or "officer") or "officer"
+    fallback_name = payload.name or user.get("fullName") or user.get("name") or user.get("email") or "Officer"
+    resolved_name, resolved_role = _resolve_actor_identity(user, fallback_name, fallback_role)
     officer_role = resolved_role.replace("_", " ").title()
+    _record_login_event(
+        scope="officer",
+        actor_role=resolved_role,
+        actor_uid=user.get("uid"),
+        actor_name=resolved_name,
+        count=1,
+    )
     return await NotificationService.notify(
         role="admin",
         type="logout",
