@@ -10,7 +10,7 @@ export const ALL_STATS = Object.freeze({
   complaints: { label: "Complaints",          variant: "danger",    icon: "🗣️" },
   incidents:  { label: "Incidents",           variant: "warning",   icon: "⚠️" },
   documents:  { label: "Documents",           variant: "dilg",      icon: "📄" },
-  logins:     { label: "Login Records",       variant: "neutral",   icon: "📊" },
+  logins:     { label: "Login / Day",         variant: "neutral",   icon: "📊" },
   youth:      { label: "Youth Registry",      variant: "youth",     icon: "🧒" },
   collections:{ label: "Collections / Day",   variant: "info",      icon: "💰" },
 });
