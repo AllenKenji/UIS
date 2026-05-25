@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { getCountFromServer, collection } from "firebase/firestore";
+import { getCountFromServer, collection, getDocs } from "firebase/firestore";
 import { db } from "../../services/firebase";
-import { ResidentsAPI } from "../../services/api";
 import { useUser } from "../../context/UserContext";
 import { CATEGORIES, CATEGORY_VARIANTS, COLLECTION_PERMISSIONS } from "../../config/roles"; 
 import "../../styles/dashboard/registry-audit.css";
@@ -37,8 +36,8 @@ const getResidentAge = (resident) => {
 };
 
 const getYouthResidentsCount = async () => {
-  const data = await ResidentsAPI.list();
-  const residents = Array.isArray(data) ? data : data?.items ?? [];
+  const snapshot = await getDocs(collection(db, "residents"));
+  const residents = snapshot.docs.map((doc) => doc.data() || {});
   return residents.filter((resident) => {
     const age = getResidentAge(resident);
     return typeof age === "number" && age >= YOUTH_MIN_AGE && age <= YOUTH_MAX_AGE;
