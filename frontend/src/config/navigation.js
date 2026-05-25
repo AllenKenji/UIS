@@ -23,10 +23,10 @@ const links = {
   audit: { path: "/audit", label: "📊 Audit", action: "auditBarangayData" },
   cfdpSurvey: { path: "/cfdp-survey", label: "🧭 CFDP Survey", action: "viewCfdpSurvey" },
   youth: { path: "/youth", label: "🏠 Dashboard", action: "viewDashboard" },
-  youthRegistry: { path: "/youth/registry", label: "📋 Youth Registry", action: "youthRegistryAccess" },
-  youthPrograms: { path: "/youth/programs", label: "🎯 Programs", action: "youthRegistryAccess" },
-  youthEvents: { path: "/youth/events", label: "📅 Events", action: "youthRegistryAccess" },
-  youthFeedback: { path: "/youth/feedback", label: "💬 Feedback", action: "youthRegistryAccess" },
+  youthRegistry: { path: "/youth/registry", label: "📋 Youth Registry", action: "viewDashboard" },
+  youthPrograms: { path: "/youth/programs", label: "🎯 Programs", action: "viewDashboard" },
+  youthEvents: { path: "/youth/events", label: "📅 Events", action: "viewDashboard" },
+  youthFeedback: { path: "/youth/feedback", label: "💬 Feedback", action: "viewDashboard" },
   home: { path: "/", label: "🏠 Home", action: "viewDashboard" },
 
   // Secretary-specific links

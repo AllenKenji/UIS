@@ -45,7 +45,9 @@ const MainLayout = () => {
     };
   }, []);
 
-  const linksToRender = sidebarLinks[role] || sidebarLinks.default || [];
+  const normalizedRole = role?.trim().toLowerCase();
+
+  const linksToRender = sidebarLinks[normalizedRole] || sidebarLinks.default || [];
 
   const handleBellClick = () => {
     setShowNotifications((prev) => !prev);
@@ -54,12 +56,12 @@ const MainLayout = () => {
   const handleLogout = async () => {
     try {
       // 🔔 Trigger logout notification
-      if (role === "staff" || role === "admin") {
+      if (normalizedRole === "staff" || normalizedRole === "admin") {
         await NotificationsAPI.createOfficerLogOut(
           getDisplayName(userInfo, userInfo?.email || ""),
-          role
+          normalizedRole
         );
-      } else if (role === "resident") {
+      } else if (normalizedRole === "resident") {
         await NotificationsAPI.createResidentLogOut(1);
       }
 
@@ -82,7 +84,7 @@ const MainLayout = () => {
             </SecureNavLink>
           ))}
 
-          {role === "admin" && (
+          {normalizedRole === "admin" && (
             <SecureNavLink action="manageSettings" to="/settings">
               ⚙️ Settings
             </SecureNavLink>
