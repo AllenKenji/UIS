@@ -15,6 +15,7 @@ import {
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../services/firebase";
 import { ROLE_PERMISSIONS, VALID_ROLES } from "../config/roles";
+import { NotificationsAPI } from "../services/api";
 
 const UserContext = createContext();
 const DEBUG = process.env.NODE_ENV !== "production";
@@ -113,7 +114,36 @@ export const UserProvider = ({ children }) => {
     }
   }, []);
 
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (options = {}) => {
+    const roleCandidate = (options.role || role || userInfo?.role || "officer").toString().trim().toLowerCase();
+    const nameCandidate =
+      options.name ||
+      userInfo?.fullName ||
+      userInfo?.full_name ||
+      userInfo?.name ||
+      userInfo?.email ||
+      auth.currentUser?.email ||
+      "Officer";
+
+    try {
+      if (roleCandidate === "resident") {
+        await NotificationsAPI.createResidentLogOut(1);
+      } else {
+        try {
+          await NotificationsAPI.createOfficerLogOut(nameCandidate, roleCandidate);
+        } catch (officerError) {
+          await NotificationsAPI.createSelfLogOut(nameCandidate, roleCandidate, 1);
+          if (DEBUG) {
+            console.warn("⚠️ officer-logout failed, used logout-self fallback:", officerError);
+          }
+        }
+      }
+    } catch (notificationError) {
+      if (DEBUG) {
+        console.error("⚠️ Logout notification failed:", notificationError);
+      }
+    }
+
     clearUserState();
     try {
       await signOut(auth);
@@ -121,7 +151,7 @@ export const UserProvider = ({ children }) => {
       console.error("❌ Sign-out failed:", err);
       safeSetError("Sign-out failed");
     }
-  }, [clearUserState]);
+  }, [clearUserState, role, userInfo]);
 
   // ✅ Fetch profile from users/{uid} or residents/{uid}
   const fetchUserProfile = useCallback(async (uid) => {

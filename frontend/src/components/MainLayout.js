@@ -4,7 +4,6 @@ import { useTheme } from "../context/ThemeContext";
 import SecureNavLink from "./auth/SecureNavLink";
 import NotificationBell from "../components/NotificationBell";
 import { useNotifications } from "../context/NotificationContext";
-import { NotificationsAPI } from "../services/api";
 import { useEffect, useState } from "react";
 import sidebarLinks from "../config/navigation";
 import "./main-layout.css";
@@ -46,24 +45,7 @@ const MainLayout = () => {
     const logoutName = userInfo?.fullName || userInfo?.full_name || userInfo?.name || userInfo?.email || "Officer";
 
     try {
-      // 🔔 Trigger logout notification (best-effort; should not block logout)
-      try {
-        if (logoutRole === "resident") {
-          await NotificationsAPI.createResidentLogOut(1);
-        } else {
-          try {
-            await NotificationsAPI.createOfficerLogOut(logoutName, logoutRole);
-          } catch (officerError) {
-            // Fallback keeps officer logout telemetry working on mismatched/older backends.
-            await NotificationsAPI.createSelfLogOut(logoutName, logoutRole, 1);
-            console.warn("⚠️ officer-logout failed, used logout-self fallback:", officerError);
-          }
-        }
-      } catch (notificationError) {
-        console.error("⚠️ Logout notification failed:", notificationError);
-      }
-
-      await logout();
+      await logout({ role: logoutRole, name: logoutName });
       navigate("/login");
     } catch (error) {
       console.error("❌ Logout failed:", error);
