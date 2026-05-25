@@ -482,9 +482,28 @@ export const NotificationsAPI = {
     api.post("/api/notifications/officer-logout", { name, role }) 
       .then((res) => res.data),
 
-  createSelfLogOut: (name, role, count = 1) =>
-    api.post("/api/notifications/logout-self", { name, role, count })
-      .then((res) => res.data),
+  createSelfLogOut: async (name, role, count = 1) => {
+    try {
+      const res = await api.post("/api/notifications/logout-self", { name, role, count });
+      return res.data;
+    } catch (err) {
+      const status = err?.response?.status;
+      const normalizedRole = String(role || "").trim().toLowerCase();
+
+      // Compatibility fallback for older backends that do not expose /logout-self.
+      if (status === 404 || status === 405) {
+        if (normalizedRole === "resident") {
+          const res = await api.post("/api/notifications/resident-logout", { count });
+          return res.data;
+        }
+
+        const res = await api.post("/api/notifications/officer-logout", { name, role: normalizedRole || "officer" });
+        return res.data;
+      }
+
+      throw err;
+    }
+  },
 
   createBusinessSubmitted: (residentName, businessName) =>
     api.post("/api/notifications/business-submitted", {
