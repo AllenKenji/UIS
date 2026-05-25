@@ -61,60 +61,59 @@ const YouthRegistry = ({ residents = [], loading = false }) => {
     return residents.filter((resident) => getBarangayLabel(resident) === selectedBarangay);
   }, [residents, selectedBarangay]);
 
+  const isFilterDisabled = loading || residents.length === 0;
+
   return (
     <div className="youth-registry">
+      <div className="youth-registry-filters">
+        <label htmlFor="youth-registry-barangay">Barangay</label>
+        <select
+          id="youth-registry-barangay"
+          value={selectedBarangay}
+          onChange={(event) => setSelectedBarangay(event.target.value)}
+          disabled={isFilterDisabled}
+        >
+          <option value="all">All Barangays</option>
+          {barangayOptions.map((barangay) => (
+            <option key={barangay} value={barangay}>
+              {barangay}
+            </option>
+          ))}
+        </select>
+        <p className="youth-registry-meta">
+          Showing {filteredResidents.length} of {residents.length}
+        </p>
+      </div>
+
       {loading ? (
         <p className="sk-empty-state">Loading youth registry...</p>
       ) : residents.length === 0 ? (
         <p className="sk-empty-state">No youth residents found yet.</p>
+      ) : filteredResidents.length === 0 ? (
+        <p className="sk-empty-state">No youth residents found for the selected barangay.</p>
       ) : (
-        <>
-          <div className="youth-registry-filters">
-            <label htmlFor="youth-registry-barangay">Barangay</label>
-            <select
-              id="youth-registry-barangay"
-              value={selectedBarangay}
-              onChange={(event) => setSelectedBarangay(event.target.value)}
-            >
-              <option value="all">All Barangays</option>
-              {barangayOptions.map((barangay) => (
-                <option key={barangay} value={barangay}>
-                  {barangay}
-                </option>
-              ))}
-            </select>
-            <p className="youth-registry-meta">
-              Showing {filteredResidents.length} of {residents.length}
-            </p>
-          </div>
-
-          {filteredResidents.length === 0 ? (
-            <p className="sk-empty-state">No youth residents found for the selected barangay.</p>
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Age</th>
-                  <th>Barangay</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredResidents.map((resident) => (
-                  <tr key={resident.id || resident.uid}>
-                    <td>{resident.fullName || resident.name || "Unnamed"}</td>
-                    <td>
-                      <span className="sk-age-value">{toAgeLabel(resident)}</span>
-                    </td>
-                    <td>{getBarangayLabel(resident)}</td>
-                    <td>{resident.status || "Active"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </>
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Age</th>
+              <th>Barangay</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredResidents.map((resident) => (
+              <tr key={resident.id || resident.uid}>
+                <td>{resident.fullName || resident.name || "Unnamed"}</td>
+                <td>
+                  <span className="sk-age-value">{toAgeLabel(resident)}</span>
+                </td>
+                <td>{getBarangayLabel(resident)}</td>
+                <td>{resident.status || "Active"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   );
