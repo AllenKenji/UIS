@@ -14,6 +14,7 @@ import json
 router = APIRouter(tags=["websocket"])
 logger = logging.getLogger("uvicorn.error")
 OFFICER_ROLES = {"staff", "secretary", "treasurer", "sk", "dilg"}
+OFFLINE_LOGOUT_GRACE_SECONDS = 3
 
 
 def _normalize_role(value: str | None) -> str:
@@ -101,7 +102,7 @@ async def _emit_disconnect_logout_if_still_offline(uid: str, role: str):
     if normalized_role not in OFFICER_ROLES:
         return
 
-    await asyncio.sleep(8)
+    await asyncio.sleep(OFFLINE_LOGOUT_GRACE_SECONDS)
 
     if _has_active_connection(uid, normalized_role):
         return
