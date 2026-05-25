@@ -104,7 +104,8 @@ const EventCalendar = ({ events = [] }) => {
 
   return (
     <div className="event-calendar">
-      <form className="sk-inline-form" onSubmit={handleSubmit}>
+      <h4 className="sk-form-title">{editingId ? "Edit Event" : "Add Event"}</h4>
+      <form id="add-event-form" className="sk-inline-form" onSubmit={handleSubmit}>
         <input
           type="text"
           placeholder="Event title"

@@ -114,6 +114,14 @@ const SKDashboard = () => {
       <header className="sk-header">
         <h2>🧒 SK Dashboard</h2>
         <p>Live youth operations view (ages {YOUTH_MIN_AGE}-{YOUTH_MAX_AGE}) for registry, programs, events, and feedback.</p>
+        <div className="sk-header-actions">
+          <button type="button" className="sk-secondary-btn" onClick={() => navigate("/youth/programs")}>
+            Add Program
+          </button>
+          <button type="button" className="sk-secondary-btn" onClick={() => navigate("/youth/events")}>
+            Add Event
+          </button>
+        </div>
       </header>
 
       <div className="sk-summary-grid">

@@ -109,7 +109,8 @@ const ProgramList = ({ programs = [] }) => {
 
   return (
     <div className="program-list">
-      <form className="sk-inline-form" onSubmit={handleSubmit}>
+      <h4 className="sk-form-title">{editingId ? "Edit Program" : "Add Program"}</h4>
+      <form id="add-program-form" className="sk-inline-form" onSubmit={handleSubmit}>
         <input
           type="text"
           placeholder="Program title"
