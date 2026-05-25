@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from typing import Optional, List
 from google.cloud import firestore
 from backend.app.utils.firestore_utils import get_db
@@ -114,14 +115,16 @@ def list_incidents_with_residents(
     query = get_db().collection(INCIDENT_COLLECTION)
 
     if status:
-        query = query.where("status", "==", status)
+        # Avoid composite-index requirement by NOT using order_by when filtering by status.
+        # We sort in Python below instead.
+        query = query.where("status", "==", status).limit(limit)
+    else:
+        query = query.order_by("createdAt").limit(limit)
 
-    query = query.order_by("createdAt").limit(limit)
-
-    if start_after_id:
-        last_doc = get_db().collection(INCIDENT_COLLECTION).document(start_after_id).get()
-        if last_doc.exists:
-            query = query.start_after(last_doc)
+        if start_after_id:
+            last_doc = get_db().collection(INCIDENT_COLLECTION).document(start_after_id).get()
+            if last_doc.exists:
+                query = query.start_after(last_doc)
 
     incidents: List[IncidentWithResident] = []
     try:
@@ -133,6 +136,11 @@ def list_incidents_with_residents(
         logger.error("🔥 Error listing incidents: %s", e, exc_info=True)
         raise
 
+    # Sort by timestamp descending in Python (avoids composite index when status filter applied)
+    incidents.sort(
+        key=lambda inc: inc.timestamp or datetime.min.replace(tzinfo=None),
+        reverse=True,
+    )
     return incidents
 
 # 📋 List incidents assigned to a specific staff (staff view)

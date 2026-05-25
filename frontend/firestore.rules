@@ -177,6 +177,12 @@ service cloud.firestore {
       allow read: if isAuthenticated() && request.auth.uid in resource.data.notifyRoles;
     }
 
+    // 💰 Collections (payment intake records)
+    match /collections/{docId} {
+      allow read: if isAdmin() || isTreasurer();
+      allow write: if isAdmin() || isTreasurer();
+    }
+
    	// 💵 Payments 
     match /payments/{docId} {
       // Resident can create payment for their own business
