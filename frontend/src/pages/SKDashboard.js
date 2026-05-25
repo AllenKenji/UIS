@@ -8,6 +8,9 @@ import { useResidents } from "../hooks/useResidents";
 import { useFirestoreCollection } from "../hooks/useFirestoreCollection";
 import "../styles/sk.css";
 
+const YOUTH_MIN_AGE = 15;
+const YOUTH_MAX_AGE = 24;
+
 const toDate = (value) => {
   if (!value) return null;
   if (value instanceof Date) return value;
@@ -18,6 +21,10 @@ const toDate = (value) => {
 
 const getResidentAge = (resident) => {
   if (typeof resident.age === "number") return resident.age;
+  if (typeof resident.age === "string") {
+    const parsed = Number.parseInt(resident.age, 10);
+    if (Number.isFinite(parsed)) return parsed;
+  }
   const birthDateValue = resident.birthDate || resident.dateOfBirth || resident.dob;
   const birthDate = toDate(birthDateValue);
   if (!birthDate) return null;
@@ -29,11 +36,6 @@ const getResidentAge = (resident) => {
     age--;
   }
   return age;
-};
-
-const isYouthResident = (resident) => {
-  const age = getResidentAge(resident);
-  return typeof age === "number" && age >= 15 && age <= 30;
 };
 
 const SKDashboard = () => {
@@ -49,10 +51,20 @@ const SKDashboard = () => {
   const eventsRef = useRef(null);
   const feedbackRef = useRef(null);
 
-  const youthResidents = useMemo(
-    () => residents.filter((resident) => isYouthResident(resident)),
-    [residents]
-  );
+  const youthResidents = useMemo(() => {
+    return residents
+      .map((resident) => {
+        const age = getResidentAge(resident);
+        return { ...resident, _computedAge: age };
+      })
+      .filter((resident) => {
+        return (
+          typeof resident._computedAge === "number" &&
+          resident._computedAge >= YOUTH_MIN_AGE &&
+          resident._computedAge <= YOUTH_MAX_AGE
+        );
+      });
+  }, [residents]);
 
   const activePrograms = useMemo(
     () => programs.filter((program) => String(program.status || "").toLowerCase() !== "completed"),
@@ -101,7 +113,7 @@ const SKDashboard = () => {
     <section className="dashboard sk-dashboard">
       <header className="sk-header">
         <h2>🧒 SK Dashboard</h2>
-        <p>Live youth operations view for registry, programs, events, and feedback.</p>
+        <p>Live youth operations view (ages {YOUTH_MIN_AGE}-{YOUTH_MAX_AGE}) for registry, programs, events, and feedback.</p>
       </header>
 
       <div className="sk-summary-grid">

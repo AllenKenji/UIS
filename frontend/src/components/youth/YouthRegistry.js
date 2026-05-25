@@ -21,7 +21,7 @@ const YouthRegistry = ({ residents = [], loading = false }) => {
             {residents.map((resident) => (
               <tr key={resident.id || resident.uid}>
                 <td>{resident.fullName || resident.name || "Unnamed"}</td>
-                <td>{resident.age ?? "-"}</td>
+                <td>{resident._computedAge ?? resident.age ?? "-"}</td>
                 <td>{resident.address?.barangay || resident.barangay || "-"}</td>
                 <td>{resident.status || "Active"}</td>
               </tr>
