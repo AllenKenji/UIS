@@ -112,7 +112,11 @@ def _resolve_actor_identity(user: dict, fallback_name: str = "Officer", fallback
                 or data.get("email")
                 or fallback_name
             )
-            return str(name), "resident"
+            # If caller already provided a non-resident role (e.g. secretary/treasurer/sk/dilg),
+            # keep that role so officer logout/login notifications are not downgraded to resident.
+            normalized_fallback = _normalize_role(fallback_role)
+            resolved_role = "resident" if normalized_fallback in {"", "resident"} else normalized_fallback
+            return str(name), resolved_role
     except Exception as err:
         logger.warning("⚠️ Failed to resolve actor identity for %s: %s", uid, err)
 
