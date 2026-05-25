@@ -63,6 +63,25 @@ service cloud.firestore {
       allow read: if isAdmin() || isSK();
     }
 
+    // 🎯 SK Programs
+    match /sk_programs/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isSK() || isAdmin();
+    }
+
+    // 📅 SK Events
+    match /sk_events/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isSK() || isAdmin();
+    }
+
+    // 💬 Youth Feedback
+    match /youth_feedback/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isSK() || isAdmin();
+    }
+
     // 📄 Documents
     match /documents/{docId} {
 
