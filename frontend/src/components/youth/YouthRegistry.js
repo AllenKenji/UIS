@@ -1,32 +1,36 @@
-import "../../styles/admin.css";
+import "../../styles/sk.css";
 
-const mockYouth = [
-  { id: 1, name: "Ana Reyes", age: 17, status: "Active" },
-  { id: 2, name: "Mark Cruz", age: 19, status: "Inactive" },
-];
-
-const YouthRegistry = () => (
-  <div className="youth-registry">
-    <h3>📋 Youth Registry</h3>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Age</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {mockYouth.map((youth) => (
-          <tr key={youth.id}>
-            <td>{youth.name}</td>
-            <td>{youth.age}</td>
-            <td>{youth.status}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-);
+const YouthRegistry = ({ residents = [], loading = false }) => {
+  return (
+    <div className="youth-registry">
+      {loading ? (
+        <p className="sk-empty-state">Loading youth registry...</p>
+      ) : residents.length === 0 ? (
+        <p className="sk-empty-state">No youth residents found yet.</p>
+      ) : (
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Age</th>
+              <th>Barangay</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {residents.map((resident) => (
+              <tr key={resident.id || resident.uid}>
+                <td>{resident.fullName || resident.name || "Unnamed"}</td>
+                <td>{resident.age ?? "-"}</td>
+                <td>{resident.address?.barangay || resident.barangay || "-"}</td>
+                <td>{resident.status || "Active"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+};
 
 export default YouthRegistry;

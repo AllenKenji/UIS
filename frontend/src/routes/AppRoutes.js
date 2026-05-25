@@ -164,6 +164,10 @@ const AppRoutes = ({ isDarkMode, toggleDarkMode }) => {
 
             {/* SK */}
             <Route path="/youth" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
+            <Route path="/youth/registry" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
+            <Route path="/youth/programs" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
+            <Route path="/youth/events" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
+            <Route path="/youth/feedback" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
 
             {/* DILG Auditor */}
             <Route path="/audit" element={<ProtectedRoute allowedRoles={["dilg"]}><AuditView /></ProtectedRoute>} />

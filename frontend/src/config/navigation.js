@@ -23,6 +23,10 @@ const links = {
   audit: { path: "/audit", label: "📊 Audit", action: "auditBarangayData" },
   cfdpSurvey: { path: "/cfdp-survey", label: "🧭 CFDP Survey", action: "viewCfdpSurvey" },
   youth: { path: "/youth", label: "🏠 Dashboard", action: "viewDashboard" },
+  youthRegistry: { path: "/youth/registry", label: "📋 Youth Registry", action: "youthRegistryAccess" },
+  youthPrograms: { path: "/youth/programs", label: "🎯 Programs", action: "youthRegistryAccess" },
+  youthEvents: { path: "/youth/events", label: "📅 Events", action: "youthRegistryAccess" },
+  youthFeedback: { path: "/youth/feedback", label: "💬 Feedback", action: "youthRegistryAccess" },
   home: { path: "/", label: "🏠 Home", action: "viewDashboard" },
 
   // Secretary-specific links
@@ -89,6 +93,10 @@ const sidebarLinks = {
   ],
   sk: [
     links.youth,
+    links.youthRegistry,
+    links.youthPrograms,
+    links.youthEvents,
+    links.youthFeedback,
     links.cfdpSurvey,
   ],
   dilg: [
