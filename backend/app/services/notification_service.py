@@ -56,10 +56,13 @@ class NotificationService:
     async def broadcast(notification: Notification):
         """Send notification to all connected WebSocket clients."""
         try:
+            # Only constrain broadcast by user_id for personal resident notifications.
+            # Role-targeted notifications (e.g., admin login/logout feed) should fan out by role.
+            target_user_id = notification.user_id if notification.role == "resident" else None
             await manager.broadcast(
                 notification.model_dump(),
                 role=notification.role,
-                user_id=notification.user_id,
+                user_id=target_user_id,
             )
             logger.info("📢 Notification broadcasted: %s", notification.message)
         except Exception as e:

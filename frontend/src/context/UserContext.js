@@ -15,13 +15,11 @@ import {
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../services/firebase";
 import { ROLE_PERMISSIONS, VALID_ROLES } from "../config/roles";
-import { NotificationsAPI, API_BASE_URL } from "../services/api";
+import { NotificationsAPI } from "../services/api";
 
 const UserContext = createContext();
 const DEBUG = process.env.NODE_ENV !== "production";
 const CACHE_TTL = 1000 * 60 * 30; // 30 minutes
-const LOGOUT_BEACON_DEDUPE_MS = 15000;
-const LAST_LOGOUT_NOTIFY_KEY = "lastLogoutNotifiedAt";
 
 // ✅ Normalize role safely
 const normalizeRole = (role) => {
@@ -89,23 +87,6 @@ export const UserProvider = ({ children }) => {
     setTimeout(() => setError(null), 5000);
   };
 
-  const markLogoutNotifiedNow = () => {
-    try {
-      sessionStorage.setItem(LAST_LOGOUT_NOTIFY_KEY, String(Date.now()));
-    } catch {
-      // no-op
-    }
-  };
-
-  const wasLogoutRecentlyNotified = () => {
-    try {
-      const last = Number(sessionStorage.getItem(LAST_LOGOUT_NOTIFY_KEY) || 0);
-      return Number.isFinite(last) && Date.now() - last < LOGOUT_BEACON_DEDUPE_MS;
-    } catch {
-      return false;
-    }
-  };
-
   // ✅ Token helpers
   const getToken = useCallback(async (forceRefresh = true) => {
     if (!auth.currentUser) return null;
@@ -157,7 +138,6 @@ export const UserProvider = ({ children }) => {
           }
         }
       }
-      markLogoutNotifiedNow();
     } catch (notificationError) {
       if (DEBUG) {
         console.error("⚠️ Logout notification failed:", notificationError);
@@ -172,64 +152,6 @@ export const UserProvider = ({ children }) => {
       safeSetError("Sign-out failed");
     }
   }, [clearUserState, role, userInfo]);
-
-  useEffect(() => {
-    const handlePageLeave = () => {
-      if (!isAuthenticated || wasLogoutRecentlyNotified()) {
-        return;
-      }
-
-      const roleCandidate = normalizeRole(role || userInfo?.role);
-      if (!roleCandidate) {
-        return;
-      }
-
-      const tokenValue = sessionStorage.getItem("authToken");
-      if (!tokenValue) {
-        return;
-      }
-
-      const endpoint = roleCandidate === "resident"
-        ? `${API_BASE_URL}/api/notifications/resident-logout`
-        : `${API_BASE_URL}/api/notifications/logout-self`;
-
-      const payload = roleCandidate === "resident"
-        ? { count: 1 }
-        : {
-            count: 1,
-            role: roleCandidate,
-            name:
-              userInfo?.fullName ||
-              userInfo?.full_name ||
-              userInfo?.name ||
-              userInfo?.email ||
-              "Officer",
-          };
-
-      try {
-        fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${tokenValue}`,
-          },
-          body: JSON.stringify(payload),
-          keepalive: true,
-        });
-        markLogoutNotifiedNow();
-      } catch {
-        // Intentionally swallow errors during unload/pagehide.
-      }
-    };
-
-    window.addEventListener("pagehide", handlePageLeave);
-    window.addEventListener("beforeunload", handlePageLeave);
-
-    return () => {
-      window.removeEventListener("pagehide", handlePageLeave);
-      window.removeEventListener("beforeunload", handlePageLeave);
-    };
-  }, [isAuthenticated, role, userInfo]);
 
   // ✅ Fetch profile from users/{uid} or residents/{uid}
   const fetchUserProfile = useCallback(async (uid) => {
