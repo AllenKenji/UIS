@@ -15,17 +15,17 @@ service cloud.firestore {
           : "resident");
   }
 
-  // 🎭 Role helpers
-  function isAdmin()       { return isAuthenticated() && userRole() == "admin"; }
-  function isSecretary()   { return isAuthenticated() && userRole() == "secretary"; }
-  function isStaff()       { return isAuthenticated() && userRole() == "staff"; }
-  function isTreasurer()   { return isAuthenticated() && userRole() == "treasurer"; }
-  function isSK()          { return isAuthenticated() && userRole() == "sk"; }
-  function isDILG()        { return isAuthenticated() && userRole() == "dilg"; }
-  function isResident()    { return isAuthenticated() && userRole() == "resident"; }
+  // 🎭 Role helpers (supports legacy mixed-case values in Firestore)
+  function isAdmin()       { return isAuthenticated() && userRole() in ["admin", "Admin", "ADMIN"]; }
+  function isSecretary()   { return isAuthenticated() && userRole() in ["secretary", "Secretary", "SECRETARY"]; }
+  function isStaff()       { return isAuthenticated() && userRole() in ["staff", "Staff", "STAFF"]; }
+  function isTreasurer()   { return isAuthenticated() && userRole() in ["treasurer", "Treasurer", "TREASURER"]; }
+  function isSK()          { return isAuthenticated() && userRole() in ["sk", "SK"]; }
+  function isDILG()        { return isAuthenticated() && userRole() in ["dilg", "DILG"]; }
+  function isResident()    { return isAuthenticated() && userRole() in ["resident", "Resident", "RESIDENT"]; }
 
-  function isAdminOrSecretary() { return isAuthenticated() && userRole() in ["admin","secretary"]; }
-  function isAdminOrStaff()     { return isAuthenticated() && userRole() in ["admin","staff"]; }
+  function isAdminOrSecretary() { return isAuthenticated() && (isAdmin() || isSecretary()); }
+  function isAdminOrStaff()     { return isAuthenticated() && (isAdmin() || isStaff()); }
 
   match /databases/{database}/documents {
 
