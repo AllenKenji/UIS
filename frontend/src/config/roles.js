@@ -12,7 +12,7 @@ export const ALL_STATS = Object.freeze({
   documents:  { label: "Documents",           variant: "dilg",      icon: "📄" },
   logins:     { label: "Login Records",       variant: "neutral",   icon: "📊" },
   youth:      { label: "Youth Registry",      variant: "youth",     icon: "🧒" },
-  collections:{ label: "Collections",         variant: "info",      icon: "💰" },
+  collections:{ label: "Collections / Day",   variant: "info",      icon: "💰" },
 });
 
 // 🛠️ Derived maps
