@@ -4,10 +4,12 @@ service cloud.firestore {
     return request.auth != null;
   }
 
-  // 🔑 Resolve role: JWT claim first (fast + reliable), then Firestore lookup, then default
+  // 🔑 Resolve role: trust claim only when it is one of the known roles.
+  // If claim is missing or malformed, fall back to /users and then resident.
   function userRole() {
-    return request.auth.token.role != null
-      ? request.auth.token.role
+    let claimRole = request.auth.token.role;
+    return claimRole in ["admin", "staff", "secretary", "treasurer", "sk", "dilg", "resident"]
+      ? claimRole
       : (exists(/databases/(default)/documents/users/$(request.auth.uid))
           ? get(/databases/(default)/documents/users/$(request.auth.uid)).data.role
           : "resident");
