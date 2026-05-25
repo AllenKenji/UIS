@@ -100,6 +100,9 @@ const SKDashboard = () => {
     return "all";
   }, [location.pathname]);
 
+  const isProgramAddRoute = location.pathname.startsWith("/youth/programs/add");
+  const isEventAddRoute = location.pathname.startsWith("/youth/events/add");
+
   const handleScrollTo = (targetRef, path) => {
     if (location.pathname !== path) {
       navigate(path);
@@ -115,10 +118,10 @@ const SKDashboard = () => {
         <h2>🧒 SK Dashboard</h2>
         <p>Live youth operations view (ages {YOUTH_MIN_AGE}-{YOUTH_MAX_AGE}) for registry, programs, events, and feedback.</p>
         <div className="sk-header-actions">
-          <button type="button" className="sk-secondary-btn" onClick={() => navigate("/youth/programs")}>
+          <button type="button" className="sk-secondary-btn" onClick={() => navigate("/youth/programs/add")}>
             Add Program
           </button>
-          <button type="button" className="sk-secondary-btn" onClick={() => navigate("/youth/events")}>
+          <button type="button" className="sk-secondary-btn" onClick={() => navigate("/youth/events/add")}>
             Add Event
           </button>
         </div>
@@ -167,15 +170,15 @@ const SKDashboard = () => {
 
         {shouldShowSection("programs") ? (
         <section className="tool-section" ref={programsRef}>
-          <h3>🎯 Program List</h3>
-          <ProgramList programs={programs} />
+          <h3>{isProgramAddRoute ? "➕ Add Program" : "🎯 Program List"}</h3>
+          <ProgramList programs={programs} formOnly={isProgramAddRoute} />
         </section>
         ) : null}
 
         {shouldShowSection("events") ? (
         <section className="tool-section" ref={eventsRef}>
-          <h3>📅 Event Calendar</h3>
-          <EventCalendar events={events} />
+          <h3>{isEventAddRoute ? "➕ Add Event" : "📅 Event Calendar"}</h3>
+          <EventCalendar events={events} formOnly={isEventAddRoute} />
         </section>
         ) : null}
 

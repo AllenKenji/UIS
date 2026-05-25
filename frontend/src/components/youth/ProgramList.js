@@ -23,7 +23,7 @@ const toInputDate = (value) => {
   return date.toISOString().slice(0, 10);
 };
 
-const ProgramList = ({ programs = [] }) => {
+const ProgramList = ({ programs = [], formOnly = false }) => {
   const [form, setForm] = useState({ title: "", date: "", category: "", status: "Planned" });
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -141,7 +141,9 @@ const ProgramList = ({ programs = [] }) => {
         ) : null}
       </form>
 
-      {sortedPrograms.length === 0 ? (
+      {formOnly ? (
+        <p className="sk-empty-state">Program list is hidden in add mode.</p>
+      ) : sortedPrograms.length === 0 ? (
         <p className="sk-empty-state">No programs yet. Add the first SK program above.</p>
       ) : (
         <ul>

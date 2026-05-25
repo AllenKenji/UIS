@@ -21,7 +21,7 @@ const toInputDate = (value) => {
   return date ? date.toISOString().slice(0, 10) : "";
 };
 
-const EventCalendar = ({ events = [] }) => {
+const EventCalendar = ({ events = [], formOnly = false }) => {
   const [form, setForm] = useState({ title: "", date: "", location: "" });
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -131,7 +131,9 @@ const EventCalendar = ({ events = [] }) => {
         ) : null}
       </form>
 
-      {sortedEvents.length === 0 ? (
+      {formOnly ? (
+        <p className="sk-empty-state">Event list is hidden in add mode.</p>
+      ) : sortedEvents.length === 0 ? (
         <p className="sk-empty-state">No events yet. Add an SK event to start the calendar.</p>
       ) : (
         <ul>
