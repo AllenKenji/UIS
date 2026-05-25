@@ -88,6 +88,10 @@
   border: 1px solid var(--border);
 }
 
+.sk-form-page .tool-section {
+  margin-top: 1rem;
+}
+
 .sk-dashboard .tool-section h3 {
   margin-bottom: 1rem;
   font-size: 1.2rem;

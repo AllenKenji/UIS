@@ -36,6 +36,8 @@ import ResidentDashboard from "../pages/ResidentDashboard";
 import SecretaryDashboard from "../pages/SecretaryDashboard";
 import TreasurerDashboard from "../pages/TreasurerDashboard";
 import SKDashboard from "../pages/SKDashboard";
+import SKAddProgramPage from "../pages/SKAddProgramPage";
+import SKAddEventPage from "../pages/SKAddEventPage";
 import AuditView from "../pages/AuditView";
 import CfdpSurveyModule from "../pages/CfdpSurveyModule";
 
@@ -166,9 +168,9 @@ const AppRoutes = ({ isDarkMode, toggleDarkMode }) => {
             <Route path="/youth" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
             <Route path="/youth/registry" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
             <Route path="/youth/programs" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
-            <Route path="/youth/programs/add" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
+            <Route path="/youth/programs/add" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKAddProgramPage /></ProtectedRoute>} />
             <Route path="/youth/events" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
-            <Route path="/youth/events/add" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
+            <Route path="/youth/events/add" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKAddEventPage /></ProtectedRoute>} />
             <Route path="/youth/feedback" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
 
             {/* DILG Auditor */}
