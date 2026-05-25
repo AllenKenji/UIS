@@ -18,8 +18,8 @@ class ResidentLoginPayload(BaseModel):
     count: int
 
 class OfficerLoginPayload(BaseModel):
-    name: str
-    role: str
+    name: str = "Officer"
+    role: str = "officer"
 
 
 class BusinessSubmittedPayload(BaseModel):
@@ -386,32 +386,36 @@ async def resident_logout(payload: ResidentLoginPayload, user: dict = Depends(ge
 @router.post("/officer-login", response_model=Notification)
 async def officer_login(payload: OfficerLoginPayload, user: dict = Depends(get_current_user)):
     """Admin receives officer login notifications with names."""
-    officer_role = (payload.role or "officer").replace("_", " ").title()
+    resolved_role = payload.role or user.get("role") or "officer"
+    resolved_name = payload.name or user.get("fullName") or user.get("name") or user.get("email") or "Officer"
+    officer_role = resolved_role.replace("_", " ").title()
     _record_login_event(
         scope="officer",
-        actor_role=(payload.role or user.get("role") or "officer"),
+        actor_role=resolved_role,
         actor_uid=user.get("uid"),
-        actor_name=payload.name,
+        actor_name=resolved_name,
         count=1,
     )
     return await NotificationService.notify(
         role="admin",
         type="login",
-        message=f"{officer_role} {payload.name} logged in",
+        message=f"{officer_role} {resolved_name} logged in",
         scope="officer",
-        user=payload.name,
+        user=resolved_name,
     )
 
 @router.post("/officer-logout", response_model=Notification)
 async def officer_logout(payload: OfficerLoginPayload, user: dict = Depends(get_current_user)):
     """Admin receives officer logout notifications with names."""
-    officer_role = (payload.role or "officer").replace("_", " ").title()
+    resolved_role = payload.role or user.get("role") or "officer"
+    resolved_name = payload.name or user.get("fullName") or user.get("name") or user.get("email") or "Officer"
+    officer_role = resolved_role.replace("_", " ").title()
     return await NotificationService.notify(
         role="admin",
         type="logout",
-        message=f"{officer_role} {payload.name} logged out",
+        message=f"{officer_role} {resolved_name} logged out",
         scope="officer",
-        user=payload.name,
+        user=resolved_name,
     )
 
 

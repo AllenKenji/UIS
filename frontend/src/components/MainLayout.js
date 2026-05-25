@@ -58,16 +58,18 @@ const MainLayout = () => {
 
   const handleLogout = async () => {
     const officerRoles = ["admin", "staff", "secretary", "treasurer", "sk", "dilg", "surveyor", "supervisor"];
+    const logoutRole = (normalizedRole || userInfo?.role || "officer").toString().trim().toLowerCase();
+    const logoutName = getDisplayName(userInfo, userInfo?.email || "") || "Officer";
 
     try {
       // 🔔 Trigger logout notification (best-effort; should not block logout)
       try {
-        if (officerRoles.includes(normalizedRole)) {
+        if (officerRoles.includes(logoutRole)) {
           await NotificationsAPI.createOfficerLogOut(
-            getDisplayName(userInfo, userInfo?.email || ""),
-            normalizedRole
+            logoutName,
+            logoutRole
           );
-        } else if (normalizedRole === "resident") {
+        } else if (logoutRole === "resident") {
           await NotificationsAPI.createResidentLogOut(1);
         }
       } catch (notificationError) {
