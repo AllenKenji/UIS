@@ -460,6 +460,7 @@ async def officer_login(payload: OfficerLoginPayload, user: dict = Depends(get_c
         message=f"{officer_role} {resolved_name} logged in",
         scope="officer",
         user=resolved_name,
+        user_id=user.get("uid"),
     )
 
 @router.post("/officer-logout", response_model=Notification)
@@ -490,6 +491,7 @@ async def officer_logout(payload: OfficerLoginPayload, user: dict = Depends(get_
         message=f"{officer_role} {resolved_name} logged out",
         scope="officer",
         user=resolved_name,
+        user_id=user.get("uid"),
     )
 
 
@@ -530,6 +532,7 @@ async def logout_self(payload: LogoutSelfPayload = None, user: dict = Depends(ge
         message=f"{officer_role} {resolved_name} logged out",
         scope="officer",
         user=resolved_name,
+        user_id=user.get("uid"),
     )
 
 
