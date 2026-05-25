@@ -465,6 +465,39 @@ async def officer_logout(payload: OfficerLoginPayload, user: dict = Depends(get_
     )
 
 
+@router.post("/logout-self", response_model=Notification)
+async def logout_self(user: dict = Depends(get_current_user)):
+        """Create logout notification based on the authenticated user role."""
+        role = _normalize_role(user.get("role"))
+
+        if role == "resident":
+            step = 1
+            await _decrement_unread_resident_logins(step)
+            updated = await _upsert_unread_resident_aggregate("logout", step)
+            return Notification(**updated)
+
+        fallback_name = user.get("fullName") or user.get("name") or user.get("email") or "Officer"
+        fallback_role = role or "officer"
+        resolved_name, resolved_role = _resolve_actor_identity(user, fallback_name, fallback_role)
+        officer_role = resolved_role.replace("_", " ").title()
+
+        _record_login_event(
+            scope="officer",
+            actor_role=resolved_role,
+            actor_uid=user.get("uid"),
+            actor_name=resolved_name,
+            count=1,
+        )
+
+        return await NotificationService.notify(
+            role="admin",
+            type="logout",
+            message=f"{officer_role} {resolved_name} logged out",
+            scope="officer",
+            user=resolved_name,
+        )
+
+
 @router.post("/incident", response_model=List[Notification])
 async def incident_submitted(resident_name: str, user: dict = Depends(get_current_user)):
     """Admin + staff receive incident submission notifications."""

@@ -9,21 +9,6 @@ import { useEffect, useState } from "react";
 import sidebarLinks from "../config/navigation";
 import "./main-layout.css";
 
-const getDisplayName = (profile = {}, fallbackEmail = "") => {
-  const firstLast = [profile.firstName || profile.first_name, profile.lastName || profile.last_name]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
-
-  return (
-    profile.fullName ||
-    profile.full_name ||
-    profile.name ||
-    firstLast ||
-    fallbackEmail
-  );
-};
-
 const MainLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -57,20 +42,10 @@ const MainLayout = () => {
   };
 
   const handleLogout = async () => {
-    const logoutRole = (normalizedRole || userInfo?.role || "officer").toString().trim().toLowerCase();
-    const logoutName = getDisplayName(userInfo, userInfo?.email || "") || "Officer";
-
     try {
       // 🔔 Trigger logout notification (best-effort; should not block logout)
       try {
-        if (logoutRole === "resident") {
-          await NotificationsAPI.createResidentLogOut(1);
-        } else {
-          await NotificationsAPI.createOfficerLogOut(
-            logoutName,
-            logoutRole
-          );
-        }
+        await NotificationsAPI.createSelfLogOut();
       } catch (notificationError) {
         console.error("⚠️ Logout notification failed:", notificationError);
       }
