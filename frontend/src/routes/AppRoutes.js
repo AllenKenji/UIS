@@ -166,7 +166,9 @@ const AppRoutes = ({ isDarkMode, toggleDarkMode }) => {
             <Route path="/youth" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
             <Route path="/youth/registry" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
             <Route path="/youth/programs" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
+            <Route path="/youth/programs/add" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
             <Route path="/youth/events" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
+            <Route path="/youth/events/add" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
             <Route path="/youth/feedback" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
 
             {/* DILG Auditor */}

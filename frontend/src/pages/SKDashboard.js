@@ -92,13 +92,13 @@ const SKDashboard = () => {
     { key: "feedback", title: "Feedback", value: pendingFeedback.length, path: "/youth/feedback", ref: feedbackRef },
   ];
 
-  const pathToSection = {
-    "/youth/registry": "registry",
-    "/youth/programs": "programs",
-    "/youth/events": "events",
-    "/youth/feedback": "feedback",
-  };
-  const activeSection = pathToSection[location.pathname] || "all";
+  const activeSection = useMemo(() => {
+    if (location.pathname.startsWith("/youth/registry")) return "registry";
+    if (location.pathname.startsWith("/youth/programs")) return "programs";
+    if (location.pathname.startsWith("/youth/events")) return "events";
+    if (location.pathname.startsWith("/youth/feedback")) return "feedback";
+    return "all";
+  }, [location.pathname]);
 
   const handleScrollTo = (targetRef, path) => {
     if (location.pathname !== path) {
