@@ -51,7 +51,13 @@ const MainLayout = () => {
         if (logoutRole === "resident") {
           await NotificationsAPI.createResidentLogOut(1);
         } else {
-          await NotificationsAPI.createOfficerLogOut(logoutName, logoutRole);
+          try {
+            await NotificationsAPI.createOfficerLogOut(logoutName, logoutRole);
+          } catch (officerError) {
+            // Fallback keeps officer logout telemetry working on mismatched/older backends.
+            await NotificationsAPI.createSelfLogOut(logoutName, logoutRole, 1);
+            console.warn("⚠️ officer-logout failed, used logout-self fallback:", officerError);
+          }
         }
       } catch (notificationError) {
         console.error("⚠️ Logout notification failed:", notificationError);

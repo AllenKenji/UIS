@@ -49,6 +49,7 @@ def _resident_message(event_type: str, count: int) -> str:
 
 def _record_login_event(
     *,
+    event_type: str = "login",
     scope: str,
     actor_role: str,
     actor_uid: Optional[str],
@@ -58,7 +59,7 @@ def _record_login_event(
     try:
         now = datetime.now(timezone.utc)
         payload = {
-            "type": "login",
+            "type": "logout" if str(event_type).strip().lower() == "logout" else "login",
             "scope": scope,
             "role": actor_role,
             "user_id": actor_uid,
@@ -413,6 +414,7 @@ async def resident_login(payload: ResidentLoginPayload, user: dict = Depends(get
     """Admin unread resident-login aggregate increments until read."""
     step = max(1, int(payload.count or 1))
     _record_login_event(
+        event_type="login",
         scope="resident",
         actor_role="resident",
         actor_uid=user.get("uid"),
@@ -438,11 +440,19 @@ async def officer_login(payload: OfficerLoginPayload, user: dict = Depends(get_c
     resolved_name, resolved_role = _resolve_actor_identity(user, fallback_name, fallback_role)
     officer_role = resolved_role.replace("_", " ").title()
     _record_login_event(
+        event_type="login",
         scope="officer",
         actor_role=resolved_role,
         actor_uid=user.get("uid"),
         actor_name=resolved_name,
         count=1,
+    )
+    logger.info(
+        "Officer login notify uid=%s payload_role=%s resolved_role=%s name=%s",
+        user.get("uid"),
+        _normalize_role(payload.role),
+        resolved_role,
+        resolved_name,
     )
     return await NotificationService.notify(
         role="admin",
@@ -460,11 +470,19 @@ async def officer_logout(payload: OfficerLoginPayload, user: dict = Depends(get_
     resolved_name, resolved_role = _resolve_actor_identity(user, fallback_name, fallback_role)
     officer_role = resolved_role.replace("_", " ").title()
     _record_login_event(
+        event_type="logout",
         scope="officer",
         actor_role=resolved_role,
         actor_uid=user.get("uid"),
         actor_name=resolved_name,
         count=1,
+    )
+    logger.info(
+        "Officer logout notify uid=%s payload_role=%s resolved_role=%s name=%s",
+        user.get("uid"),
+        _normalize_role(payload.role),
+        resolved_role,
+        resolved_name,
     )
     return await NotificationService.notify(
         role="admin",
@@ -498,6 +516,7 @@ async def logout_self(payload: LogoutSelfPayload = None, user: dict = Depends(ge
     officer_role = resolved_role.replace("_", " ").title()
 
     _record_login_event(
+        event_type="logout",
         scope="officer",
         actor_role=resolved_role,
         actor_uid=user.get("uid"),
