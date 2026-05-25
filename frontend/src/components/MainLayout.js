@@ -1,4 +1,4 @@
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useUser } from "../context/UserContext";
 import { useTheme } from "../context/ThemeContext";
 import SecureNavLink from "./auth/SecureNavLink";
@@ -26,6 +26,7 @@ const getDisplayName = (profile = {}, fallbackEmail = "") => {
 
 const MainLayout = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { userInfo, role, logout } = useUser();
   const { isDarkMode, toggleDarkMode } = useTheme();
   const {
@@ -46,8 +47,10 @@ const MainLayout = () => {
   }, []);
 
   const normalizedRole = role?.trim().toLowerCase();
-
-  const linksToRender = sidebarLinks[normalizedRole] || sidebarLinks.default || [];
+  const isSkModuleRoute = location.pathname.startsWith("/youth");
+  const linksToRender = isSkModuleRoute && ["sk", "admin"].includes(normalizedRole)
+    ? sidebarLinks.sk || []
+    : sidebarLinks[normalizedRole] || sidebarLinks.default || [];
 
   const handleBellClick = () => {
     setShowNotifications((prev) => !prev);
