@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { collection, getCountFromServer } from "firebase/firestore";
 import { db } from "../../services/firebase";
+import { ResidentsAPI } from "../../services/api";
 import DashboardCard from "./DashboardCard";
 import { useUser } from "../../context/UserContext";
 import { COLLECTION_PERMISSIONS } from "../../config/roles"; 
@@ -8,6 +9,45 @@ import "../../styles/dashboard/registry-overview.css";
 
 // 🔑 Static registry keys (avoid lint warning)
 const REGISTRY_KEYS = ["residents", "businesses", "youth"];
+
+const YOUTH_MIN_AGE = 15;
+const YOUTH_MAX_AGE = 24;
+
+const toDate = (value) => {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value.toDate === "function") return value.toDate();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const getResidentAge = (resident) => {
+  if (typeof resident.age === "number") return resident.age;
+  if (typeof resident.age === "string") {
+    const parsed = Number.parseInt(resident.age, 10);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+
+  const birthDate = toDate(resident.birthDate || resident.dateOfBirth || resident.dob);
+  if (!birthDate) return null;
+
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+};
+
+const getYouthResidentsCount = async () => {
+  const data = await ResidentsAPI.list();
+  const residents = Array.isArray(data) ? data : data?.items ?? [];
+  return residents.filter((resident) => {
+    const age = getResidentAge(resident);
+    return typeof age === "number" && age >= YOUTH_MIN_AGE && age <= YOUTH_MAX_AGE;
+  }).length;
+};
 
 const RegistryOverview = () => {
   const { can } = useUser(); 
@@ -30,8 +70,12 @@ const RegistryOverview = () => {
         }
 
         try {
-          const snap = await getCountFromServer(collection(db, key));
-          results[key] = snap.data().count;
+          if (key === "youth") {
+            results[key] = await getYouthResidentsCount();
+          } else {
+            const snap = await getCountFromServer(collection(db, key));
+            results[key] = snap.data().count;
+          }
         } catch (err) {
           console.warn(`⚠️ Cannot access ${key}:`, err.message);
           results[key] = "N/A";
