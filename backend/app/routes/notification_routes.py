@@ -468,17 +468,16 @@ async def officer_logout(payload: OfficerLoginPayload, user: dict = Depends(get_
 @router.post("/logout-self", response_model=Notification)
 async def logout_self(user: dict = Depends(get_current_user)):
         """Create logout notification based on the authenticated user role."""
-        role = _normalize_role(user.get("role"))
+        fallback_name = user.get("fullName") or user.get("name") or user.get("email") or "Officer"
+        fallback_role = _normalize_role(user.get("role")) or "officer"
+        resolved_name, resolved_role = _resolve_actor_identity(user, fallback_name, fallback_role)
 
-        if role == "resident":
+        if resolved_role == "resident":
             step = 1
             await _decrement_unread_resident_logins(step)
             updated = await _upsert_unread_resident_aggregate("logout", step)
             return Notification(**updated)
 
-        fallback_name = user.get("fullName") or user.get("name") or user.get("email") or "Officer"
-        fallback_role = role or "officer"
-        resolved_name, resolved_role = _resolve_actor_identity(user, fallback_name, fallback_role)
         officer_role = resolved_role.replace("_", " ").title()
 
         _record_login_event(
