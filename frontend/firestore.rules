@@ -4,11 +4,13 @@ service cloud.firestore {
     return request.auth != null;
   }
 
-  // 🔑 Resolve role from /users or /residents
+  // 🔑 Resolve role: JWT claim first (fast + reliable), then Firestore lookup, then default
   function userRole() {
-    return exists(/databases/(default)/documents/users/$(request.auth.uid))
-      ? get(/databases/(default)/documents/users/$(request.auth.uid)).data.role
-      : "resident"; // ✅ default to resident if not in /users
+    return request.auth.token.role != null
+      ? request.auth.token.role
+      : (exists(/databases/(default)/documents/users/$(request.auth.uid))
+          ? get(/databases/(default)/documents/users/$(request.auth.uid)).data.role
+          : "resident");
   }
 
   // 🎭 Role helpers
@@ -97,6 +99,9 @@ service cloud.firestore {
 
       // Admins and secretaries have full access
       allow read, create, update, delete: if isAdminOrSecretary();
+
+      // Treasurer can read documents for financial reporting (needed by usePayments hook)
+      allow read: if isTreasurer();
     }
     
     // 📄 Document Types
