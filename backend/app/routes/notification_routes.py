@@ -22,6 +22,12 @@ class OfficerLoginPayload(BaseModel):
     role: str = "officer"
 
 
+class LogoutSelfPayload(BaseModel):
+    name: Optional[str] = None
+    role: Optional[str] = None
+    count: Optional[int] = 1
+
+
 class BusinessSubmittedPayload(BaseModel):
     resident_name: str
     business_name: str | None = None
@@ -466,35 +472,42 @@ async def officer_logout(payload: OfficerLoginPayload, user: dict = Depends(get_
 
 
 @router.post("/logout-self", response_model=Notification)
-async def logout_self(user: dict = Depends(get_current_user)):
-        """Create logout notification based on the authenticated user role."""
-        fallback_name = user.get("fullName") or user.get("name") or user.get("email") or "Officer"
-        fallback_role = _normalize_role(user.get("role")) or "officer"
-        resolved_name, resolved_role = _resolve_actor_identity(user, fallback_name, fallback_role)
+async def logout_self(payload: LogoutSelfPayload = None, user: dict = Depends(get_current_user)):
+    """Create logout notification based on the authenticated user role."""
+    requested_name = (payload.name if payload else None) or None
+    requested_role = _normalize_role(payload.role if payload else None) or None
+    fallback_name = requested_name or user.get("fullName") or user.get("name") or user.get("email") or "Officer"
+    fallback_role = requested_role or _normalize_role(user.get("role")) or "officer"
+    resolved_name, resolved_role = _resolve_actor_identity(user, fallback_name, fallback_role)
 
-        if resolved_role == "resident":
-            step = 1
-            await _decrement_unread_resident_logins(step)
-            updated = await _upsert_unread_resident_aggregate("logout", step)
-            return Notification(**updated)
+    if requested_name:
+        resolved_name = requested_name
+    if requested_role:
+        resolved_role = requested_role
 
-        officer_role = resolved_role.replace("_", " ").title()
+    if resolved_role == "resident":
+        step = max(1, int((payload.count if payload else 1) or 1))
+        await _decrement_unread_resident_logins(step)
+        updated = await _upsert_unread_resident_aggregate("logout", step)
+        return Notification(**updated)
 
-        _record_login_event(
-            scope="officer",
-            actor_role=resolved_role,
-            actor_uid=user.get("uid"),
-            actor_name=resolved_name,
-            count=1,
-        )
+    officer_role = resolved_role.replace("_", " ").title()
 
-        return await NotificationService.notify(
-            role="admin",
-            type="logout",
-            message=f"{officer_role} {resolved_name} logged out",
-            scope="officer",
-            user=resolved_name,
-        )
+    _record_login_event(
+        scope="officer",
+        actor_role=resolved_role,
+        actor_uid=user.get("uid"),
+        actor_name=resolved_name,
+        count=1,
+    )
+
+    return await NotificationService.notify(
+        role="admin",
+        type="logout",
+        message=f"{officer_role} {resolved_name} logged out",
+        scope="officer",
+        user=resolved_name,
+    )
 
 
 @router.post("/incident", response_model=List[Notification])

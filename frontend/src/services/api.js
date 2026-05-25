@@ -482,8 +482,8 @@ export const NotificationsAPI = {
     api.post("/api/notifications/officer-logout", { name, role }) 
       .then((res) => res.data),
 
-  createSelfLogOut: () =>
-    api.post("/api/notifications/logout-self")
+  createSelfLogOut: (name, role, count = 1) =>
+    api.post("/api/notifications/logout-self", { name, role, count })
       .then((res) => res.data),
 
   createBusinessSubmitted: (residentName, businessName) =>

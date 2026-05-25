@@ -42,10 +42,13 @@ const MainLayout = () => {
   };
 
   const handleLogout = async () => {
+    const logoutRole = (normalizedRole || userInfo?.role || "officer").toString().trim().toLowerCase();
+    const logoutName = userInfo?.fullName || userInfo?.full_name || userInfo?.name || userInfo?.email || "Officer";
+
     try {
       // 🔔 Trigger logout notification (best-effort; should not block logout)
       try {
-        await NotificationsAPI.createSelfLogOut();
+        await NotificationsAPI.createSelfLogOut(logoutName, logoutRole, 1);
       } catch (notificationError) {
         console.error("⚠️ Logout notification failed:", notificationError);
       }
