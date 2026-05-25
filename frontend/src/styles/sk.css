@@ -190,6 +190,13 @@
   text-align: left;
 }
 
+.youth-registry .sk-age-value {
+  display: inline-block;
+  min-width: 2ch;
+  font-weight: 600;
+  color: var(--text);
+}
+
 .program-list ul,
 .event-calendar ul {
   list-style: none;

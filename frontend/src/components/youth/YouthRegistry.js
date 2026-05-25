@@ -31,6 +31,14 @@ const getDisplayAge = (resident) => {
   return computeAgeFromBirthDate(resident);
 };
 
+const toAgeLabel = (resident) => {
+  const age = getDisplayAge(resident);
+  if (typeof age === "number" && Number.isFinite(age) && age >= 0) {
+    return String(age);
+  }
+  return "N/A";
+};
+
 const YouthRegistry = ({ residents = [], loading = false }) => {
   return (
     <div className="youth-registry">
@@ -52,7 +60,9 @@ const YouthRegistry = ({ residents = [], loading = false }) => {
             {residents.map((resident) => (
               <tr key={resident.id || resident.uid}>
                 <td>{resident.fullName || resident.name || "Unnamed"}</td>
-                <td>{getDisplayAge(resident) ?? "-"}</td>
+                <td>
+                  <span className="sk-age-value">{toAgeLabel(resident)}</span>
+                </td>
                 <td>{resident.address?.barangay || resident.barangay || "-"}</td>
                 <td>{resident.status || "Active"}</td>
               </tr>
