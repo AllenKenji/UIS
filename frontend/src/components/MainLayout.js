@@ -48,7 +48,11 @@ const MainLayout = () => {
     try {
       // 🔔 Trigger logout notification (best-effort; should not block logout)
       try {
-        await NotificationsAPI.createSelfLogOut(logoutName, logoutRole, 1);
+        if (logoutRole === "resident") {
+          await NotificationsAPI.createResidentLogOut(1);
+        } else {
+          await NotificationsAPI.createOfficerLogOut(logoutName, logoutRole);
+        }
       } catch (notificationError) {
         console.error("⚠️ Logout notification failed:", notificationError);
       }
