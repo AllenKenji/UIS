@@ -184,7 +184,16 @@ export const UserProvider = ({ children }) => {
       const cached = sessionStorage.getItem("userInfo");
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (parsed?.cachedAt && Date.now() - parsed.cachedAt < CACHE_TTL) {
+        const cachedUid = parsed?.uid;
+        const activeUid = auth.currentUser?.uid;
+
+        if (
+          parsed?.cachedAt &&
+          Date.now() - parsed.cachedAt < CACHE_TTL &&
+          cachedUid &&
+          activeUid &&
+          cachedUid === activeUid
+        ) {
           setUserInfo(parsed);
           setRole(normalizeRole(parsed.role));
           setIsAuthenticated(true);
@@ -192,8 +201,6 @@ export const UserProvider = ({ children }) => {
       }
     } catch (err) {
       console.warn("⚠️ Failed to hydrate session cache:", err);
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -213,7 +220,8 @@ export const UserProvider = ({ children }) => {
           : null;
 
         const profile = await fetchUserProfile(user.uid);
-        const effectiveRole = claimRole || normalizeRole(profile?.role);
+        // Prefer Firestore profile role so stale token claims do not keep old admin navigation.
+        const effectiveRole = normalizeRole(profile?.role) || claimRole;
 
         if (!effectiveRole) {
           clearUserState();
