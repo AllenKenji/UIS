@@ -157,6 +157,28 @@ async def get_role_presence(_uid: str = Depends(require_permission("manageUsers"
         "total_active_connections": len(manager.active_connections),
     }
 
+
+@router.get("/api/ws/presence/users")
+async def get_user_presence(_uid: str = Depends(require_permission("manageUsers"))):
+    users = {}
+
+    for info in manager.active_connections.values():
+        uid = str(info.get("uid") or "").strip()
+        if not uid:
+            continue
+
+        role = str(info.get("role") or "resident").strip().lower()
+        existing = users.get(uid, {"online": False, "count": 0, "role": role})
+        existing["online"] = True
+        existing["count"] = int(existing.get("count", 0)) + 1
+        existing["role"] = role
+        users[uid] = existing
+
+    return {
+        "users": users,
+        "total_active_connections": len(manager.active_connections),
+    }
+
 @router.websocket("/ws/notifications")
 async def websocket_notifications(websocket: WebSocket, token: str = Query(None)):
     user_info = None

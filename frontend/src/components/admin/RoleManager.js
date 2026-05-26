@@ -12,20 +12,20 @@ const RoleManager = () => {
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState(null);
   const [pendingUserId, setPendingUserId] = useState(null);
-  const [rolePresence, setRolePresence] = useState({});
+  const [userPresence, setUserPresence] = useState({});
 
   const { userInfo, isAdmin, can } = useUser();
   const hasManagePermission = isAdmin || can("manageUsers"); 
 
-  const fetchRolePresence = useCallback(async () => {
+  const fetchUserPresence = useCallback(async () => {
     if (!hasManagePermission) return;
 
     try {
-      const { data } = await api.get("/api/ws/presence/roles");
-      setRolePresence(data?.roles || {});
+      const { data } = await api.get("/api/ws/presence/users");
+      setUserPresence(data?.users || {});
     } catch (err) {
-      console.warn("⚠️ Failed to load role presence:", err?.message || err);
-      setRolePresence({});
+      console.warn("⚠️ Failed to load user presence:", err?.message || err);
+      setUserPresence({});
     }
   }, [hasManagePermission]);
 
@@ -60,14 +60,14 @@ const RoleManager = () => {
       });
       setUsers(data);
       setError(null);
-      await fetchRolePresence();
+      await fetchUserPresence();
     } catch (err) {
       console.error("❌ Failed to load users:", err);
       setError("Failed to load users.");
     } finally {
       setLoading(false);
     }
-  }, [hasManagePermission, fetchRolePresence]);
+  }, [hasManagePermission, fetchUserPresence]);
 
   useEffect(() => {
     fetchUsers();
@@ -77,11 +77,11 @@ const RoleManager = () => {
     if (!hasManagePermission) return;
 
     const interval = setInterval(() => {
-      fetchRolePresence();
+      fetchUserPresence();
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [hasManagePermission, fetchRolePresence]);
+  }, [hasManagePermission, fetchUserPresence]);
 
   // 🔧 Unified safe API call
   const safeApiCall = useCallback(
@@ -181,7 +181,7 @@ const RoleManager = () => {
       (a.full_name || "").localeCompare(b.full_name || "")
   );
 
-  const getRoleOnline = (role) => Boolean(rolePresence?.[role]?.online);
+  const getUserOnline = (uid) => Boolean(userPresence?.[uid]?.online);
 
   const bootstrapAdmin = async () => {
     try { 
@@ -231,10 +231,10 @@ const RoleManager = () => {
                   <span className={`role-badge ${user.role}`}>{user.role}</span>
                 </td>
                 <td>
-                  <span className="presence-indicator" title={getRoleOnline(user.role) ? "Online" : "Offline"}>
+                  <span className="presence-indicator" title={getUserOnline(user.id) ? "Online" : "Offline"}>
                     <span
-                      className={`presence-dot ${getRoleOnline(user.role) ? "online" : "offline"}`}
-                      aria-label={getRoleOnline(user.role) ? "Online" : "Offline"}
+                      className={`presence-dot ${getUserOnline(user.id) ? "online" : "offline"}`}
+                      aria-label={getUserOnline(user.id) ? "Online" : "Offline"}
                     />
                   </span>
                 </td>

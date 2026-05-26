@@ -75,6 +75,7 @@ export const UserProvider = ({ children }) => {
   const clearUserState = useCallback(() => {
     setUserInfo(null);
     setRole(null);
+    setToken(null);
     setIsAuthenticated(false);
     setError(null);
     sessionStorage.removeItem("userInfo");
