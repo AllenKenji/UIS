@@ -137,6 +137,10 @@ const CreateAccountForm = () => {
         </select>
       </label>
 
+      {(form.role === "surveyor" || form.role === "supervisor") && (
+        <p className="feedback">ℹ️ This account will also be auto-created in CFDP.</p>
+      )}
+
       {!confirming ? (
         <button
           type="button"

@@ -1,6 +1,10 @@
 import logging
+import json
+import os
 from typing import Optional
 from datetime import datetime, timezone
+from urllib import request as urllib_request
+from urllib.error import HTTPError, URLError
 from fastapi import HTTPException, status
 from firebase_admin import auth
 from firebase_admin.exceptions import FirebaseError
@@ -12,6 +16,7 @@ from backend.app.core.roles import ROLE_PERMISSIONS
 from backend.app.core.firebase import get_firestore
 
 logger: logging.Logger = logging.getLogger("uvicorn.error")
+CFDP_SYNC_ROLES = {"surveyor", "supervisor"}
 
 
 # ===============================
@@ -78,6 +83,72 @@ def delete_firebase_user(uid: str):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Failed to delete Firebase Auth user: {str(e)}",
+        )
+
+
+def rollback_account_creation(uid: str):
+    """Best-effort rollback when downstream provisioning fails."""
+    try:
+        get_db().collection("users").document(uid).delete()
+    except Exception as err:
+        logger.warning("⚠️ Rollback Firestore delete failed for UID %s: %s", uid, err)
+
+    try:
+        auth.delete_user(uid)
+    except Exception as err:
+        logger.warning("⚠️ Rollback Firebase Auth delete failed for UID %s: %s", uid, err)
+
+
+def provision_cfdp_local_user(uid: str, data: AccountCreate):
+    """Provision surveyor/supervisor credentials in CFDP local-auth system."""
+    role = str(data.role.value).strip().lower()
+    if role not in CFDP_SYNC_ROLES:
+        return
+
+    provision_url = os.environ.get("CFDP_PROVISION_URL", "").strip()
+    provision_key = os.environ.get("CFDP_PROVISION_API_KEY", "").strip()
+
+    if not provision_url or not provision_key:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="CFDP provisioning is not configured. Set CFDP_PROVISION_URL and CFDP_PROVISION_API_KEY.",
+        )
+
+    payload = {
+        "externalId": uid,
+        "name": data.full_name,
+        "email": data.email,
+        "password": data.password,
+        "role": role,
+    }
+
+    req = urllib_request.Request(
+        provision_url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "X-BIS-Provision-Key": provision_key,
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib_request.urlopen(req, timeout=10) as res:
+            if int(getattr(res, "status", 0)) >= 400:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"CFDP provisioning failed with status {res.status}",
+                )
+    except HTTPError as err:
+        error_detail = err.read().decode("utf-8", errors="ignore") if hasattr(err, "read") else str(err)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"CFDP provisioning failed ({err.code}): {error_detail}",
+        )
+    except URLError as err:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"CFDP provisioning unreachable: {err}",
         )
 
 
@@ -173,8 +244,14 @@ async def create_barangay_account(data: AccountCreate, created_by: str) -> Accou
     """Create a Firebase Auth user, Firestore profile, and set claims."""
     uid = create_firebase_user(data)
     payload = sanitize_account_payload(data, created_by)
-    write_firestore_profile(uid, payload)
-    set_user_claims(uid, data.role)
+
+    try:
+        write_firestore_profile(uid, payload)
+        set_user_claims(uid, data.role)
+        provision_cfdp_local_user(uid, data)
+    except Exception:
+        rollback_account_creation(uid)
+        raise
 
     # 📝 Log account creation in audit trail
     try:
