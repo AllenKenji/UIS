@@ -6,6 +6,8 @@ import { useUser } from "../../context/UserContext";
 import { ROLE_OPTIONS } from "../../config/roles";
 import "../../styles/dashboard/role-manager.css";
 
+const PRESENCE_POLL_MS = 3000;
+
 const RoleManager = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -78,9 +80,26 @@ const RoleManager = () => {
 
     const interval = setInterval(() => {
       fetchUserPresence();
-    }, 10000);
+    }, PRESENCE_POLL_MS);
 
-    return () => clearInterval(interval);
+    const refreshOnVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchUserPresence();
+      }
+    };
+
+    const refreshOnFocus = () => {
+      fetchUserPresence();
+    };
+
+    document.addEventListener("visibilitychange", refreshOnVisibility);
+    window.addEventListener("focus", refreshOnFocus);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshOnVisibility);
+      window.removeEventListener("focus", refreshOnFocus);
+    };
   }, [hasManagePermission, fetchUserPresence]);
 
   // 🔧 Unified safe API call
