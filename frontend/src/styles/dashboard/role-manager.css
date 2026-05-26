@@ -51,6 +51,8 @@
 .role-badge.sk { background: var(--color-youth); color: #fff; }
 .role-badge.dilg { background: var(--color-dilg); color: #fff; }
 .role-badge.resident { background: var(--color-resident); color: #fff; }
+.role-badge.surveyor { background: #2563eb; color: #fff; }
+.role-badge.supervisor { background: #7c3aed; color: #fff; }
 
 /* Role presence indicator */
 .presence-indicator {
