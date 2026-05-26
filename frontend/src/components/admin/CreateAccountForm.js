@@ -12,7 +12,7 @@ const defaultForm = {
 };
 
 const CreateAccountForm = () => {
-  const { getToken } = useUser();
+  const { getToken, isAdmin } = useUser();
   const [form, setForm] = useState(defaultForm);
   const [loading, setLoading] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -129,7 +129,7 @@ const CreateAccountForm = () => {
       <label>
         Role
         <select name="role" value={form.role} onChange={handleChange}>
-          {ROLE_OPTIONS.filter((opt) => opt.value !== "admin").map((opt) => (
+          {ROLE_OPTIONS.filter((opt) => isAdmin || opt.value !== "admin").map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
             </option>

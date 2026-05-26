@@ -74,5 +74,13 @@
   "dilg": [
     "viewDashboard",
     "auditBarangayData"
+  ],
+  "surveyor": [
+    "viewDashboard",
+    "viewCfdpSurvey"
+  ],
+  "supervisor": [
+    "viewDashboard",
+    "viewCfdpSurvey"
   ]
 }

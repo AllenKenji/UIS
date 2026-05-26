@@ -11,6 +11,8 @@ class RoleEnum(str, Enum):
     sk = "sk"
     dilg = "dilg"
     admin = "admin"
+    surveyor = "surveyor"
+    supervisor = "supervisor"
 
 # 🧾 Base account schema
 class AccountBase(BaseModel):
