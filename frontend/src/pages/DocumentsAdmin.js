@@ -53,18 +53,16 @@ const DocumentsAdmin = () => {
       setDocuments(normalized);
       setStatus("");
     } catch (err) {
-      console.error("❌ Error fetching documents:", err);
-      setStatus("❌ Failed to load documents.");
+      const detail = err.response?.data?.detail || err.message;
+      console.error("❌ Error fetching documents:", detail);
+      setStatus(`❌ Failed to load documents. ${detail || ""}`.trim());
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchDocuments({});
-    }, 5000); 
-    return () => clearTimeout(timer);
+    fetchDocuments({});
   }, []);
 
   const handleDelete = async (docId) => {

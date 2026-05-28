@@ -1,19 +1,23 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union
 from datetime import datetime
 from enum import Enum
 
 class DocumentStatus(str, Enum):
     pending = "pending"
     for_payment = "for_payment"
+    awaiting_payment = "awaiting_payment"
     payment_submitted = "payment_submitted"
     paid = "paid"
+    payment_failed = "payment_failed"
+    payment_cancelled = "payment_cancelled"
+    payment_refunded = "payment_refunded"
     approved = "approved"
     rejected = "rejected"
 
 class Attachment(BaseModel):
-    url: str = Field(..., description="Public or signed URL to the uploaded file")
-    path: str = Field(..., description="Storage path inside Firebase bucket")
+    url: Optional[str] = Field(None, description="Public or signed URL to the uploaded file")
+    path: Optional[str] = Field(None, description="Storage path inside Firebase bucket")
 
 class Document(BaseModel):
     # 🔑 Firestore document ID
@@ -42,7 +46,7 @@ class Document(BaseModel):
     issuedAt: Optional[datetime] = Field(None, description="When the document was issued")
 
     # 📎 Attachments (now objects with url + path)
-    attachments: Optional[Dict[str, Attachment]] = Field(
+    attachments: Optional[Dict[str, Union[Attachment, str]]] = Field(
         None,
         description="Uploaded file metadata including URL and storage path"
     )
