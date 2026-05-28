@@ -3,6 +3,15 @@ import { IncidentsAPI } from "../../services/api";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../services/firebase";
 
+const FIXED_ASSIGNEES = [
+  { uid: "Police", label: "Police" },
+  { uid: "DSWD", label: "DSWD" },
+  { uid: "Firemen", label: "Firemen" },
+  { uid: "Barangay Captain", label: "Barangay Captain" },
+  { uid: "Barangay Tanod", label: "Barangay Tanod" },
+  { uid: "BFP", label: "BFP" },
+];
+
 const normalizeStatus = (value) => {
   const normalized = String(value || "").trim().toLowerCase();
   if (normalized === "in-progress" || normalized === "in_progress" || normalized === "inreview") {
@@ -32,8 +41,9 @@ const formatDateTime = (value) => {
 };
 
 const IncidentEvaluation = ({ incident, role, onClose, onUpdate }) => {
+  const preferredAssignee = incident.assigned_to_uid || incident.assigned_to_name || "";
   const [status, setStatus] = useState(normalizeStatus(incident.status));
-  const [assignedTo, setAssignedTo] = useState(incident.assigned_to_uid || "");
+  const [assignedTo, setAssignedTo] = useState(preferredAssignee);
   const [assignees, setAssignees] = useState([]);
   const [loadingAssignees, setLoadingAssignees] = useState(false);
 
@@ -44,7 +54,7 @@ const IncidentEvaluation = ({ incident, role, onClose, onUpdate }) => {
         const usersRef = collection(db, "users");
         const q = query(usersRef, where("role", "in", ["staff", "admin"]));
         const snapshot = await getDocs(q);
-        const options = snapshot.docs.map((docSnap) => {
+        const userOptions = snapshot.docs.map((docSnap) => {
           const data = docSnap.data() || {};
           const label = data.full_name || data.fullName || data.email || docSnap.id;
           return {
@@ -52,23 +62,35 @@ const IncidentEvaluation = ({ incident, role, onClose, onUpdate }) => {
             label,
           };
         });
-        setAssignees(options);
+        const merged = [...FIXED_ASSIGNEES, ...userOptions].filter(
+          (option, index, arr) => arr.findIndex((item) => item.uid === option.uid) === index
+        );
 
-        if (!incident.assigned_to_uid && incident.assigned_to_name) {
-          const match = options.find(
-            (opt) => opt.label.toLowerCase() === String(incident.assigned_to_name || "").toLowerCase()
+        setAssignees(merged);
+
+        if (preferredAssignee) {
+          const directMatch = merged.find(
+            (opt) => opt.uid.toLowerCase() === String(preferredAssignee).toLowerCase()
           );
-          if (match) setAssignedTo(match.uid);
+          if (directMatch) {
+            setAssignedTo(directMatch.uid);
+          } else {
+            const labelMatch = merged.find(
+              (opt) => opt.label.toLowerCase() === String(preferredAssignee).toLowerCase()
+            );
+            if (labelMatch) setAssignedTo(labelMatch.uid);
+          }
         }
       } catch (error) {
         console.error("❌ Failed to load assignee list:", error);
+        setAssignees(FIXED_ASSIGNEES);
       } finally {
         setLoadingAssignees(false);
       }
     };
 
     loadAssignees();
-  }, [incident.assigned_to_name, incident.assigned_to_uid]);
+  }, [incident.assigned_to_name, incident.assigned_to_uid, preferredAssignee]);
 
   const handleUpdate = async () => {
     try {
