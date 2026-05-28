@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "../../services/firebase";
 import { useUser } from "../../context/UserContext";
+import { API_BASE_URL } from "../../services/api";
 import { QRCodeCanvas } from "qrcode.react";
 import ResidentBusinessPayment from "./ResidentBusinessPayment";
 import "../../styles/resident/resident-business-dashboard.css";
@@ -23,6 +24,7 @@ const ResidentBusinessDashboard = () => {
   const [businesses, setBusinesses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("inProgress");
+  const reconciledRef = useRef(new Set());
 
   useEffect(() => {
     if (!user?.email) {
@@ -49,6 +51,37 @@ const ResidentBusinessDashboard = () => {
 
     return () => unsubscribe();
   }, [user]);
+
+  useEffect(() => {
+    const reconcileAwaiting = async () => {
+      for (const b of businesses) {
+        const status = String(b.status || "").toLowerCase();
+        const paymentStatus = String(b.paymentStatus || "").toLowerCase();
+        const identifier = b.businessId || b.id;
+
+        if (!identifier) continue;
+        if (paymentStatus === "paid" || paymentStatus === "succeeded") continue;
+        if (!["awaiting_payment", "for_payment"].includes(status)) continue;
+        if (!b.paymongoLinkId && !b.paymentIntentId) continue;
+        if (reconciledRef.current.has(identifier)) continue;
+
+        reconciledRef.current.add(identifier);
+        try {
+          await fetch(`${API_BASE_URL}/api/paymongo/reconcile-return`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ type: "business", businessId: identifier }),
+          });
+        } catch (error) {
+          console.warn("⚠️ Auto reconcile failed for business", identifier, error);
+        }
+      }
+    };
+
+    if (businesses.length > 0) {
+      reconcileAwaiting();
+    }
+  }, [businesses]);
 
   const renderStatus = (b) => {
     const rawStatus = String(b.status || "").toLowerCase();

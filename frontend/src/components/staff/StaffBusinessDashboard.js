@@ -1,8 +1,15 @@
 import { useEffect, useState } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../services/firebase";
 import BusinessEvaluationModal from "./BusinessEvaluationModal";
 import "../../styles/staff/staff-business-dashboard.css";
+
+const getEffectiveStatus = (business) => {
+  const status = String(business?.status || "").toLowerCase();
+  const paymentStatus = String(business?.paymentStatus || "").toLowerCase();
+  if (paymentStatus === "paid" || paymentStatus === "succeeded") return "paid";
+  return status || "pending_evaluation";
+};
 
 const StaffBusinessDashboard = () => {
   const [businesses, setBusinesses] = useState([]);
@@ -12,44 +19,48 @@ const StaffBusinessDashboard = () => {
 
   // 🔄 Fetch all businesses
   useEffect(() => {
-    const fetchBusinesses = async () => {
-      try {
-        const snapshot = await getDocs(collection(db, "businesses"));
-        const data = snapshot.docs.map(doc => ({
-          id: doc.id,          // Firestore doc ID
-          ...doc.data()
+    const unsubscribe = onSnapshot(
+      collection(db, "businesses"),
+      (snapshot) => {
+        const data = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
         }));
         setBusinesses(data);
-      } catch (error) {
+        setLoading(false);
+      },
+      (error) => {
         console.error("❌ Firebase fetch error:", error);
-      } finally {
         setLoading(false);
       }
-    };
+    );
 
-    fetchBusinesses();
+    return () => unsubscribe();
   }, []);
 
   // 🧩 Separate businesses by status
   const needsEvaluation = businesses.filter(b =>
-    ["pending_evaluation", "for_payment", "payment_submitted", "paid"].includes(b.status)
+    ["pending_evaluation", "for_payment", "payment_submitted", "awaiting_payment", "paid"].includes(getEffectiveStatus(b))
   );
 
   const evaluated = businesses.filter(b =>
-    ["approved", "rejected"].includes(b.status)
+    ["approved", "rejected"].includes(getEffectiveStatus(b))
   );
 
   // 🧩 Render business cards
-  const renderBusinessCard = (b) => (
-    <div key={b.id} className="business-card">
-      <h3>{b.businessName}</h3>
-      <p><strong>Owner:</strong> {b.ownerName}</p>
-      <p><strong>Type:</strong> {b.businessType}</p>
-      <p><strong>Barangay:</strong> {b.barangay}</p>
-      <p><strong>Status:</strong> {b.status}</p>
-      <button onClick={() => setSelectedBusiness(b)}>Evaluate</button>
-    </div>
-  );
+  const renderBusinessCard = (b) => {
+    const effectiveStatus = getEffectiveStatus(b);
+    return (
+      <div key={b.id} className="business-card">
+        <h3>{b.businessName}</h3>
+        <p><strong>Owner:</strong> {b.ownerName}</p>
+        <p><strong>Type:</strong> {b.businessType}</p>
+        <p><strong>Barangay:</strong> {b.barangay}</p>
+        <p><strong>Status:</strong> {effectiveStatus}</p>
+        <button onClick={() => setSelectedBusiness({ ...b, status: effectiveStatus })}>Evaluate</button>
+      </div>
+    );
+  };
 
   return (
     <div className="staff-business-dashboard">
