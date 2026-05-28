@@ -125,12 +125,23 @@ def provision_cfdp_local_user(uid: str, data: AccountCreate):
 
     provision_url = os.environ.get("CFDP_PROVISION_URL", "").strip()
     provision_key = os.environ.get("CFDP_PROVISION_API_KEY", "").strip()
+    strict_sync = os.environ.get("CFDP_PROVISION_REQUIRED", "false").strip().lower() in {"1", "true", "yes", "on"}
 
     if not provision_url or not provision_key:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="CFDP provisioning is not configured. Set CFDP_PROVISION_URL and CFDP_PROVISION_API_KEY.",
+        detail = "CFDP provisioning is not configured. Set CFDP_PROVISION_URL and CFDP_PROVISION_API_KEY."
+        if strict_sync:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=detail,
+            )
+
+        logger.warning(
+            "⚠️ %s Skipping CFDP sync for UID=%s role=%s (set CFDP_PROVISION_REQUIRED=true to enforce).",
+            detail,
+            uid,
+            role,
         )
+        return
 
     payload = {
         "externalId": uid,
@@ -153,21 +164,33 @@ def provision_cfdp_local_user(uid: str, data: AccountCreate):
     try:
         with urllib_request.urlopen(req, timeout=10) as res:
             if int(getattr(res, "status", 0)) >= 400:
-                raise HTTPException(
-                    status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail=f"CFDP provisioning failed with status {res.status}",
-                )
+                detail = f"CFDP provisioning failed with status {res.status}"
+                if strict_sync:
+                    raise HTTPException(
+                        status_code=status.HTTP_502_BAD_GATEWAY,
+                        detail=detail,
+                    )
+                logger.warning("⚠️ %s; continuing because CFDP_PROVISION_REQUIRED=false", detail)
+                return
     except HTTPError as err:
         error_detail = err.read().decode("utf-8", errors="ignore") if hasattr(err, "read") else str(err)
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"CFDP provisioning failed ({err.code}): {error_detail}",
-        )
+        detail = f"CFDP provisioning failed ({err.code}): {error_detail}"
+        if strict_sync:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=detail,
+            )
+        logger.warning("⚠️ %s; continuing because CFDP_PROVISION_REQUIRED=false", detail)
+        return
     except URLError as err:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"CFDP provisioning unreachable: {err}",
-        )
+        detail = f"CFDP provisioning unreachable: {err}"
+        if strict_sync:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=detail,
+            )
+        logger.warning("⚠️ %s; continuing because CFDP_PROVISION_REQUIRED=false", detail)
+        return
 
 
 def write_firestore_profile(uid: str, payload: dict):
@@ -258,7 +281,11 @@ def update_user_role(uid: str, new_role: RoleEnum, changed_by: str) -> AccountRe
 # ===============================
 # 🚀 Public Service Functions
 # ===============================
-async def create_barangay_account(data: AccountCreate, created_by: str) -> AccountResponse:
+async def create_barangay_account(
+    data: AccountCreate,
+    created_by: str,
+    skip_cfdp_provision: bool = False,
+) -> AccountResponse:
     """Create a Firebase Auth user, Firestore profile, and set claims."""
     uid = create_firebase_user(data)
     payload = sanitize_account_payload(data, created_by)
@@ -266,7 +293,8 @@ async def create_barangay_account(data: AccountCreate, created_by: str) -> Accou
     try:
         write_firestore_profile(uid, payload)
         set_user_claims(uid, data.role)
-        provision_cfdp_local_user(uid, data)
+        if not skip_cfdp_provision:
+            provision_cfdp_local_user(uid, data)
     except Exception:
         rollback_account_creation(uid)
         raise

@@ -1,6 +1,7 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+import os
+from fastapi import APIRouter, Depends, Header, HTTPException, status
+from pydantic import BaseModel, EmailStr, Field
 
 from backend.app.models.account import AccountCreate, AccountResponse, RoleEnum
 from backend.app.services.account_service import (
@@ -25,6 +26,14 @@ class ActionResponse(BaseModel):
 
 class RoleUpdatePayload(BaseModel):
     role: RoleEnum
+
+
+class CfdpProvisionPayload(BaseModel):
+    name: str = Field(..., min_length=2, max_length=100)
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=128)
+    role: RoleEnum
+    requestedBy: str | None = None
 
 
 # ===============================
@@ -129,3 +138,42 @@ async def list_accounts_handler(
     # You’d implement a service function to query Firestore
     accounts = await safe_service_call(list_barangay_accounts, role=role, limit=limit, offset=offset) 
     return accounts
+
+
+@router.post(
+    "/internal/cfdp/provision-account",
+    response_model=AccountResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Provision BIS account from CFDP",
+    description="Internal endpoint used by CFDP to create surveyor/supervisor BIS accounts.",
+)
+async def provision_account_from_cfdp(
+    payload: CfdpProvisionPayload,
+    x_cfdp_provision_key: str | None = Header(default=None),
+) -> AccountResponse:
+    expected_key = os.environ.get("CFDP_TO_BIS_PROVISION_API_KEY", "").strip()
+    provided_key = (x_cfdp_provision_key or "").strip()
+
+    if not expected_key or provided_key != expected_key:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+    if payload.role not in {RoleEnum.surveyor, RoleEnum.supervisor}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only surveyor or supervisor roles are allowed",
+        )
+
+    created_by = f"cfdp:{(payload.requestedBy or 'system').strip() or 'system'}"
+    create_payload = AccountCreate(
+        full_name=payload.name,
+        email=payload.email,
+        password=payload.password,
+        role=payload.role,
+    )
+
+    return await safe_service_call(
+        create_barangay_account,
+        create_payload,
+        created_by=created_by,
+        skip_cfdp_provision=True,
+    )

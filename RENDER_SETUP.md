@@ -60,6 +60,13 @@ uvicorn app.main:app --host 0.0.0.0 --port $PORT
 - `PAYMONGO_PUBLIC_KEY`
 - `PAYMONGO_WEBHOOK_SECRET`
 
+### Optional CFDP provisioning variables (for surveyor/supervisor sync)
+
+- `CFDP_PROVISION_URL` (CFDP internal endpoint, e.g. `/survey/api/internal/bis/provision-user`)
+- `CFDP_PROVISION_API_KEY` (shared secret expected by CFDP in `X-BIS-Provision-Key`)
+- `CFDP_PROVISION_REQUIRED` (`true` to block BIS account creation when CFDP sync fails; default is `false`)
+- `CFDP_TO_BIS_PROVISION_API_KEY` (shared secret required by BIS internal endpoint `POST /api/internal/cfdp/provision-account`)
+
 ## 2) Frontend service (Static Site)
 
 - Root directory: `BIS/frontend`

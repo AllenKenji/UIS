@@ -23,6 +23,14 @@ services:
         sync: false
       - key: CORS_ORIGINS
         sync: false
+      - key: CFDP_PROVISION_URL
+        sync: false
+      - key: CFDP_PROVISION_API_KEY
+        sync: false
+      - key: CFDP_PROVISION_REQUIRED
+        value: "false"
+      - key: CFDP_TO_BIS_PROVISION_API_KEY
+        sync: false
 
   - type: static
     name: bis-frontend
