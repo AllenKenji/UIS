@@ -79,6 +79,7 @@ const ResidentBusinessDashboard = () => {
           </div>
         );
       case "payment_submitted":
+      case "paid":
         return <p className="info-text">⏳ Payment submitted. Awaiting staff verification.</p>;
       case "rejected":
         return (

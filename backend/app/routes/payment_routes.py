@@ -122,7 +122,7 @@ async def paymongo_webhook(request: Request):
             return JSONResponse(status_code=400, content={"success": False, "message": "Invalid payload"})
 
         workflow_map = {
-            "paid": "payment_submitted",
+            "paid": "paid",
             "failed": "payment_failed",
             "cancelled": "payment_cancelled",
             "refunded": "payment_refunded"

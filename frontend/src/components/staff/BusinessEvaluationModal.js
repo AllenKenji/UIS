@@ -16,7 +16,7 @@ const resolveDocumentUrl = (documents, key) => {
 const BusinessEvaluationModal = ({ business, onClose, onUpdated, onSubmit }) => {
   const isApproved = business.status === "approved";
   const [status, setStatus] = useState(
-    business.status === "payment_submitted" ? "approved" : (business.status || "pending_evaluation")
+    ["payment_submitted", "paid"].includes(business.status) ? "approved" : (business.status || "pending_evaluation")
   );
   const [notes, setNotes] = useState(business.notes || "");
 
@@ -108,7 +108,7 @@ const BusinessEvaluationModal = ({ business, onClose, onUpdated, onSubmit }) => 
           <form onSubmit={handleSubmit} className="modal-form">
             <label>Status</label>
             <select value={status} onChange={(e) => setStatus(e.target.value)}>
-              {business.status === "payment_submitted" ? (
+              {["payment_submitted", "paid"].includes(business.status) ? (
                 <>
                   <option value="approved">Approved</option>
                   <option value="rejected">Rejected</option>

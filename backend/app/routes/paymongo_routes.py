@@ -285,11 +285,11 @@ async def reconcile_return(payload: dict) -> dict:
                 doc.reference.update,
                 {
                     "paymentStatus": "paid",
-                    "status": "payment_submitted",
+                    "status": "paid",
                     "referenceNumber": reference_number or data.get("referenceNumber"),
                 },
             )
-            return {"success": True, "updated": True, "paymentStatus": "paid", "status": "payment_submitted"}
+            return {"success": True, "updated": True, "paymentStatus": "paid", "status": "paid"}
 
         document_id = str(payload.get("documentId") or "").strip()
         if not document_id:
@@ -330,11 +330,11 @@ async def reconcile_return(payload: dict) -> dict:
             doc.reference.update,
             {
                 "paymentStatus": "paid",
-                "status": "payment_submitted",
+                "status": "paid",
                 "referenceNumber": reference_number or data.get("referenceNumber"),
             },
         )
-        return {"success": True, "updated": True, "paymentStatus": "paid", "status": "payment_submitted"}
+        return {"success": True, "updated": True, "paymentStatus": "paid", "status": "paid"}
 
     except HTTPException:
         raise

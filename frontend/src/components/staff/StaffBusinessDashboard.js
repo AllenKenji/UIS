@@ -32,7 +32,7 @@ const StaffBusinessDashboard = () => {
 
   // 🧩 Separate businesses by status
   const needsEvaluation = businesses.filter(b =>
-    ["pending_evaluation", "for_payment", "payment_submitted"].includes(b.status)
+    ["pending_evaluation", "for_payment", "payment_submitted", "paid"].includes(b.status)
   );
 
   const evaluated = businesses.filter(b =>
