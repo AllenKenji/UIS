@@ -10,6 +10,7 @@ from backend.app.services.paymongo_service import (
     create_payment_intent,
     get_payment_link,
     get_payment_intent,
+    get_payment_link_payments,
 )
 from backend.app.models.paymongo import DocumentPaymentRequest, BusinessPaymentRequest, AttachPaymentRequest
 from backend.app.routes.fee_routes import (
@@ -51,6 +52,15 @@ def _link_has_paid_payment(link_state: dict) -> bool:
             return True
 
     return False
+
+def _link_payments_has_paid(link_id: str) -> bool:
+    try:
+        payments_state = get_payment_link_payments(link_id)
+        statuses = payments_state.get("statuses") or []
+        return any(status in {"paid", "succeeded"} for status in statuses)
+    except Exception as err:
+        logger.warning("⚠️ Failed to fetch link payments for %s: %s", link_id, err)
+        return False
 
 # -----------------------------
 # Shared payment creation logic
@@ -287,7 +297,11 @@ async def reconcile_return(payload: dict) -> dict:
                 link_state = get_payment_link(link_id)
                 provider_status = link_state.get("paymentStatus")
                 reference_number = link_state.get("referenceNumber")
-                is_paid = _is_paid_status(provider_status) or _link_has_paid_payment(link_state)
+                is_paid = (
+                    _is_paid_status(provider_status)
+                    or _link_has_paid_payment(link_state)
+                    or _link_payments_has_paid(link_id)
+                )
             elif intent_id:
                 intent_state = get_payment_intent(intent_id)
                 provider_status = intent_state.get("paymentStatus")
@@ -338,7 +352,11 @@ async def reconcile_return(payload: dict) -> dict:
             link_state = get_payment_link(link_id)
             provider_status = link_state.get("paymentStatus")
             reference_number = link_state.get("referenceNumber")
-            is_paid = _is_paid_status(provider_status) or _link_has_paid_payment(link_state)
+            is_paid = (
+                _is_paid_status(provider_status)
+                or _link_has_paid_payment(link_state)
+                or _link_payments_has_paid(link_id)
+            )
         elif intent_id:
             intent_state = get_payment_intent(intent_id)
             provider_status = intent_state.get("paymentStatus")

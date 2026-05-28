@@ -86,6 +86,36 @@ def get_payment_link(link_id: str) -> dict:
         logger.exception("❌ Unexpected error fetching payment link %s", link_id)
         raise RuntimeError("Failed to fetch payment link")
 
+def get_payment_link_payments(link_id: str) -> dict:
+    """Retrieve payments associated with a PayMongo payment link."""
+    headers = _make_headers(_get_secret_key())
+    try:
+        response = requests.get(f"{BASE_URL}/links/{link_id}/payments", headers=headers)
+        response.raise_for_status()
+        payload = response.json()
+        data = payload.get("data", [])
+
+        statuses = []
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            attrs = item.get("attributes", {})
+            status = attrs.get("status") or item.get("status")
+            if status:
+                statuses.append(str(status).strip().lower())
+
+        return {
+            "statuses": statuses,
+            "raw": payload,
+        }
+    except requests.exceptions.HTTPError as e:
+        logger.error("❌ PayMongo API error when fetching link payments %s: %s", link_id, e)
+        logger.error("📦 Response status=%s body=%s", response.status_code, response.text)
+        raise RuntimeError("Failed to fetch payment link payments")
+    except Exception:
+        logger.exception("❌ Unexpected error fetching link payments %s", link_id)
+        raise RuntimeError("Failed to fetch payment link payments")
+
 def get_payment_intent(payment_intent_id: str) -> dict:
     """Retrieve an existing PayMongo payment intent by ID."""
     headers = _make_headers(_get_secret_key())

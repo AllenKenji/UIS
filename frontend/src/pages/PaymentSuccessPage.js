@@ -4,6 +4,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { API_BASE_URL } from "../services/api";
 import "../styles/payment-success-page.css";
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const PaymentSuccessPage = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -17,18 +19,29 @@ const PaymentSuccessPage = () => {
       const documentId = params.get("documentId");
 
       try {
-        if (type === "business" && businessId) {
-          await fetch(`${API_BASE_URL}/api/paymongo/reconcile-return`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ type: "business", businessId }),
-          });
-        } else if (type === "document" && documentId) {
-          await fetch(`${API_BASE_URL}/api/paymongo/reconcile-return`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ type: "document", documentId }),
-          });
+        const payload =
+          type === "business" && businessId
+            ? { type: "business", businessId }
+            : type === "document" && documentId
+              ? { type: "document", documentId }
+              : null;
+
+        if (payload) {
+          for (let attempt = 1; attempt <= 4; attempt += 1) {
+            const response = await fetch(`${API_BASE_URL}/api/paymongo/reconcile-return`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+
+            if (response.ok) {
+              const result = await response.json();
+              const paid = (result?.paymentStatus || "").toLowerCase() === "paid" || (result?.status || "").toLowerCase() === "paid";
+              if (paid || result?.updated) break;
+            }
+
+            await sleep(1800);
+          }
         }
       } catch (error) {
         // Reconciliation is best-effort; webhook can still update status.
