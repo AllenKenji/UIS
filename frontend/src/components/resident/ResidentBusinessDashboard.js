@@ -86,9 +86,11 @@ const ResidentBusinessDashboard = () => {
   const renderStatus = (b) => {
     const rawStatus = String(b.status || "").toLowerCase();
     const rawPaymentStatus = String(b.paymentStatus || "").toLowerCase();
-    const status = (rawPaymentStatus === "paid" || rawPaymentStatus === "succeeded")
-      ? "paid"
-      : (rawStatus || rawPaymentStatus || "pending_evaluation");
+    const status = ["approved", "rejected"].includes(rawStatus)
+      ? rawStatus
+      : (rawPaymentStatus === "paid" || rawPaymentStatus === "succeeded")
+        ? "paid"
+        : (rawStatus || rawPaymentStatus || "pending_evaluation");
 
     if (status === "approved") {
       const approvedDate = b.submittedAt ? new Date(b.submittedAt) : new Date();
