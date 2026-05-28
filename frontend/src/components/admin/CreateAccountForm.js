@@ -19,8 +19,9 @@ const CreateAccountForm = () => {
   const [feedback, setFeedback] = useState("");
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    const { name, value, dataset } = e.target;
+    const field = dataset.field || name;
+    setForm((prev) => ({ ...prev, [field]: value }));
   };
 
   const resetForm = () => setForm(defaultForm);
@@ -86,49 +87,62 @@ const CreateAccountForm = () => {
       onSubmit={handleSubmit}
       aria-busy={loading}
       aria-live="polite"
+      autoComplete="off"
     >
       <h3>👤 Create Barangay Account</h3>
+
+      {/* Decoy fields help prevent password managers from overriding actual inputs. */}
+      <input type="text" name="username" autoComplete="username" tabIndex={-1} style={{ display: "none" }} />
+      <input type="password" name="password" autoComplete="current-password" tabIndex={-1} style={{ display: "none" }} />
 
       {feedback && <p className="feedback">{feedback}</p>}
 
       <label>
         Full Name
         <input
-          name="full_name"
+          name="account_full_name"
+          data-field="full_name"
           placeholder="Juan Dela Cruz"
           value={form.full_name}
           onChange={handleChange}
           required
+          autoComplete="off"
         />
       </label>
 
       <label>
         Email
         <input
-          name="email"
+          name="account_email"
+          data-field="email"
           type="email"
           placeholder="juan@example.com"
           value={form.email}
           onChange={handleChange}
           required
+          autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
         />
       </label>
 
       <label>
         Password
         <input
-          name="password"
+          name="account_password"
+          data-field="password"
           type="password"
           placeholder="••••••••"
           value={form.password}
           onChange={handleChange}
           required
+          autoComplete="new-password"
         />
       </label>
 
       <label>
         Role
-        <select name="role" value={form.role} onChange={handleChange}>
+        <select name="account_role" data-field="role" value={form.role} onChange={handleChange}>
           {ROLE_OPTIONS.filter((opt) => isAdmin || opt.value !== "admin").map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
