@@ -98,6 +98,22 @@ async def paymongo_webhook(request: Request):
             or inner_attrs.get("externalReferenceNumber")
             or metadata.get("pmReferenceNumber")
         )
+        link_id_candidates = {
+            str(value).strip()
+            for value in (
+                inner_attrs.get("link_id"),
+                inner_attrs.get("payment_link_id"),
+                inner_attrs.get("linkId"),
+                inner_attrs.get("paymongoLinkId"),
+                metadata.get("paymongoLinkId"),
+            )
+            if value
+        }
+
+        # Some link events expose the link id in data.id (e.g., link_xxx).
+        inner_data_id = str(inner_data.get("id") or "").strip()
+        if inner_data_id.startswith("link_"):
+            link_id_candidates.add(inner_data_id)
         paid_at = inner_attrs.get("paidAt")
 
         transaction_id = inner_data.get("id")
@@ -265,6 +281,44 @@ async def paymongo_webhook(request: Request):
                 else:
                     logger.warning("⚠️ No record found for referenceNumber=%s", reference_number)
                     return JSONResponse(status_code=200, content={"success": False, "message": "Unmatched webhook"})
+
+        # --- Fallback: paymongoLinkId (common for link.payment.* events) ---
+        elif link_id_candidates:
+            docs = []
+            matched_link_id = None
+            for candidate in link_id_candidates:
+                docs = get_db().collection("businesses").where("paymongoLinkId", "==", candidate).limit(1).get()
+                if docs:
+                    matched_link_id = candidate
+                    break
+
+            if docs:
+                await run_in_threadpool(docs[0].reference.update, update_data)
+                logger.info("✅ Updated business via paymongoLinkId=%s status=%s", matched_link_id, status)
+
+                business_data = docs[0].to_dict()
+                log_payment_record(
+                    reference_number=reference_number or business_data.get("referenceNumber") or transaction_id,
+                    transaction_id=transaction_id,
+                    amount=(inner_attrs.get("amount") or 0) / 100,
+                    status=status,
+                    fee_type=metadata.get("feeType") or business_data.get("feeType"),
+                    business_id=business_data.get("businessId"),
+                    owner_name=business_data.get("ownerName"),
+                    business_name=business_data.get("businessName"),
+                    business_type=business_data.get("businessType"),
+                    event_type=event_type,
+                    paid_at=paid_at,
+                    method="paymongo"
+                )
+
+                await _notify_payment_roles(
+                    f"Business payment {status} ({business_data.get('businessId') or matched_link_id})",
+                    "payment_update",
+                )
+            else:
+                logger.warning("⚠️ No business found for paymongoLinkId candidates=%s", sorted(link_id_candidates))
+                return JSONResponse(status_code=200, content={"success": False, "message": "Unmatched webhook"})
 
         else:
             logger.warning("⚠️ No identifiers in webhook payload: %s", payload)

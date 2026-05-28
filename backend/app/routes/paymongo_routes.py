@@ -37,6 +37,21 @@ def _get_business_doc(business_id: str):
 def _is_paid_status(value: str | None) -> bool:
     return str(value or "").strip().lower() in {"paid", "succeeded"}
 
+def _link_has_paid_payment(link_state: dict) -> bool:
+    raw = (link_state or {}).get("raw") or {}
+    attrs = (raw.get("data") or {}).get("attributes") or {}
+    payments = attrs.get("payments") or []
+
+    for payment in payments:
+        if not isinstance(payment, dict):
+            continue
+        payment_attrs = payment.get("attributes") or {}
+        status = str(payment_attrs.get("status") or payment.get("status") or "").strip().lower()
+        if status in {"paid", "succeeded"}:
+            return True
+
+    return False
+
 # -----------------------------
 # Shared payment creation logic
 # -----------------------------
@@ -264,16 +279,19 @@ async def reconcile_return(payload: dict) -> dict:
 
             provider_status = None
             reference_number = None
+            is_paid = False
             if link_id:
                 link_state = get_payment_link(link_id)
                 provider_status = link_state.get("paymentStatus")
                 reference_number = link_state.get("referenceNumber")
+                is_paid = _is_paid_status(provider_status) or _link_has_paid_payment(link_state)
             elif intent_id:
                 intent_state = get_payment_intent(intent_id)
                 provider_status = intent_state.get("paymentStatus")
                 reference_number = intent_state.get("referenceNumber")
+                is_paid = _is_paid_status(provider_status)
 
-            if not _is_paid_status(provider_status):
+            if not is_paid:
                 return {
                     "success": True,
                     "updated": False,
@@ -309,16 +327,19 @@ async def reconcile_return(payload: dict) -> dict:
 
         provider_status = None
         reference_number = None
+        is_paid = False
         if link_id:
             link_state = get_payment_link(link_id)
             provider_status = link_state.get("paymentStatus")
             reference_number = link_state.get("referenceNumber")
+            is_paid = _is_paid_status(provider_status) or _link_has_paid_payment(link_state)
         elif intent_id:
             intent_state = get_payment_intent(intent_id)
             provider_status = intent_state.get("paymentStatus")
             reference_number = intent_state.get("referenceNumber")
+            is_paid = _is_paid_status(provider_status)
 
-        if not _is_paid_status(provider_status):
+        if not is_paid:
             return {
                 "success": True,
                 "updated": False,
