@@ -11,7 +11,7 @@ Login details:
 Username: ${email}
 Password: 123456 (please change after first login)
 
-Login here: https://barangay-1721d.web.app
+Login here: https://uis.lits.com.ph
 
 Best regards,
 Barangay ${barangay} Registry Team`,
