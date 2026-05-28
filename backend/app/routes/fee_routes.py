@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
+import os
 from backend.app.core.auth import get_admin_uid
 from backend.app.services.paymongo_service import ( 
     create_payment_link, 
@@ -22,6 +23,7 @@ from pydantic import BaseModel
 
 router = APIRouter(prefix="/fees", tags=["Fees"])
 logger = logging.getLogger("uvicorn.error")
+FRONTEND_BASE_URL = os.environ.get("FRONTEND_BASE_URL", "https://uis.lits.com.ph").rstrip("/")
 
 
 
@@ -281,9 +283,7 @@ def create_business_payment(business_id: str, payload: dict = Body(...)):
                 "businessId": business_id,
                 "businessType": business.get("businessType"),
                 "paymentType": payment_type,
-            },
-            success_url="https://your-app.com/business/payment-success",
-            cancel_url="https://your-app.com/business/payment-cancel"
+            }
         )
     else:
         result = create_payment_link(
@@ -295,15 +295,17 @@ def create_business_payment(business_id: str, payload: dict = Body(...)):
                 "businessType": business.get("businessType"),
                 "paymentType": payment_type,
             },
-            success_url="https://your-app.com/business/payment-success",
-            cancel_url="https://your-app.com/business/payment-cancel"
+            success_url=f"{FRONTEND_BASE_URL}/payment-success?type=business&businessId={business_id}",
+            cancel_url=f"{FRONTEND_BASE_URL}/business/payment-cancel"
         )
 
     # ✅ Update Firestore with checkout details
     ref.update({
-        "checkoutUrl": result["checkout_url"],
-        "paymongoLinkId": result.get("link_id"),
-        "paymentIntentId": result.get("intent_id"),
+        "checkoutUrl": result.get("checkoutUrl"),
+        "paymongoLinkId": result.get("paymongoLinkId"),
+        "paymentIntentId": result.get("paymentIntentId"),
+        "paymongoClientKey": result.get("paymongoClientKey"),
+        "paymentStatus": result.get("paymentStatus") or "awaiting_payment",
         "status": "for_payment",
         "fee": fee,
         "paymentType": payment_type,  # store type for audit clarity
@@ -340,9 +342,7 @@ def create_document_payment(document_id: str, payload: dict = Body(...)):
             amount=fee,
             description=description,
             remarks=remarks,
-            metadata={"documentId": document_id, "documentType": doc_type},
-            success_url="https://your-app.com/documents/payment-success",
-            cancel_url="https://your-app.com/documents/payment-cancel"
+            metadata={"documentId": document_id, "documentType": doc_type}
         )
     else:
         result = create_payment_link(
@@ -350,18 +350,20 @@ def create_document_payment(document_id: str, payload: dict = Body(...)):
             description=description,
             remarks=remarks,
             metadata={"documentId": document_id, "documentType": doc_type},
-            success_url="https://your-app.com/documents/payment-success",
-            cancel_url="https://your-app.com/documents/payment-cancel"
+            success_url=f"{FRONTEND_BASE_URL}/payment-success?type=document&documentId={document_id}",
+            cancel_url=f"{FRONTEND_BASE_URL}/documents/payment-cancel"
         )
 
     ref.update({
-        "checkoutUrl": result["checkout_url"],
-        "paymongoLinkId": result.get("link_id"),
-        "paymentIntentId": result.get("intent_id"),
+        "checkoutUrl": result.get("checkoutUrl"),
+        "paymongoLinkId": result.get("paymongoLinkId"),
+        "paymentIntentId": result.get("paymentIntentId"),
+        "paymongoClientKey": result.get("paymongoClientKey"),
+        "paymentStatus": result.get("paymentStatus") or "awaiting_payment",
         "status": "awaiting_payment",
         "fee": fee
     })
 
-    logger.info("Updated Firestore with new checkoutUrl=%s fee=%s", result["checkout_url"], fee)
+    logger.info("Updated Firestore with new checkoutUrl=%s fee=%s", result.get("checkoutUrl"), fee)
 
     return result
