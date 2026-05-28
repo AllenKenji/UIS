@@ -86,6 +86,30 @@ def get_payment_link(link_id: str) -> dict:
         logger.exception("❌ Unexpected error fetching payment link %s", link_id)
         raise RuntimeError("Failed to fetch payment link")
 
+def get_payment_intent(payment_intent_id: str) -> dict:
+    """Retrieve an existing PayMongo payment intent by ID."""
+    headers = _make_headers(_get_secret_key())
+    try:
+        response = requests.get(f"{BASE_URL}/payment_intents/{payment_intent_id}", headers=headers)
+        response.raise_for_status()
+        payload = response.json()
+        data = payload.get("data", {})
+        attrs = data.get("attributes", {})
+        return {
+            "paymentIntentId": data.get("id"),
+            "paymentStatus": attrs.get("status"),
+            "referenceNumber": attrs.get("reference_number"),
+            "metadata": attrs.get("metadata", {}),
+            "raw": payload,
+        }
+    except requests.exceptions.HTTPError as e:
+        logger.error("❌ PayMongo API error when fetching intent %s: %s", payment_intent_id, e)
+        logger.error("📦 Response status=%s body=%s", response.status_code, response.text)
+        raise RuntimeError("Failed to fetch payment intent")
+    except Exception as e:
+        logger.exception("❌ Unexpected error fetching payment intent %s", payment_intent_id)
+        raise RuntimeError("Failed to fetch payment intent")
+
 def create_payment_intent(amount: int, description: str, remarks: str = "",
                           metadata: dict = None) -> dict:
     headers = _make_headers(_get_secret_key())
@@ -133,7 +157,8 @@ def create_payment_intent(amount: int, description: str, remarks: str = "",
             "metadata": attrs.get("metadata", {})
         }
     except requests.exceptions.HTTPError as e:
-        logger.error("❌ PayMongo API error. Payload=%s Response=%s", payload, resp.text)
+        response_text = resp.text if 'resp' in locals() and resp is not None else "<no response body>"
+        logger.error("❌ PayMongo API error. Payload=%s Response=%s", payload, response_text)
         raise RuntimeError("Failed to create payment intent")
     except Exception as e:
         logger.exception("❌ Unexpected error creating payment intent")

@@ -7,7 +7,7 @@ const ResidentBusinessPayment = ({ business }) => {
   const handlePayment = async (method = "gcash") => {
     try {
       const identifier = business.businessId || business.id;
-      const returnUrl = `${window.location.origin}/payment-success?type=business`;
+      const returnUrl = `${window.location.origin}/payment-success?type=business&businessId=${encodeURIComponent(identifier)}`;
 
       // Step 1: Request backend to create a PayMongo Payment Link or Intent
       const res = await fetch(`${API_BASE_URL}/api/paymongo/create-business-link`, {

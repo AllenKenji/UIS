@@ -5,7 +5,12 @@ import requests
 from fastapi import APIRouter, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from backend.app.utils.firestore_utils import get_db
-from backend.app.services.paymongo_service import create_payment_link, create_payment_intent, attach_payment_method
+from backend.app.services.paymongo_service import (
+    create_payment_link,
+    create_payment_intent,
+    get_payment_link,
+    get_payment_intent,
+)
 from backend.app.models.paymongo import DocumentPaymentRequest, BusinessPaymentRequest, AttachPaymentRequest
 from backend.app.routes.fee_routes import (
     compute_document_fee,
@@ -28,6 +33,9 @@ def _get_document_doc(document_id: str):
 def _get_business_doc(business_id: str):
     docs = get_db().collection("businesses").where("businessId", "==", business_id).limit(1).get()
     return docs[0] if docs else None
+
+def _is_paid_status(value: str | None) -> bool:
+    return str(value or "").strip().lower() in {"paid", "succeeded"}
 
 # -----------------------------
 # Shared payment creation logic
@@ -76,7 +84,7 @@ async def create_document_payment_link(payload: DocumentPaymentRequest) -> dict:
 
         result = _create_payment(
             fee, description, payload.remarks, metadata,
-            success_url=f"{FRONTEND_BASE_URL}/payment-success?type=document",
+            success_url=f"{FRONTEND_BASE_URL}/payment-success?type=document&documentId={payload.documentId}",
             cancel_url=f"{FRONTEND_BASE_URL}/documents/payment-cancel"
         )
 
@@ -118,7 +126,7 @@ async def create_business_payment_link(payload: BusinessPaymentRequest) -> dict:
 
         result = _create_payment(
             fee, description, payload.remarks, metadata,
-            success_url=f"{FRONTEND_BASE_URL}/payment-success?type=business",
+            success_url=f"{FRONTEND_BASE_URL}/payment-success?type=business&businessId={payload.businessId}",
             cancel_url=f"{FRONTEND_BASE_URL}/business/payment-cancel"
         )
 
@@ -160,7 +168,7 @@ async def attach_payment_method(payload: AttachPaymentRequest) -> dict:
             raise HTTPException(status_code=500, detail="PayMongo secret key not configured")
 
         headers = {
-            "Authorization": f"Basic {base64.b64encode(PAYMONGO_SECRET_KEY.encode()).decode()}",
+            "Authorization": f"Basic {base64.b64encode(f'{PAYMONGO_SECRET_KEY}:'.encode()).decode()}",
             "Content-Type": "application/json"
         }
 
@@ -227,3 +235,109 @@ async def attach_payment_method(payload: AttachPaymentRequest) -> dict:
     except Exception as e:
         logger.exception("❌ Failed to attach payment method: %s", e)
         raise HTTPException(status_code=500, detail="Attach payment method failed")
+
+
+@router.post("/reconcile-return")
+async def reconcile_return(payload: dict) -> dict:
+    """Fallback sync when user returns from PayMongo but webhook is delayed/missed."""
+    try:
+        kind = str(payload.get("type") or "").strip().lower()
+        if kind not in {"business", "document"}:
+            raise HTTPException(status_code=400, detail="type must be 'business' or 'document'")
+
+        if kind == "business":
+            business_id = str(payload.get("businessId") or "").strip()
+            if not business_id:
+                raise HTTPException(status_code=400, detail="businessId is required")
+
+            doc = _get_business_doc(business_id)
+            if not doc:
+                raise HTTPException(status_code=404, detail="Business not found")
+
+            data = doc.to_dict() or {}
+            current_status = str(data.get("paymentStatus") or "").strip().lower()
+            if _is_paid_status(current_status):
+                return {"success": True, "updated": False, "paymentStatus": current_status, "status": data.get("status")}
+
+            link_id = data.get("paymongoLinkId")
+            intent_id = data.get("paymentIntentId")
+
+            provider_status = None
+            reference_number = None
+            if link_id:
+                link_state = get_payment_link(link_id)
+                provider_status = link_state.get("paymentStatus")
+                reference_number = link_state.get("referenceNumber")
+            elif intent_id:
+                intent_state = get_payment_intent(intent_id)
+                provider_status = intent_state.get("paymentStatus")
+                reference_number = intent_state.get("referenceNumber")
+
+            if not _is_paid_status(provider_status):
+                return {
+                    "success": True,
+                    "updated": False,
+                    "paymentStatus": provider_status or current_status or "unpaid",
+                    "status": data.get("status"),
+                }
+
+            await run_in_threadpool(
+                doc.reference.update,
+                {
+                    "paymentStatus": "paid",
+                    "status": "payment_submitted",
+                    "referenceNumber": reference_number or data.get("referenceNumber"),
+                },
+            )
+            return {"success": True, "updated": True, "paymentStatus": "paid", "status": "payment_submitted"}
+
+        document_id = str(payload.get("documentId") or "").strip()
+        if not document_id:
+            raise HTTPException(status_code=400, detail="documentId is required")
+
+        doc = _get_document_doc(document_id)
+        if not doc:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        data = doc.to_dict() or {}
+        current_status = str(data.get("paymentStatus") or "").strip().lower()
+        if _is_paid_status(current_status):
+            return {"success": True, "updated": False, "paymentStatus": current_status, "status": data.get("status")}
+
+        link_id = data.get("paymongoLinkId")
+        intent_id = data.get("paymentIntentId")
+
+        provider_status = None
+        reference_number = None
+        if link_id:
+            link_state = get_payment_link(link_id)
+            provider_status = link_state.get("paymentStatus")
+            reference_number = link_state.get("referenceNumber")
+        elif intent_id:
+            intent_state = get_payment_intent(intent_id)
+            provider_status = intent_state.get("paymentStatus")
+            reference_number = intent_state.get("referenceNumber")
+
+        if not _is_paid_status(provider_status):
+            return {
+                "success": True,
+                "updated": False,
+                "paymentStatus": provider_status or current_status or "unpaid",
+                "status": data.get("status"),
+            }
+
+        await run_in_threadpool(
+            doc.reference.update,
+            {
+                "paymentStatus": "paid",
+                "status": "payment_submitted",
+                "referenceNumber": reference_number or data.get("referenceNumber"),
+            },
+        )
+        return {"success": True, "updated": True, "paymentStatus": "paid", "status": "payment_submitted"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("❌ Failed to reconcile return status: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to reconcile payment status")

@@ -46,7 +46,7 @@ const MyDocuments = ({ residentId }) => {
           name: doc.resident_name || "Resident",
           email: doc.resident_email || "resident@example.com",
         },
-        return_url: `${window.location.origin}/payment-success?type=document`,
+        return_url: `${window.location.origin}/payment-success?type=document&documentId=${encodeURIComponent(doc.document_id)}`,
       }),
     });
     if (!res.ok) throw new Error(`Attach method error: ${await res.text()}`);
