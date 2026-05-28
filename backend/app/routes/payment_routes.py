@@ -96,6 +96,7 @@ async def paymongo_webhook(request: Request):
         reference_number = (
             inner_attrs.get("reference_number")
             or inner_attrs.get("externalReferenceNumber")
+            or (inner_attrs.get("link") or {}).get("reference_number")
             or metadata.get("pmReferenceNumber")
         )
         link_id_candidates = {
@@ -105,6 +106,7 @@ async def paymongo_webhook(request: Request):
                 inner_attrs.get("payment_link_id"),
                 inner_attrs.get("linkId"),
                 inner_attrs.get("paymongoLinkId"),
+                (inner_attrs.get("link") or {}).get("id"),
                 metadata.get("paymongoLinkId"),
             )
             if value
@@ -117,7 +119,11 @@ async def paymongo_webhook(request: Request):
         paid_at = inner_attrs.get("paidAt")
 
         transaction_id = inner_data.get("id")
-        intent_id = inner_attrs.get("paymentIntentId")
+        intent_id = (
+            inner_attrs.get("paymentIntentId")
+            or inner_attrs.get("payment_intent_id")
+            or (inner_attrs.get("payment_intent") or {}).get("id")
+        )
 
         # logger.info("📦 Webhook event=%s status=%s metadata=%s ref=%s",
         #             event_type, status, metadata, reference_number)
@@ -150,8 +156,13 @@ async def paymongo_webhook(request: Request):
             logger.warning("⚠️ Webhook status missing and could not be derived. event=%s payload=%s", event_type, payload)
             return JSONResponse(status_code=400, content={"success": False, "message": "Invalid payload"})
 
+        # Normalize provider variants to internal workflow values.
+        if str(status).strip().lower() == "succeeded":
+            status = "paid"
+
         workflow_map = {
             "paid": "paid",
+            "succeeded": "paid",
             "failed": "payment_failed",
             "cancelled": "payment_cancelled",
             "refunded": "payment_refunded"

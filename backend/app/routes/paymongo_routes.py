@@ -272,6 +272,9 @@ async def reconcile_return(payload: dict) -> dict:
             data = doc.to_dict() or {}
             current_status = str(data.get("paymentStatus") or "").strip().lower()
             if _is_paid_status(current_status):
+                doc_status = str(data.get("status") or "").strip().lower()
+                if doc_status != "paid":
+                    await run_in_threadpool(doc.reference.update, {"status": "paid"})
                 return {"success": True, "updated": False, "paymentStatus": current_status, "status": data.get("status")}
 
             link_id = data.get("paymongoLinkId")
@@ -320,6 +323,9 @@ async def reconcile_return(payload: dict) -> dict:
         data = doc.to_dict() or {}
         current_status = str(data.get("paymentStatus") or "").strip().lower()
         if _is_paid_status(current_status):
+            doc_status = str(data.get("status") or "").strip().lower()
+            if doc_status != "paid":
+                await run_in_threadpool(doc.reference.update, {"status": "paid"})
             return {"success": True, "updated": False, "paymentStatus": current_status, "status": data.get("status")}
 
         link_id = data.get("paymongoLinkId")
