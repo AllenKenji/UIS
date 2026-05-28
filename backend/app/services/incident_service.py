@@ -36,7 +36,7 @@ def _normalize_incident(doc) -> dict:
         "updated_at": data.get("updatedAt"),
         "authUid": data.get("authUid"),
         "residentId": data.get("residentId") or data.get("filed_for"),
-        "assigned_to_name": data.get("assigned_to_name"),
+        "assigned_to_uid": data.get("assigned_to_name"),
     }
 
 
@@ -90,18 +90,28 @@ def _enrich_with_resident(data: dict) -> IncidentWithResident:
         except Exception as e:
             logger.warning("⚠️ Failed to enrich staff info: %s", e)
 
-    assigned_to_name = data.get("assigned_to_name") or "—"
-    if assigned_to_name not in (None, "—"):
+    assigned_to_uid = data.get("assigned_to_uid")
+    assigned_to_name = "—"
+    if assigned_to_uid:
         try:
-            staff_doc = get_db().collection("users").document(assigned_to_name).get()
+            staff_doc = get_db().collection("users").document(assigned_to_uid).get()
             if staff_doc.exists:
-                assigned_to_name = staff_doc.to_dict().get("full_name", assigned_to_name)
+                staff_data = staff_doc.to_dict() or {}
+                assigned_to_name = (
+                    staff_data.get("full_name")
+                    or staff_data.get("fullName")
+                    or assigned_to_uid
+                )
+            else:
+                assigned_to_name = assigned_to_uid
         except Exception:
-            logger.info("ℹ️ Assigned_to is external or free-form: %s", assigned_to_name)
+            logger.info("ℹ️ Assigned_to is external or free-form: %s", assigned_to_uid)
+            assigned_to_name = assigned_to_uid
 
     data.update({
         "reported_by_name": reported_by_name,
         "logged_by_officer": logged_by_officer,
+        "assigned_to_uid": assigned_to_uid,
         "assigned_to_name": assigned_to_name,
     })
 

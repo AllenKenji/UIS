@@ -41,6 +41,7 @@ class Incident(BaseModel):
     location: str
     authUid: Optional[str] = None
     residentId: Optional[str] = None
+    assigned_to_uid: Optional[str] = None
     timestamp: datetime
     updated_at: Optional[datetime] = None
     status: IncidentStatus = IncidentStatus.pending

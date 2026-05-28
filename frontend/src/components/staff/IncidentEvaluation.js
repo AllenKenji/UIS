@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { IncidentsAPI } from "../../services/api"; 
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { db } from "../../services/firebase";
 
 const normalizeStatus = (value) => {
   const normalized = String(value || "").trim().toLowerCase();
@@ -31,7 +33,42 @@ const formatDateTime = (value) => {
 
 const IncidentEvaluation = ({ incident, role, onClose, onUpdate }) => {
   const [status, setStatus] = useState(normalizeStatus(incident.status));
-  const [assignedTo, setAssignedTo] = useState(incident.assigned_to_name || "");
+  const [assignedTo, setAssignedTo] = useState(incident.assigned_to_uid || "");
+  const [assignees, setAssignees] = useState([]);
+  const [loadingAssignees, setLoadingAssignees] = useState(false);
+
+  useEffect(() => {
+    const loadAssignees = async () => {
+      setLoadingAssignees(true);
+      try {
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, where("role", "in", ["staff", "admin"]));
+        const snapshot = await getDocs(q);
+        const options = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data() || {};
+          const label = data.full_name || data.fullName || data.email || docSnap.id;
+          return {
+            uid: docSnap.id,
+            label,
+          };
+        });
+        setAssignees(options);
+
+        if (!incident.assigned_to_uid && incident.assigned_to_name) {
+          const match = options.find(
+            (opt) => opt.label.toLowerCase() === String(incident.assigned_to_name || "").toLowerCase()
+          );
+          if (match) setAssignedTo(match.uid);
+        }
+      } catch (error) {
+        console.error("❌ Failed to load assignee list:", error);
+      } finally {
+        setLoadingAssignees(false);
+      }
+    };
+
+    loadAssignees();
+  }, [incident.assigned_to_name, incident.assigned_to_uid]);
 
   const handleUpdate = async () => {
     try {
@@ -79,12 +116,18 @@ const IncidentEvaluation = ({ incident, role, onClose, onUpdate }) => {
         {/* ✅ Allow staff to assign too */}
         <label>
           Assign To:
-          <input
-            type="text"
+          <select
             value={assignedTo}
             onChange={(e) => setAssignedTo(e.target.value)}
-            placeholder="Staff name or ID"
-          />
+            disabled={loadingAssignees}
+          >
+            <option value="">Unassigned</option>
+            {assignees.map((assignee) => (
+              <option key={assignee.uid} value={assignee.uid}>
+                {assignee.label}
+              </option>
+            ))}
+          </select>
         </label>
 
         <div className="buttons">
