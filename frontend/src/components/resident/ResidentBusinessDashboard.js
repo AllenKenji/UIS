@@ -6,6 +6,18 @@ import { QRCodeCanvas } from "qrcode.react";
 import ResidentBusinessPayment from "./ResidentBusinessPayment";
 import "../../styles/resident/resident-business-dashboard.css";
 
+const resolveDocumentUrl = (business, key) => {
+  const nested = business?.documents?.[key];
+  if (typeof nested === "string") return nested;
+  if (nested && typeof nested === "object") return nested.url || null;
+
+  const legacy = business?.[key];
+  if (typeof legacy === "string") return legacy;
+  if (legacy && typeof legacy === "object") return legacy.url || null;
+
+  return null;
+};
+
 const ResidentBusinessDashboard = () => {
   const { userInfo: user } = useUser();
   const [businesses, setBusinesses] = useState([]);
@@ -90,14 +102,16 @@ const ResidentBusinessDashboard = () => {
     return (
       <div className="documents-list">
         {docs.map(
-          ({ key, label }) =>
-            b[key] && (
+          ({ key, label }) => {
+            const url = resolveDocumentUrl(b, key);
+            return url && (
               <p key={key}>
-                <a href={b[key]} target="_blank" rel="noopener noreferrer">
+                <a href={url} target="_blank" rel="noopener noreferrer">
                   📎 View {label}
                 </a>
               </p>
-            )
+            );
+          }
         )}
       </div>
     );

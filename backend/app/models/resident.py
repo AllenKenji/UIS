@@ -31,7 +31,7 @@ class Address(BaseModel):
 
     house_number: str = Field(..., alias="houseNumber", example="123")
     street: str = Field(..., example="Main St")
-    purok: str = Field(..., example="3")
+    purok: Optional[str] = Field(None, example="3")
     barangay: str = Field(..., example="Moonwalk")
     city: str = Field(..., example="Parañaque")
     province: str = Field(..., example="Metro Manila")

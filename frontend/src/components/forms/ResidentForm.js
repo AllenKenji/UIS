@@ -243,10 +243,10 @@ const ResidentForm = ({ onResidentAdded, onCancel, user: userProp }) => {
         />
         {errors.street && <span className="error">{errors.street.message}</span>}
 
-        <label htmlFor="purok">Purok</label>
+        <label htmlFor="purok">Purok (optional)</label>
         <input
           id="purok"
-          {...register("purok", { required: "Purok is required" })}
+          {...register("purok")}
           className={errors.purok ? "input-error" : ""}
         />
         {errors.purok && <span className="error">{errors.purok.message}</span>}

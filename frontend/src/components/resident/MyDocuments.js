@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMyDocuments } from "../../hooks/useMyDocuments";
+import { API_BASE_URL } from "../../services/api";
 import "../../styles/resident/my-documents.css";
 
 const MyDocuments = ({ residentId }) => {
@@ -19,7 +20,7 @@ const MyDocuments = ({ residentId }) => {
   };
 
   const createDocumentPaymentLink = async (doc) => {
-    const res = await fetch(`/api/paymongo/create-document-link`, {
+    const res = await fetch(`${API_BASE_URL}/api/paymongo/create-document-link`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -33,7 +34,7 @@ const MyDocuments = ({ residentId }) => {
   };
 
   const attachPaymentMethod = async (paymentIntentId, paymongoClientKey, method, doc) => {
-    const res = await fetch(`/api/paymongo/attach-payment-method`, {
+    const res = await fetch(`${API_BASE_URL}/api/paymongo/attach-payment-method`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -45,7 +46,7 @@ const MyDocuments = ({ residentId }) => {
           name: doc.resident_name || "Resident",
           email: doc.resident_email || "resident@example.com",
         },
-        return_url: "http://localhost:3000/payment-success?type=document",
+        return_url: `${window.location.origin}/payment-success?type=document`,
       }),
     });
     if (!res.ok) throw new Error(`Attach method error: ${await res.text()}`);

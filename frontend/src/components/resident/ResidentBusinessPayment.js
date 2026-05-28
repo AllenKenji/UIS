@@ -1,4 +1,5 @@
 import { useUser } from "../../context/UserContext";
+import { API_BASE_URL } from "../../services/api";
 
 const ResidentBusinessPayment = ({ business }) => {
   const { userInfo: user } = useUser();
@@ -6,9 +7,10 @@ const ResidentBusinessPayment = ({ business }) => {
   const handlePayment = async (method = "gcash") => {
     try {
       const identifier = business.businessId || business.id;
+      const returnUrl = `${window.location.origin}/payment-success?type=business`;
 
       // Step 1: Request backend to create a PayMongo Payment Link or Intent
-      const res = await fetch(`/api/paymongo/create-business-link`, {
+      const res = await fetch(`${API_BASE_URL}/api/paymongo/create-business-link`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -36,7 +38,7 @@ const ResidentBusinessPayment = ({ business }) => {
 
       // ✅ Payment Intent flow
       if (data.paymentIntentId && data.paymongoClientKey) {
-        const attachRes = await fetch(`/api/paymongo/attach-payment-method`, {
+        const attachRes = await fetch(`${API_BASE_URL}/api/paymongo/attach-payment-method`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -47,7 +49,8 @@ const ResidentBusinessPayment = ({ business }) => {
               name: user?.name || "Resident",
               email: user?.email || "resident@example.com",
             },
-            type: "business"
+            type: "business",
+            return_url: returnUrl,
           }),
         });
 

@@ -5,6 +5,14 @@ import { toast } from "react-toastify";
 import { QRCodeCanvas } from "qrcode.react";
 import "./business-eval-modal.css";
 
+const resolveDocumentUrl = (documents, key) => {
+  const value = documents?.[key];
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  if (typeof value === "object") return value.url || null;
+  return null;
+};
+
 const BusinessEvaluationModal = ({ business, onClose, onUpdated, onSubmit }) => {
   const isApproved = business.status === "approved";
   const [status, setStatus] = useState(
@@ -53,30 +61,30 @@ const BusinessEvaluationModal = ({ business, onClose, onUpdated, onSubmit }) => 
 
         <div className="modal-section">
           <h4>Submitted Documents</h4>
-          {business.documents?.validId && (
+          {resolveDocumentUrl(business.documents, "validId") && (
             <p>
-              <a href={business.documents.validId} target="_blank" rel="noopener noreferrer">
+              <a href={resolveDocumentUrl(business.documents, "validId")} target="_blank" rel="noopener noreferrer">
                 📄 View Valid ID
               </a>
             </p>
           )}
-          {business.documents?.proofOfAddress && (
+          {resolveDocumentUrl(business.documents, "proofOfAddress") && (
             <p>
-              <a href={business.documents.proofOfAddress} target="_blank" rel="noopener noreferrer">
+              <a href={resolveDocumentUrl(business.documents, "proofOfAddress")} target="_blank" rel="noopener noreferrer">
                 📄 View Proof of Address
               </a>
             </p>
           )}
-          {business.documents?.dtiCert && (
+          {resolveDocumentUrl(business.documents, "dtiCert") && (
             <p>
-              <a href={business.documents.dtiCert} target="_blank" rel="noopener noreferrer">
+              <a href={resolveDocumentUrl(business.documents, "dtiCert")} target="_blank" rel="noopener noreferrer">
                 📄 View DTI Certificate
               </a>
             </p>
           )}
-          {business.documents?.businessLogo && (
+          {resolveDocumentUrl(business.documents, "businessLogo") && (
             <p>
-              <a href={business.documents.businessLogo} target="_blank" rel="noopener noreferrer">
+              <a href={resolveDocumentUrl(business.documents, "businessLogo")} target="_blank" rel="noopener noreferrer">
                 🖼️ View Business Logo
               </a>
             </p>

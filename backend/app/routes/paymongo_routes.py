@@ -16,6 +16,7 @@ from backend.app.routes.fee_routes import (
 
 logger = logging.getLogger("uvicorn.error")
 router = APIRouter(tags=["Payments"])
+FRONTEND_BASE_URL = os.environ.get("FRONTEND_BASE_URL", "https://uis.lits.com.ph").rstrip("/")
 
 # -----------------------------
 # Firestore helpers
@@ -75,8 +76,8 @@ async def create_document_payment_link(payload: DocumentPaymentRequest) -> dict:
 
         result = _create_payment(
             fee, description, payload.remarks, metadata,
-            success_url="http://localhost:3000/payment-success?type=document",
-            cancel_url="http://localhost:3000/documents/payment-cancel"
+            success_url=f"{FRONTEND_BASE_URL}/payment-success?type=document",
+            cancel_url=f"{FRONTEND_BASE_URL}/documents/payment-cancel"
         )
 
         doc = _get_document_doc(payload.documentId)
@@ -117,8 +118,8 @@ async def create_business_payment_link(payload: BusinessPaymentRequest) -> dict:
 
         result = _create_payment(
             fee, description, payload.remarks, metadata,
-            success_url="http://localhost:3000/payment-success?type=business",
-            cancel_url="http://localhost:3000/business/payment-cancel"
+            success_url=f"{FRONTEND_BASE_URL}/payment-success?type=business",
+            cancel_url=f"{FRONTEND_BASE_URL}/business/payment-cancel"
         )
 
         doc = _get_business_doc(payload.businessId)
@@ -183,10 +184,12 @@ async def attach_payment_method(payload: AttachPaymentRequest) -> dict:
         payment_method_id = pm_data["data"]["id"]
 
         # Step 2: Attach to intent
-        if payload.type == "business":
-            return_url = "http://localhost:3000/payment-success?type=business"
+        if payload.return_url:
+            return_url = payload.return_url
+        elif payload.type == "business":
+            return_url = f"{FRONTEND_BASE_URL}/payment-success?type=business"
         else:
-            return_url = "http://localhost:3000/payment-success?type=document"
+            return_url = f"{FRONTEND_BASE_URL}/payment-success?type=document"
 
         attach_payload = {
             "data": {
