@@ -71,19 +71,37 @@ def set_user_claims(uid: str, role: RoleEnum):
         )
 
 
-def delete_firebase_user(uid: str):
-    """Delete a Firebase Auth user by UID."""
+def delete_firebase_user(uid: str, email: Optional[str] = None):
+    """Delete a Firebase Auth user by UID, with email fallback for legacy/mismatched IDs."""
     try:
         auth.delete_user(uid)
-        logger.info("🗑️ Firebase Auth user deleted: %s", uid)
+        logger.info("🗑️ Firebase Auth user deleted by UID: %s", uid)
+        return
     except UserNotFoundError:
-        logger.warning("⚠️ Tried to delete non-existent Firebase Auth user: %s", uid)
+        logger.warning("⚠️ Firebase UID not found for deletion: %s", uid)
     except FirebaseError as e:
-        logger.error("❌ Firebase Auth deletion failed: %s", str(e), exc_info=True)
+        logger.error("❌ Firebase Auth deletion by UID failed: %s", str(e), exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to delete Firebase Auth user: {str(e)}",
+            detail=f"Failed to delete Firebase user by UID: {str(e)}",
         )
+
+    # Some legacy records may pass a Firestore doc id instead of Firebase UID.
+    if email:
+        try:
+            user = auth.get_user_by_email(email)
+            auth.delete_user(user.uid)
+            logger.info("🗑️ Firebase Auth user deleted by email fallback: %s (%s)", email, user.uid)
+            return
+        except UserNotFoundError:
+            logger.warning("⚠️ Firebase user not found by email fallback: %s", email)
+            return
+        except FirebaseError as e:
+            logger.error("❌ Firebase Auth deletion by email failed: %s", str(e), exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to delete Firebase user by email: {str(e)}",
+            )
 
 
 def rollback_account_creation(uid: str):
@@ -279,7 +297,12 @@ async def create_barangay_account(data: AccountCreate, created_by: str) -> Accou
 
 async def delete_barangay_account(uid: str, deleted_by: str):
     """Delete a Firebase Auth user and Firestore profile."""
-    delete_firebase_user(uid)
+    user_doc = get_db().collection("users").document(uid).get()
+    user_email = None
+    if user_doc.exists:
+        user_email = user_doc.to_dict().get("email")
+
+    delete_firebase_user(uid, user_email)
     delete_firestore_profile(uid, deleted_by)
     return {"detail": f"Account {uid} deleted successfully"}
 
