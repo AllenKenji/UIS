@@ -118,7 +118,20 @@ async def paymongo_webhook(request: Request):
         if event_type not in allowed_events:
             return JSONResponse(status_code=200, content={"success": True, "message": f"Ignored event {event_type}"})
 
+        # Some PayMongo events (notably link events) can omit status in inner attributes.
+        # Fall back to event-type-derived status to keep webhook updates reliable.
         if not status:
+            event_status_map = {
+                "link.payment.paid": "paid",
+                "payment.paid": "paid",
+                "payment.failed": "failed",
+                "payment.cancelled": "cancelled",
+                "payment.refunded": "refunded",
+            }
+            status = event_status_map.get(event_type)
+
+        if not status:
+            logger.warning("⚠️ Webhook status missing and could not be derived. event=%s payload=%s", event_type, payload)
             return JSONResponse(status_code=400, content={"success": False, "message": "Invalid payload"})
 
         workflow_map = {
