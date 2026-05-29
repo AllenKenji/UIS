@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from typing import Optional
+from firebase_admin import auth as firebase_auth
 from backend.app.models.document import Document, DocumentStatus
 import json
 from backend.app.services.resident_service import get_resident_by_id
@@ -287,10 +288,27 @@ def list_documents(
     fromDate: Optional[datetime] = None,
     toDate: Optional[datetime] = None,
 ) -> list[Document]:
-    user_doc = get_db().collection("users").document(uid).get()
-    role = user_doc.to_dict().get("role") if user_doc.exists else None
+    db = get_db()
+    role = None
 
-    query = get_db().collection("documents")
+    user_doc = db.collection("users").document(uid).get()
+    if user_doc.exists:
+        role = user_doc.to_dict().get("role")
+
+    # Fallback to Firebase custom claims for legacy/offline-synced accounts.
+    if not role:
+        try:
+            claims = firebase_auth.get_user(uid).custom_claims or {}
+            role = claims.get("role")
+        except Exception as err:
+            logger.warning("⚠️ Failed to resolve role from claims for uid=%s: %s", uid, err)
+
+    if not role and db.collection("residents").document(uid).get().exists:
+        role = "resident"
+
+    role = str(role or "resident").strip().lower()
+
+    query = db.collection("documents")
 
     # Role-based filtering
     if role in ("admin", "secretary") and residentId:
