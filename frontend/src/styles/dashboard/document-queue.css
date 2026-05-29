@@ -54,12 +54,39 @@
   font-size: var(--font-size-sm);
   font-weight: 600;
   text-transform: capitalize;
-  color: #fff;
+  color: #1f2937;
+  border: 1px solid transparent;
 }
 
-.status-badge.pending { background: var(--color-warning); }
-.status-badge.approved { background: var(--color-success); }
-.status-badge.rejected { background: var(--color-danger); }
+.status-badge.pending,
+.status-badge.for_payment,
+.status-badge.awaiting_payment,
+.status-badge.payment_submitted,
+.status-badge.for-payment,
+.status-badge.awaiting-payment,
+.status-badge.payment-submitted {
+  background: #fff1c2;
+  color: #7a5200;
+  border-color: #f7d27c;
+}
+
+.status-badge.paid {
+  background: #dbeafe;
+  color: #1d4f91;
+  border-color: #a8c6f5;
+}
+
+.status-badge.approved {
+  background: #dff7e6;
+  color: #1f6b36;
+  border-color: #a8e2b8;
+}
+
+.status-badge.rejected {
+  background: #fbe3e5;
+  color: #8a1f2b;
+  border-color: #f3b4bc;
+}
 
 /* ===============================
 ⚙️ Action Buttons

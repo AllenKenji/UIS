@@ -5,7 +5,31 @@ import { db } from "../../services/firebase";
 import { useUser } from "../../context/UserContext";
 import "../../styles/dashboard/document-queue.css";
 
-const DocumentQueue = () => {
+const normalizeStatus = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
+
+const normalizeRequest = (docId, data = {}) => {
+  const normalizedStatus = normalizeStatus(data.status);
+  return {
+    id: docId,
+    ...data,
+    status: normalizedStatus || "pending",
+    residentName:
+      data.residentName ||
+      data.resident_name ||
+      data.fullName ||
+      data.residentId ||
+      data.resident_id ||
+      "—",
+    documentType: data.documentType || data.document_type || data.type || "—",
+  };
+};
+
+const toStatusLabel = (value) =>
+  String(value || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (ch) => ch.toUpperCase());
+
+const DocumentQueue = ({ statusFilter = "pending", title = "📄 Pending Document Requests" }) => {
   const { role } = useUser();
   const [requests, setRequests] = useState([]);
   const [selectedRequest, setSelectedRequest] = useState(null);
@@ -24,11 +48,12 @@ const DocumentQueue = () => {
         }
 
         const snapshot = await getDocs(collection(db, "documents"));
-        const data = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setRequests(data);
+        const data = snapshot.docs.map((docSnap) => normalizeRequest(docSnap.id, docSnap.data()));
+        const filtered =
+          statusFilter === "all"
+            ? data
+            : data.filter((request) => normalizeStatus(request.status) === normalizeStatus(statusFilter));
+        setRequests(filtered);
       } catch (err) {
         console.error("❌ Failed to load requests:", err);
         setError("Failed to load requests.");
@@ -38,7 +63,7 @@ const DocumentQueue = () => {
     };
 
     fetchRequests();
-  }, [role]);
+  }, [role, statusFilter]);
 
   const handleReview = (req) => setSelectedRequest(req);
   const closeModal = () => setSelectedRequest(null);
@@ -47,13 +72,16 @@ const DocumentQueue = () => {
   const updateStatus = async (newStatus) => {
     if (!selectedRequest) return;
     try {
+      const normalizedStatus = normalizeStatus(newStatus);
       const ref = doc(db, "documents", selectedRequest.id);
-      await updateDoc(ref, { status: newStatus });
-      setRequests((prev) =>
-        prev.map((r) =>
-          r.id === selectedRequest.id ? { ...r, status: newStatus } : r
-        )
-      );
+      await updateDoc(ref, { status: normalizedStatus });
+      setRequests((prev) => {
+        const updated = prev.map((r) =>
+          r.id === selectedRequest.id ? { ...r, status: normalizedStatus } : r
+        );
+        if (statusFilter === "all") return updated;
+        return updated.filter((r) => normalizeStatus(r.status) === normalizeStatus(statusFilter));
+      });
       closeModal();
     } catch (err) {
       console.error("❌ Failed to update status:", err);
@@ -67,13 +95,13 @@ const DocumentQueue = () => {
       aria-busy={loading}
       aria-live="polite"
     >
-      <h3>📄 Document Requests</h3>
+      <h3>{title} ({requests.length})</h3>
       {loading ? (
         <p>Loading requests…</p>
       ) : error ? (
         <p className="error">{error}</p>
       ) : requests.length === 0 ? (
-        <p>No requests available.</p>
+        <p>No pending requests available.</p>
       ) : (
         <table className="queue-table" aria-label="Document Requests Table">
           <thead>
@@ -90,8 +118,8 @@ const DocumentQueue = () => {
                 <td>{req.residentName}</td>
                 <td>{req.documentType}</td>
                 <td>
-                  <span className={`status-badge ${req.status?.toLowerCase()}`}>
-                    {req.status}
+                  <span className={`status-badge ${normalizeStatus(req.status).replace(/_/g, "-")} ${normalizeStatus(req.status)}`}>
+                    {toStatusLabel(req.status)}
                   </span>
                 </td>
                 <td>
@@ -118,20 +146,20 @@ const DocumentQueue = () => {
                 <button className="close-btn" onClick={closeModal}>✖</button>
               </header>
               <div className="modal-body">
-                <p><strong>Resident:</strong> {selectedRequest.name}</p>
-                <p><strong>Type:</strong> {selectedRequest.type}</p>
-                <p><strong>Status:</strong> {selectedRequest.status}</p>
+                <p><strong>Resident:</strong> {selectedRequest.residentName}</p>
+                <p><strong>Type:</strong> {selectedRequest.documentType}</p>
+                <p><strong>Status:</strong> {toStatusLabel(selectedRequest.status)}</p>
               </div>
               <footer className="modal-footer">
                 <button
                   className="approve-btn"
-                  onClick={() => updateStatus("Approved")}
+                  onClick={() => updateStatus("approved")}
                 >
                   ✅ Approve
                 </button>
                 <button
                   className="reject-btn"
-                  onClick={() => updateStatus("Rejected")}
+                  onClick={() => updateStatus("rejected")}
                 >
                   ❌ Reject
                 </button>
