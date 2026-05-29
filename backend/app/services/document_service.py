@@ -263,6 +263,16 @@ def _serialize(snapshot) -> Document:
 
     return Document(id=snapshot.id, **data)
 
+
+def _serialize_many(snapshots) -> list[Document]:
+    docs: list[Document] = []
+    for snapshot in snapshots:
+        try:
+            docs.append(_serialize(snapshot))
+        except Exception as err:
+            logger.warning("⚠️ Skipping malformed document id=%s: %s", getattr(snapshot, "id", "unknown"), err)
+    return docs
+
 def get_and_serialize(doc_id: str) -> Document:
     snapshot = get_db().collection("documents").document(doc_id).get()
     if not snapshot.exists:
@@ -326,23 +336,30 @@ def list_documents(
     if toDate:
         query = query.where("issuedAt", "<=", toDate)
 
-    return [_serialize(s) for s in query.stream()]
+    return _serialize_many(query.stream())
 
 def list_my_documents(resident_id: str) -> list[Document]:
-    return [_serialize(s) for s in get_db().collection("documents")
-            .where("residentId", "==", resident_id).stream()]
+    return _serialize_many(
+        get_db().collection("documents").where("residentId", "==", resident_id).stream()
+    )
 
 def list_active_documents(resident_id: str) -> list[Document]:
     active_statuses = {DocumentStatus.pending, DocumentStatus.for_payment, DocumentStatus.paid}
-    return [doc for s in get_db().collection("documents")
-            .where("residentId", "==", resident_id).stream()
-            if (doc := _serialize(s)).status in active_statuses]
+    return [
+        doc for doc in _serialize_many(
+            get_db().collection("documents").where("residentId", "==", resident_id).stream()
+        )
+        if doc.status in active_statuses
+    ]
 
 def list_history_documents(resident_id: str) -> list[Document]:
-    return [doc for s in get_db().collection("documents")
-            .where("residentId", "==", resident_id).stream()
-            if (doc := _serialize(s)).status == DocumentStatus.approved
-            or (doc.status == DocumentStatus.rejected and doc.resubmitted)]
+    return [
+        doc for doc in _serialize_many(
+            get_db().collection("documents").where("residentId", "==", resident_id).stream()
+        )
+        if doc.status == DocumentStatus.approved
+        or (doc.status == DocumentStatus.rejected and doc.resubmitted)
+    ]
 
 def get_document(doc_id: str) -> Document:
     return get_and_serialize(doc_id)
