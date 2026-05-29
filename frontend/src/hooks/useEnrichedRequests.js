@@ -4,10 +4,18 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { getDoc, doc } from "firebase/firestore";
 import { db } from "../services/firebase";
 
+const normalizeStatus = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
+
 const normalizeDoc = (doc) => ({
   ...doc,
+  status: normalizeStatus(doc.status),
+  documentId: doc.documentId || doc.document_id || doc.id,
   document_id: doc.documentId || doc.document_id || doc.id,
+  residentId: doc.residentId || doc.resident_id,
   resident_id: doc.residentId || doc.resident_id,
+  residentName: doc.residentName || doc.resident_name || doc.fullName || doc.name || null,
+  resident_name: doc.residentName || doc.resident_name || doc.fullName || doc.name || null,
+  documentType: doc.documentType || doc.document_type,
   document_type: doc.documentType || doc.document_type,
   created_at: doc.createdAt || doc.created_at,
   updated_at: doc.updatedAt || doc.updated_at,
@@ -48,17 +56,18 @@ export const useEnrichedRequests = () => {
       const enrich = async (docs) =>
         Promise.all(
           docs.map(async (doc) => {
-            const name = await getResidentName(doc.resident_id);
-            return { ...doc, resident_name: name };
+            const existingName = doc.residentName || doc.resident_name;
+            const name = existingName || await getResidentName(doc.resident_id || doc.residentId);
+            return { ...doc, resident_name: name, residentName: name };
           })
         );
 
-      setPending(await enrich(normalized.filter((doc) => doc.status === "pending")));
-      setToVerify(await enrich(normalized.filter((doc) => doc.status === "payment_submitted")));
+      setPending(await enrich(normalized.filter((doc) => normalizeStatus(doc.status) === "pending")));
+      setToVerify(await enrich(normalized.filter((doc) => normalizeStatus(doc.status) === "payment_submitted")));
       setReadyToIssue(await enrich(
-        normalized.filter((doc) => doc.status === "paid")
+        normalized.filter((doc) => normalizeStatus(doc.status) === "paid")
       ));
-      setApproved(await enrich(normalized.filter((doc) => doc.status === "approved")));
+      setApproved(await enrich(normalized.filter((doc) => normalizeStatus(doc.status) === "approved")));
     } catch (err) {
       console.error("❌ Error fetching requests:", err.message);
       setError(err.message);
