@@ -3,7 +3,9 @@ import { api, endpoints } from "../../services/api";
 import { useUser } from "../../context/UserContext";
 import "../../styles/dashboard/incident-queue.css";
 
-const IncidentQueue = () => {
+const normalizeStatus = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
+
+const IncidentQueue = ({ statusFilter = "pending", title = "🚨 Incident Queue" }) => {
   const { can } = useUser();
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -19,9 +21,15 @@ const IncidentQueue = () => {
 
       try {
         const { data } = await api.get(endpoints.incidents, {
-          params: { status: "pending" },
+          params: statusFilter && statusFilter !== "all" ? { status: statusFilter } : {},
         });
-        setIncidents(data || []);
+        const filtered = Array.isArray(data)
+          ? data.filter((incident) => {
+              if (statusFilter === "all") return true;
+              return normalizeStatus(incident.status) === normalizeStatus(statusFilter);
+            })
+          : [];
+        setIncidents(filtered);
         setError(null);
       } catch (err) {
         console.error("❌ Failed to load incidents:", err);
@@ -33,7 +41,7 @@ const IncidentQueue = () => {
     };
 
     fetchIncidents();
-  }, [can]);
+  }, [can, statusFilter]);
 
   const renderContent = () => {
     if (loading) return <p>Loading incidents…</p>;
@@ -92,7 +100,7 @@ const IncidentQueue = () => {
 
   return (
     <div className="incident-queue" aria-busy={loading} aria-live="polite">
-      <h3>🚨 Incident Queue ({incidents.length} pending)</h3>
+      <h3>{title} ({incidents.length})</h3>
       {renderContent()}
     </div>
   );

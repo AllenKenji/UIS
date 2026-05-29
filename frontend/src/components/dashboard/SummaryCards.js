@@ -82,7 +82,7 @@ const getSpecialDashboardCount = async (key) => {
   return null;
 };
 
-const SummaryCards = () => {
+const SummaryCards = ({ onCardClick } = {}) => {
   const { role } = useUser();
   const navigate = useNavigate();
   const [stats, setStats] = useState([]);
@@ -242,7 +242,13 @@ const SummaryCards = () => {
             value={value}
             variant={variant}
             icon={icon}
-            onClick={routeByKey[key] ? () => navigate(routeByKey[key]) : undefined}
+            onClick={
+              onCardClick
+                ? () => onCardClick(key)
+                : routeByKey[key]
+                  ? () => navigate(routeByKey[key])
+                  : undefined
+            }
           />
         ))
       )}

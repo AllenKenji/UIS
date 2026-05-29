@@ -1,11 +1,11 @@
+import { useState } from "react";
 import SummaryCards from "../components/dashboard/SummaryCards";
 import RegistryOverview from "../components/dashboard/RegistryOverview";
 import RoleManager from "../components/admin/RoleManager";
 import AnalyticsPanel from "../components/admin/AnalyticsPanel";
 import DocumentQueue from "../components/dashboard/DocumentQueue";
-import ComplaintList from "../components/dashboard/ComplaintList";
-import IncidentQueue from "../components/dashboard/IncidentQueue";
 import RegistryAudit from "../components/dashboard/RegistryAudit";
+import DashboardFocusPanel from "../components/dashboard/DashboardFocusPanel";
 import { useUser } from "../context/UserContext";
 import { Navigate } from "react-router-dom";
 import DashboardSection from "../components/layout/DashboardSection";
@@ -14,6 +14,7 @@ import "./adminDashboard.css";
 
 const AdminDashboard = () => {
   const { isAdmin, role } = useUser();
+  const [activeView, setActiveView] = useState("overview");
   
 
   if (!isAdmin) {
@@ -37,7 +38,7 @@ const AdminDashboard = () => {
           layout="stack"
           ariaLabel="Registry Management"
         >
-          <SummaryCards role={role} /> 
+          <SummaryCards role={role} onCardClick={setActiveView} />
           <RegistryOverview />
           <RegistryAudit />
         </DashboardSection>
@@ -55,15 +56,14 @@ const AdminDashboard = () => {
         </DashboardSection>
 
         <DashboardSection
-          title="Document, Complaints & Incident Queue"
+          title="Dashboard Drill-down"
           icon="📋"
           accent="danger"
-          layout="flex-wrap"
-          ariaLabel="Document, Complaints & Incidents"
+          layout="stack"
+          ariaLabel="Dashboard Drill-down"
         >
           <DocumentQueue />
-          <ComplaintList />
-          <IncidentQueue />
+          <DashboardFocusPanel view={activeView} />
         </DashboardSection>
       </div>
     </section>

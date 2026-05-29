@@ -4,7 +4,9 @@ import { useUser } from "../../context/UserContext";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import "../../styles/dashboard/complaint-list.css";
 
-const ComplaintList = () => {
+const normalizeStatus = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
+
+const ComplaintList = ({ statusFilter = "all", excludeStatus = null, title = "📢 Complaints" }) => {
   const { role, can } = useUser();
 
   const [complaints, setComplaints] = useState([]);
@@ -39,7 +41,17 @@ const ComplaintList = () => {
           ? await ComplaintsAPI.listAll()
           : await ComplaintsAPI.listMine();
 
-        setComplaints(data);
+        const filtered = Array.isArray(data)
+          ? data.filter((item) => {
+              if (excludeStatus && normalizeStatus(item.status) === normalizeStatus(excludeStatus)) {
+                return false;
+              }
+              if (statusFilter === "all") return true;
+              return normalizeStatus(item.status) === normalizeStatus(statusFilter);
+            })
+          : [];
+
+        setComplaints(filtered);
         setError(null);
       } catch (err) {
         console.error("❌ Failed to load complaints:", err);
@@ -51,7 +63,7 @@ const ComplaintList = () => {
     });
 
     return () => unsubscribe();
-  }, [canView, canViewAll, canViewOwn, role]);
+  }, [canView, canViewAll, canViewOwn, excludeStatus, role, statusFilter]);
 
   const renderContent = () => {
     if (!canView) return <p>❌ You do not have access to view complaints.</p>;
@@ -91,7 +103,7 @@ const ComplaintList = () => {
 
   return (
     <div className="complaint-list">
-      <h3>📢 Complaints</h3>
+      <h3>{title}</h3>
       {renderContent()}
     </div>
   );
