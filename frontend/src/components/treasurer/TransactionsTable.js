@@ -1,38 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
+import { useMemo, useState } from "react";
 import { usePayments } from "../../hooks/usePayments";
-import { db } from "../../services/firebase";
 import "../../styles/treasurer/transactions-table.css";
 
 function TransactionsTable() {
   const { transactions = [] } = usePayments();
   const [entityTab, setEntityTab] = useState("business");
   const [statusTab, setStatusTab] = useState("pending");
-  const [lastReceiptCounter, setLastReceiptCounter] = useState(0);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const loadReceiptCounter = async () => {
-      try {
-        const snap = await getDoc(doc(db, "counters", "receipts"));
-        const value = snap.exists() ? Number(snap.data()?.value || 0) : 0;
-        if (mounted) {
-          setLastReceiptCounter(Number.isFinite(value) ? value : 0);
-        }
-      } catch (err) {
-        console.error("❌ Failed to load receipt counter:", err?.message || err);
-        if (mounted) {
-          setLastReceiptCounter(0);
-        }
-      }
-    };
-
-    loadReceiptCounter();
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   const normalizeStatus = (value) => String(value || "").trim().toLowerCase();
 
@@ -87,8 +60,7 @@ function TransactionsTable() {
         : `RCPT-${receipt.toUpperCase()}`;
     }
 
-    const fallback = fallbackReceiptMap.get(tx.customPaymentId || tx.id);
-    return fallback || "—";
+    return "—";
   };
 
   const filteredTransactions = useMemo(() => {
@@ -100,26 +72,6 @@ function TransactionsTable() {
       return isPendingStatus(tx);
     });
   }, [transactions, entityTab, statusTab]);
-
-  const fallbackReceiptMap = useMemo(() => {
-    const paidMissing = transactions
-      .filter((tx) => isPaidStatus(tx) && !String(tx.receiptNumber || "").trim())
-      .sort((a, b) => {
-        const aTime = new Date(a.datePaid || a.createdAt || 0).getTime() || 0;
-        const bTime = new Date(b.datePaid || b.createdAt || 0).getTime() || 0;
-        if (aTime !== bTime) return aTime - bTime;
-        return String(a.id || "").localeCompare(String(b.id || ""));
-      });
-
-    const map = new Map();
-    paidMissing.forEach((tx, index) => {
-      const nextValue = lastReceiptCounter + index + 1;
-      const rcpt = `RCPT-${String(nextValue).padStart(5, "0")}`;
-      map.set(tx.customPaymentId || tx.id, rcpt);
-    });
-
-    return map;
-  }, [transactions, lastReceiptCounter]);
 
   const formatDate = (dateValue) => {
     if (!dateValue) return "—";

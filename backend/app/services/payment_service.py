@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 from google.cloud import firestore
 from backend.app.utils.firestore_utils import get_db
 
@@ -10,28 +11,22 @@ def _get_business_doc(business_id: str):
     return docs[0] if docs else None
 
 def _next_receipt_number():
-    counter_ref = get_db().collection("counters").document("receipts")
+    current_year = datetime.now(timezone.utc).year
+    counter_ref = get_db().collection("counters").document(f"receipts_{current_year}")
     transaction = get_db().transaction()
 
     @firestore.transactional
     def increment_counter(transaction):
         snapshot = counter_ref.get(transaction=transaction)
 
-        # Check if receipts collection is empty
-        receipts_exist = get_db().collection("receipts").limit(1).get()
-        if not receipts_exist:
-            # Reset counter if no receipts exist
-            transaction.set(counter_ref, {"value": 0})
-            current = 0
-        else:
-            current = snapshot.get("value") if snapshot.exists else 0
+        current = snapshot.get("value") if snapshot.exists else 0
 
         new_value = current + 1
         transaction.set(counter_ref, {"value": new_value})
         return new_value
 
     new_number = increment_counter(transaction)
-    return f"RCPT-{new_number:05d}"
+    return f"RCPT-{current_year}-{new_number:05d}"
 
 
 
