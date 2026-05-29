@@ -6,7 +6,7 @@ import "../../styles/secretary/pending-requests.css";
 
 // 🔹 Main Component
 const PendingRequests = () => {
-  const { pending, loading, fetchRequests } = useEnrichedRequests();
+  const { pending, loading, error, fetchRequests } = useEnrichedRequests();
   const [selectedDoc, setSelectedDoc] = useState(null);
 
   const updateStatus = async (firestoreId, newStatus, remarks = null) => {
@@ -24,8 +24,9 @@ const PendingRequests = () => {
     <div className="pending-requests">
       <h3>📋 Requests to Verify</h3>
       {loading && <p className="status-message">Loading requests…</p>}
+      {error && !loading && <p className="status-message">❌ {error}</p>}
 
-      {pending.length === 0 && !loading ? (
+      {pending.length === 0 && !loading && !error ? (
         <p className="status-message">No requests awaiting verification.</p>
       ) : (
         <ul className="request-list">

@@ -50,8 +50,12 @@ export const useEnrichedRequests = () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await DocumentsAPI.list();  
-      const normalized = data.map(normalizeDoc);
+      const data = await DocumentsAPI.list();
+      const list = Array.isArray(data) ? data : data?.items || data?.results || [];
+      if (!Array.isArray(list)) {
+        throw new Error("Unexpected documents response format.");
+      }
+      const normalized = list.map(normalizeDoc);
 
       const enrich = async (docs) =>
         Promise.all(
@@ -78,8 +82,17 @@ export const useEnrichedRequests = () => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(getAuth(), async (user) => {
-      if (user) {
+      if (!user) {
+        setAuthReady(false);
+        return;
+      }
+
+      try {
         await user.getIdToken(true);
+      } catch (err) {
+        console.warn("⚠️ Failed to refresh auth token for document requests:", err?.message || err);
+      } finally {
+        // Continue loading requests even if token refresh fails; axios interceptor can still attach cached token.
         setAuthReady(true);
       }
     });
