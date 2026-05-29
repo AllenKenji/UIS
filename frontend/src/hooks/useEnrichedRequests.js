@@ -6,6 +6,20 @@ import { db } from "../services/firebase";
 
 const normalizeStatus = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
 
+const toReadableError = (err, fallback = "Failed to load document requests.") => {
+  const message = String(err?.message || "").trim();
+  const lowered = message.toLowerCase();
+  const isGeneric = !message || lowered === "unknown error" || lowered === "unexpected error format";
+
+  if (!isGeneric) {
+    return message;
+  }
+
+  const status = err?.status ? ` (HTTP ${err.status})` : "";
+  const context = err?.context ? ` [${err.context}]` : "";
+  return `${fallback}${status}${context}`;
+};
+
 const normalizeDoc = (doc) => ({
   ...doc,
   status: normalizeStatus(doc.status),
@@ -73,8 +87,8 @@ export const useEnrichedRequests = () => {
       ));
       setApproved(await enrich(normalized.filter((doc) => normalizeStatus(doc.status) === "approved")));
     } catch (err) {
-      console.error("❌ Error fetching requests:", err.message);
-      setError(err.message);
+      console.error("❌ Error fetching requests:", err);
+      setError(toReadableError(err, "Failed to load secretary document requests."));
     } finally {
       setLoading(false);
     }

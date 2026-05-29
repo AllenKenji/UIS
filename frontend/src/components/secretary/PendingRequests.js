@@ -4,6 +4,20 @@ import { useEnrichedRequests } from "../../hooks/useEnrichedRequests";
 import RequestModal from "./RequestModal";
 import "../../styles/secretary/pending-requests.css";
 
+const toReadableError = (err, fallback = "Failed to update status.") => {
+  const message = String(err?.message || "").trim();
+  const lowered = message.toLowerCase();
+  const isGeneric = !message || lowered === "unknown error" || lowered === "unexpected error format";
+
+  if (!isGeneric) {
+    return message;
+  }
+
+  const status = err?.status ? ` (HTTP ${err.status})` : "";
+  const context = err?.context ? ` [${err.context}]` : "";
+  return `${fallback}${status}${context}`;
+};
+
 // 🔹 Main Component
 const PendingRequests = () => {
   const { pending, loading, error, fetchRequests } = useEnrichedRequests();
@@ -15,8 +29,8 @@ const PendingRequests = () => {
       setSelectedDoc(null);
       fetchRequests();
     } catch (err) {
-      console.error("❌ Error updating document:", err.message);
-      alert("Failed to update status. Please try again.");
+      console.error("❌ Error updating document:", err);
+      alert(toReadableError(err, "Failed to update document status."));
     }
   };
 
