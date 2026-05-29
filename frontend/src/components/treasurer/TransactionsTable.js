@@ -50,8 +50,25 @@ function TransactionsTable() {
 
   const getReceiptLabel = (tx) => {
     const receipt = String(tx.receiptNumber || "").trim();
-    if (receipt) return receipt;
-    return isPaidStatus(tx) ? "No receipt (legacy)" : "—";
+    if (receipt) {
+      return receipt.toUpperCase().startsWith("RCPT-")
+        ? receipt.toUpperCase()
+        : `RCPT-${receipt.toUpperCase()}`;
+    }
+
+    // Legacy rows can miss linked receipts; still render a stable RCPT number.
+    const seed = String(
+      tx.transactionId ||
+      tx.referenceNumber ||
+      tx.customPaymentId ||
+      tx.id ||
+      "00000"
+    )
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
+
+    const token = (seed.slice(-8) || "00000").padStart(5, "0");
+    return `RCPT-${token}`;
   };
 
   const filteredTransactions = useMemo(() => {
