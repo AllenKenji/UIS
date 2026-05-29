@@ -1,6 +1,28 @@
 import { useState } from "react";
 import documentConfig from "../../config/documentConfig";
 
+const getAttachmentMeta = (file) => {
+  if (!file) return { url: null, filename: null };
+
+  if (typeof file === "string") {
+    const raw = String(file || "").trim();
+    if (!raw) return { url: null, filename: null };
+    const nameFromUrl = raw.split("?")[0].split("#")[0].split("/").pop() || null;
+    return { url: raw, filename: nameFromUrl };
+  }
+
+  const url = file.url || file.path || null;
+  const explicitName = file.filename || file.fileName || file.name || null;
+  const nameFromUrl = url
+    ? (String(url).split("?")[0].split("#")[0].split("/").pop() || null)
+    : null;
+
+  return {
+    url,
+    filename: explicitName || nameFromUrl,
+  };
+};
+
 const RequestModal = ({ doc, onClose, onUpdateStatus }) => {
   const [rejectionReason, setRejectionReason] = useState("");
 
@@ -84,31 +106,31 @@ const RequestModal = ({ doc, onClose, onUpdateStatus }) => {
             <h5>Attachments</h5>
             <ul>
             {config.attachments.map((att) => {
-                const file = doc.attachments[att.name];
-                if (!file) return null;
+            const file = doc.attachments[att.name];
+            const { url, filename } = getAttachmentMeta(file);
+            if (!url) return null;
 
                 return (
                 <li key={att.name}>
                     <strong>{att.label}:</strong>{" "}
-                    {file.url.match(/\.(jpg|jpeg|png|gif)$/i) ? (
+              {url.match(/\.(jpg|jpeg|png|gif)$/i) ? (
                     <div>
                         <img
-                        src={file.url}
+                src={url}
                         alt={att.label}
                         style={{ maxWidth: "200px", display: "block", marginTop: "5px" }}
                         />
-                        <small style={{ wordBreak: "break-all" }}>
-                        URL: <a href={file.url} target="_blank" rel="noopener noreferrer">{file.url}</a>
-                        </small>
+                <a href={url} target="_blank" rel="noopener noreferrer">
+                View File
+                </a>
+                {filename && <small> ({filename})</small>}
                     </div>
                     ) : (
                     <div>
-                        <a href={file.url} target="_blank" rel="noopener noreferrer">
+                <a href={url} target="_blank" rel="noopener noreferrer">
                         View File
                         </a>
-                        <small style={{ wordBreak: "break-all" }}>
-                        URL: {file.url}
-                        </small>
+                {filename && <small> ({filename})</small>}
                     </div>
                     )}
                 </li>
