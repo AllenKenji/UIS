@@ -394,9 +394,21 @@ async def record_business_payment(payload: dict):
 @router.post("/payments/document")
 async def record_document_payment(payload: dict):
     try:
-        document_id = payload["documentId"]
-        amount = payload["amount"]
+        document_id = payload.get("documentId")
+        amount = payload.get("amount")
         method = payload.get("method")
+
+        if not document_id:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Missing documentId"},
+            )
+
+        if amount is None:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Missing amount"},
+            )
 
         # fetch document doc
         doc_ref = get_db().collection("documents").document(document_id)
@@ -428,7 +440,7 @@ async def record_document_payment(payload: dict):
             status="paid",
             fee_type="document_fee",
             document_id=document_id,
-            owner_name=doc_data.get("ownerName"),
+            owner_name=doc_data.get("ownerName") or doc_data.get("residentName"),
             business_name=doc_data.get("businessName"),
             document_type=doc_data.get("documentType"),
             event_type="staff.payment",
@@ -443,7 +455,7 @@ async def record_document_payment(payload: dict):
             "transactionId": transaction_id,
             "documentId": document_id,
             "documentType": doc_data.get("documentType"),
-            "ownerName": doc_data.get("ownerName"),
+            "ownerName": doc_data.get("ownerName") or doc_data.get("residentName"),
             "businessName": doc_data.get("businessName"),
             "method": method
         }

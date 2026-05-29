@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import { auth, db } from "../../services/firebase";
+import { api } from "../../services/api";
 import { doc, getDoc } from "firebase/firestore";
 import ReceiptPreview from "../staff/ReceiptPreview";
 import "../../styles/staff/payment_form.css";
@@ -55,6 +56,17 @@ const PaymentForm = ({
           ? "/api/paymongo/payments/business"
           : "/api/paymongo/payments/document";
 
+      const processedBy =
+        currentStaff.full_name ||
+        currentStaff.fullName ||
+        currentStaff.name ||
+        "Staff";
+      const residentName =
+        resident.fullName ||
+        resident.full_name ||
+        resident.name ||
+        "Resident";
+
       const payload =
         entityType === "business"
           ? {
@@ -62,7 +74,7 @@ const PaymentForm = ({
               businessName: data.businessName || businessName,
               amount: fee,
               method: data.method,
-              processedBy: currentStaff.full_name || currentStaff.fullName,
+              processedBy,
             }
           : {
               documentId: entityId,
@@ -70,23 +82,11 @@ const PaymentForm = ({
               docType: entityCategory,
               amount: fee,
               method: data.method,
-              processedBy: currentStaff.full_name || currentStaff.fullName,
-              residentName: resident.fullName,
+              processedBy,
+              residentName,
             };
 
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      let result;
-      try {
-        result = await response.json();
-      } catch {
-        const text = await response.text();
-        throw new Error(text);
-      }
+      const { data: result } = await api.post(url, payload);
 
       console.log("Backend result:", result);
 
@@ -95,10 +95,10 @@ const PaymentForm = ({
 
         const receiptBase = {
           receiptNumber: result.receiptNumber,
-          residentName: resident.fullName,
+          residentName,
           amount: fee,
           method: data.method,
-          processedBy: currentStaff.full_name || currentStaff.fullName,
+          processedBy,
           issuedAt: new Date().toISOString(),
           entityType,
         };
@@ -131,7 +131,7 @@ const PaymentForm = ({
       }
     } catch (error) {
       console.error("❌ Error recording payment:", error);
-      toast.error("❌ Failed to record payment.");
+      toast.error(`❌ Failed to record payment: ${error?.response?.data?.message || error?.message || "Unknown error"}`);
     } finally {
       setIsSubmitting(false);
     }
