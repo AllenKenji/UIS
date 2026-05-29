@@ -91,7 +91,13 @@ const ComplaintList = ({ statusFilter = "all", excludeStatus = null, title = "�
               <td>{c.category}</td>
               <td>{c.description}</td>
               <td>{c.location}</td>
-              <td>{c.status}</td>
+              <td>
+                <span
+                  className={`status-badge ${normalizeStatus(c.status).replace(/_/g, "-")} ${normalizeStatus(c.status)}`}
+                >
+                  {c.status || "—"}
+                </span>
+              </td>
               <td>{c.timestamp ? new Date(c.timestamp).toLocaleString() : "—"}</td>
               <td>{c.resolution_notes || "—"}</td>
             </tr>

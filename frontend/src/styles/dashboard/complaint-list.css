@@ -50,32 +50,46 @@
   font-size: var(--font-size-sm);
   font-weight: 600;
   text-transform: capitalize;
-  color: #fff;
+  color: #1f2937;
+  border: 1px solid transparent;
 }
 
 /* Open = amber */
+.status-badge.pending,
 .status-badge.open {
-  background: var(--color-warning);
+  background: #fff1c2;
+  color: #7a5200;
+  border-color: #f7d27c;
 }
 
 /* In Review = blue */
-.status-badge.inreview {
-  background: var(--color-review); 
+.status-badge.inreview,
+.status-badge.in_review,
+.status-badge.in-review {
+  background: #dbeafe;
+  color: #1d4f91;
+  border-color: #a8c6f5;
 }
 
 /* Resolved = green */
 .status-badge.resolved {
-  background: var(--color-success);
+  background: #dff7e6;
+  color: #1f6b36;
+  border-color: #a8e2b8;
 }
 
 /* Rejected = red */
 .status-badge.rejected {
-  background: var(--color-danger);
+  background: #fbe3e5;
+  color: #8a1f2b;
+  border-color: #f3b4bc;
 }
 
 /* Escalated = purple/accent */
 .status-badge.escalated {
-  background: var(--color-accent);
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fecaca;
 }
 
 @media (max-width: 768px) {

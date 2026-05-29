@@ -50,27 +50,45 @@
   font-size: var(--font-size-sm);
   font-weight: 600;
   text-transform: capitalize;
-  color: #fff;
+  color: #1f2937;
+  border: 1px solid transparent;
 }
 
 /* Pending = amber */
 .status-badge.pending {
-  background: var(--color-warning);
+  background: #fff1c2;
+  color: #7a5200;
+  border-color: #f7d27c;
 }
 
 /* Escalated = red, stands out */
 .status-badge.escalated {
-  background: var(--color-danger);
+  background: #fbe3e5;
+  color: #8a1f2b;
+  border-color: #f3b4bc;
 }
 
 /* Resolved = green */
 .status-badge.resolved {
-  background: var(--color-success);
+  background: #dff7e6;
+  color: #1f6b36;
+  border-color: #a8e2b8;
 }
 
 /* Dismissed = gray */
 .status-badge.dismissed {
-  background: var(--color-muted);
+  background: #eceff3;
+  color: #3f4a57;
+  border-color: #d6dde6;
+}
+
+/* In Review aliases */
+.status-badge.in-review,
+.status-badge.in_review,
+.status-badge.inreview {
+  background: #dbeafe;
+  color: #1d4f91;
+  border-color: #a8c6f5;
 }
 
 @media (max-width: 768px) {

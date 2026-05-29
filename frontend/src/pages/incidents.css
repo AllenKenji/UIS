@@ -71,9 +71,14 @@ button {
   font-weight: 600;
   text-transform: capitalize;
   white-space: nowrap;
+  border: 1px solid transparent;
 }
 
-.status-open       { background: #fff3cd; color: #856404; }
-.status-in-progress { background: #cce5ff; color: #004085; }
-.status-resolved   { background: #d4edda; color: #155724; }
-.status-closed     { background: #e2e3e5; color: #383d41; }
+.status-open       { background: #fff3cd; color: #856404; border-color: #f7d27c; }
+.status-pending    { background: #fff3cd; color: #856404; border-color: #f7d27c; }
+.status-in-progress { background: #dbeafe; color: #1d4f91; border-color: #a8c6f5; }
+.status-in-review  { background: #dbeafe; color: #1d4f91; border-color: #a8c6f5; }
+.status-resolved   { background: #dff7e6; color: #1f6b36; border-color: #a8e2b8; }
+.status-closed     { background: #eceff3; color: #3f4a57; border-color: #d6dde6; }
+.status-escalated  { background: #fbe3e5; color: #8a1f2b; border-color: #f3b4bc; }
+.status-dismissed  { background: #eceff3; color: #3f4a57; border-color: #d6dde6; }
