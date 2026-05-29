@@ -1,6 +1,4 @@
-import { useEffect, useState } from "react";
 import DashboardCard from "../dashboard/DashboardCard";
-import { DashboardAPI } from "../../services/api";   
 import "../../styles/dashboard/summary-card.css";
 
 const DOCUMENT_CATEGORIES = [
@@ -15,60 +13,38 @@ const DOCUMENT_CATEGORIES = [
   { type: "Barangay ID", label: "Barangay ID", icon: "🪪", variant: "info" },
 ];
 
-const DocumentSummaryCards = () => {
-  const [stats, setStats] = useState([]);
-  const [loading, setLoading] = useState(true);
+const DocumentSummaryCards = ({ documents = [], activeType = "all", onTypeClick }) => {
+  const stats = DOCUMENT_CATEGORIES.map((cat) => ({
+    ...cat,
+    value: documents.filter((doc) => (doc.documentType || doc.document_type) === cat.type).length,
+  }));
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchStats = async () => {
-      try {
-        const results = await Promise.all(
-          DOCUMENT_CATEGORIES.map(async (cat) => {
-            try {
-              const data = await DashboardAPI.issuedCount(cat.type);
-              return { ...cat, value: data.issuedCount || 0 };
-            } catch (err) {
-              console.warn(`⚠️ Error fetching issued count for ${cat.type}:`, err.message);
-              return { ...cat, value: 0 };
-            }
-          })
-        );
-        if (!cancelled) {
-          setStats(results);
-          setLoading(false);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setStats([]);
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchStats();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const allCount = documents.length;
 
   return (
-    <section className="summary-cards" aria-busy={loading} aria-live="polite">
-      <h2>📊 Documents Issued per Category</h2>
-      {loading ? (
-        <p>Loading document stats...</p>
-      ) : (
-        stats.map(({ label, value, variant, icon }, index) => (
-          <DashboardCard
-            key={index}
-            label={label}
-            value={value}
-            variant={variant}
-            icon={icon}
-          />
-        ))
-      )}
+    <section className="summary-cards" aria-live="polite">
+      <h2>📊 Documents by Category</h2>
+
+      <DashboardCard
+        label="All Documents"
+        value={allCount}
+        variant={activeType === "all" ? "accent" : "neutral"}
+        icon="📁"
+        selected={activeType === "all"}
+        onClick={() => onTypeClick?.("all")}
+      />
+
+      {stats.map(({ type, label, value, variant, icon }) => (
+        <DashboardCard
+          key={type}
+          label={label}
+          value={value}
+          variant={activeType === type ? "accent" : variant}
+          icon={icon}
+          selected={activeType === type}
+          onClick={() => onTypeClick?.(type)}
+        />
+      ))}
     </section>
   );
 };

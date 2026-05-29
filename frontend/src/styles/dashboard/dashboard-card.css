@@ -29,6 +29,18 @@
   outline-offset: 3px;
 }
 
+.dashboard-card.is-selected {
+  border: 2px solid var(--color-accent);
+  border-left-width: 8px;
+  background: linear-gradient(135deg, rgba(56, 161, 105, 0.16), rgba(66, 153, 225, 0.14));
+  box-shadow: 0 0 0 3px rgba(56, 161, 105, 0.18), var(--shadow-card-hover);
+}
+
+.dashboard-card.is-selected h4,
+.dashboard-card.is-selected p {
+  color: var(--color-text-strong);
+}
+
 .dashboard-card h4 {
   font-size: var(--font-size-md);
   font-weight: 600;

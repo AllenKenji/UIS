@@ -7,6 +7,7 @@ const DashboardCard = ({
   variant = "accent",
   icon = null,
   onClick,
+  selected = false,
 }) => {
   const cardId = `card-${label.replace(/\s+/g, "-").toLowerCase()}`;
   const CardTag = onClick ? "button" : "div";
@@ -14,8 +15,9 @@ const DashboardCard = ({
   return (
     <CardTag
       type={onClick ? "button" : undefined}
-      className={`dashboard-card ${variant}${onClick ? " is-clickable" : ""}`}
+      className={`dashboard-card ${variant}${onClick ? " is-clickable" : ""}${selected ? " is-selected" : ""}`}
       aria-labelledby={cardId}
+      aria-pressed={onClick ? selected : undefined}
       role={onClick ? undefined : "region"}
       onClick={onClick}
     >
@@ -43,6 +45,7 @@ DashboardCard.propTypes = {
   ]),
   icon: PropTypes.node,
   onClick: PropTypes.func,
+  selected: PropTypes.bool,
 };
 
 export default DashboardCard;

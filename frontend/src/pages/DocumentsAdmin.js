@@ -15,10 +15,32 @@ const DocumentsAdmin = () => {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [activeTab, setActiveTab] = useState("pending");
+  const [activeType, setActiveType] = useState("all");
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [issueRemarks, setIssueRemarks] = useState("");
   const navigate = useNavigate();
+
+  const normalizeStatus = (value) =>
+    String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
+
+  const pendingStatuses = new Set(["pending", "for_payment", "payment_submitted", "paid"]);
+
+  const tabFilteredDocuments = documents.filter((doc) => {
+    const normalized = normalizeStatus(doc.status);
+    if (activeTab === "approved") {
+      return normalized === "approved";
+    }
+    return pendingStatuses.has(normalized);
+  });
+
+  const displayedDocuments =
+    activeType === "all"
+      ? tabFilteredDocuments
+      : tabFilteredDocuments.filter(
+          (doc) => (doc.documentType || doc.document_type) === activeType
+        );
 
   const normalizeForModal = (doc) => ({
     ...doc,
@@ -309,15 +331,53 @@ const DocumentsAdmin = () => {
           ➕ Issue Document
         </button>
       </div>
-      <DocumentSummaryCards key={refreshKey} role="admin" />
+
+      <div className="tabs" role="tablist" aria-label="Document status tabs">
+        <button
+          role="tab"
+          aria-selected={activeTab === "pending"}
+          className={activeTab === "pending" ? "active" : ""}
+          onClick={() => {
+            setActiveTab("pending");
+            setActiveType("all");
+          }}
+        >
+          ⏳ Pending Documents
+        </button>
+        <button
+          role="tab"
+          aria-selected={activeTab === "approved"}
+          className={activeTab === "approved" ? "active" : ""}
+          onClick={() => {
+            setActiveTab("approved");
+            setActiveType("all");
+          }}
+        >
+          ✅ Approved Documents
+        </button>
+      </div>
+
+      <DocumentSummaryCards
+        key={`${refreshKey}-${activeTab}`}
+        documents={tabFilteredDocuments}
+        activeType={activeType}
+        onTypeClick={setActiveType}
+      />
+
+      {activeType !== "all" && (
+        <p className="status-message">
+          Filter: {activeTab === "approved" ? "Approved" : "Pending"} - {activeType}
+        </p>
+      )}
+
       <SearchFilters onSearch={fetchDocuments} />
       <h2>Recent Document Activity</h2>
       <AuditTable />
-      <h2>All Documents</h2>
+      <h2>{activeTab === "approved" ? "Approved Documents" : "Pending Documents"}</h2>
       {status && <p className="status-message">{status}</p>}
       {loading ? (
         <p>Loading documents...</p>
-      ) : documents.length === 0 ? (
+      ) : displayedDocuments.length === 0 ? (
         <p>No documents found.</p>
       ) : (
         <table className="document-table">
@@ -331,7 +391,7 @@ const DocumentsAdmin = () => {
             </tr>
           </thead>
           <tbody>
-            {documents.map((doc) => (
+            {displayedDocuments.map((doc) => (
               <tr
                 key={doc.id}
                 onClick={() => setSelectedDoc(normalizeForModal(doc))}
