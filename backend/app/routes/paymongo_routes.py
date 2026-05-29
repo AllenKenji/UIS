@@ -12,6 +12,7 @@ from backend.app.services.paymongo_service import (
     get_payment_intent,
     get_payment_link_payments,
 )
+from backend.app.services.payment_service import log_payment_record
 from backend.app.models.paymongo import DocumentPaymentRequest, BusinessPaymentRequest, AttachPaymentRequest
 from backend.app.routes.fee_routes import (
     compute_document_fee,
@@ -61,6 +62,60 @@ def _link_payments_has_paid(link_id: str) -> bool:
     except Exception as err:
         logger.warning("⚠️ Failed to fetch link payments for %s: %s", link_id, err)
         return False
+
+
+def _receipt_exists_for_entity(*, business_id: str | None = None, document_id: str | None = None) -> bool:
+    try:
+        if business_id:
+            existing = get_db().collection("receipts").where("businessId", "==", business_id).limit(1).get()
+            if existing:
+                return True
+        if document_id:
+            existing = get_db().collection("receipts").where("documentId", "==", document_id).limit(1).get()
+            if existing:
+                return True
+        return False
+    except Exception as err:
+        logger.warning("⚠️ Failed checking receipt existence business=%s document=%s: %s", business_id, document_id, err)
+        return False
+
+
+def _ensure_reconciled_receipt(*, kind: str, doc_data: dict, status: str, event_type: str, method: str = "paymongo"):
+    if kind == "business":
+        business_id = doc_data.get("businessId")
+        if not business_id or _receipt_exists_for_entity(business_id=business_id):
+            return
+        log_payment_record(
+            reference_number=doc_data.get("referenceNumber") or business_id,
+            transaction_id=doc_data.get("transactionId") or doc_data.get("paymentIntentId") or doc_data.get("paymongoLinkId") or business_id,
+            amount=doc_data.get("amount") or doc_data.get("amountDue") or doc_data.get("fee") or 0,
+            status=status,
+            fee_type=doc_data.get("feeType") or "business_fee",
+            business_id=business_id,
+            owner_name=doc_data.get("ownerName"),
+            business_name=doc_data.get("businessName"),
+            business_type=doc_data.get("businessType"),
+            event_type=event_type,
+            method=method,
+        )
+        return
+
+    document_id = doc_data.get("documentId")
+    if not document_id or _receipt_exists_for_entity(document_id=document_id):
+        return
+    log_payment_record(
+        reference_number=doc_data.get("referenceNumber") or document_id,
+        transaction_id=doc_data.get("transactionId") or doc_data.get("paymentIntentId") or doc_data.get("paymongoLinkId") or document_id,
+        amount=doc_data.get("amount") or doc_data.get("amountDue") or doc_data.get("fee") or 0,
+        status=status,
+        fee_type="document_fee",
+        document_id=document_id,
+        owner_name=doc_data.get("ownerName") or doc_data.get("residentName"),
+        business_name=doc_data.get("businessName"),
+        document_type=doc_data.get("documentType"),
+        event_type=event_type,
+        method=method,
+    )
 
 # -----------------------------
 # Shared payment creation logic
@@ -324,6 +379,14 @@ async def reconcile_return(payload: dict) -> dict:
                     "referenceNumber": reference_number or data.get("referenceNumber"),
                 },
             )
+
+            refreshed = doc.to_dict() or {}
+            _ensure_reconciled_receipt(
+                kind="business",
+                doc_data=refreshed,
+                status="paid",
+                event_type="paymongo.reconcile_return",
+            )
             return {"success": True, "updated": True, "paymentStatus": "paid", "status": "paid"}
 
         document_id = str(payload.get("documentId") or "").strip()
@@ -378,6 +441,14 @@ async def reconcile_return(payload: dict) -> dict:
                 "status": "paid",
                 "referenceNumber": reference_number or data.get("referenceNumber"),
             },
+        )
+
+        refreshed = doc.to_dict() or {}
+        _ensure_reconciled_receipt(
+            kind="document",
+            doc_data=refreshed,
+            status="paid",
+            event_type="paymongo.reconcile_return",
         )
         return {"success": True, "updated": True, "paymentStatus": "paid", "status": "paid"}
 
