@@ -17,6 +17,7 @@ const DocumentsAdmin = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState("pending");
   const [activeType, setActiveType] = useState("all");
+  const [activeSearchFilters, setActiveSearchFilters] = useState({});
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [issueRemarks, setIssueRemarks] = useState("");
@@ -35,12 +36,19 @@ const DocumentsAdmin = () => {
     return pendingStatuses.has(normalized);
   });
 
-  const displayedDocuments =
+  const typeFilteredDocuments =
     activeType === "all"
       ? tabFilteredDocuments
       : tabFilteredDocuments.filter(
           (doc) => (doc.documentType || doc.document_type) === activeType
         );
+
+  const issuedToPrefix = String(activeSearchFilters.issuedTo || "").trim().toLowerCase();
+  const displayedDocuments = typeFilteredDocuments.filter((doc) => {
+    if (!issuedToPrefix) return true;
+    const residentName = String(doc.residentName || doc.resident_name || "").trim().toLowerCase();
+    return residentName.startsWith(issuedToPrefix);
+  });
 
   const normalizeForModal = (doc) => ({
     ...doc,
@@ -63,8 +71,12 @@ const DocumentsAdmin = () => {
   const fetchDocuments = async (filters = {}) => {
     setLoading(true);
     setStatus("Fetching all documents...");
+    setActiveSearchFilters(filters || {});
+
+    // Keep issuedTo for local prefix filtering only.
+    const { issuedTo, ...serverFilters } = filters || {};
     const cleanFilters = Object.fromEntries(
-      Object.entries(filters).filter(([_, v]) => v !== "" && v !== null)
+      Object.entries(serverFilters).filter(([_, v]) => v !== "" && v !== null)
     );
     try {
       const { data } = await api.get("/api/documents", { params: cleanFilters });
