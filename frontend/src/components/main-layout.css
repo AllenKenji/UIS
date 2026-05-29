@@ -70,6 +70,51 @@ body.dashboard-scroll-lock {
   margin: 0 0 var(--space-sm) 0;
 }
 
+/* User info block at the top of the sidebar */
+.sidebar-user-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 0.5rem;
+}
+
+.sidebar-user-avatar {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background-color: var(--color-primary, #007bff);
+  color: #fff;
+  font-weight: 700;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sidebar-user-details {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-user-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-text, inherit);
+}
+
+.sidebar-user-role {
+  font-size: 0.75rem;
+  text-transform: capitalize;
+  color: var(--color-text-muted, #6c757d);
+}
+
 .sidebar ul {
   list-style: none;
   margin: 0;

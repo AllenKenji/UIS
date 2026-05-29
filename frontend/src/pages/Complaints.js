@@ -10,6 +10,8 @@ const Complaints = () => {
   const [mode, setMode] = useState("dashboard");
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("active");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const { getToken, role, can, isAuthenticated, loading: authLoading } = useUser();
 
@@ -107,19 +109,19 @@ const Complaints = () => {
     );
   }
 
-  const renderDashboard = () => (
-    <>
-      <div className="header">
-        <h2>{canViewAll ? "Complaints Dashboard" : "My Complaints"}</h2>
-        {canFile && <button onClick={() => setMode("form")}>+ Report Complaint</button>}
-      </div>
+  const renderDashboard = () => {
+    const resolvedComplaints = complaints.filter((c) => c.status === "resolved");
+    const activeComplaints = complaints.filter((c) => c.status !== "resolved");
+    const activeStatuses = Array.from(new Set(activeComplaints.map((c) => c.status).filter(Boolean)));
 
-      {loading || authLoading ? (
-        <p>Loading complaints...</p>
-      ) : error ? (
-        <p className="error">{error}</p>
-      ) : complaints.length === 0 ? (
-        <p>No complaints found.</p>
+    const displayedActive =
+      statusFilter === "all"
+        ? activeComplaints
+        : activeComplaints.filter((c) => c.status === statusFilter);
+
+    const renderTable = (rows, showEmpty) =>
+      showEmpty ? (
+        <p>No complaints found{activeTab === "active" && statusFilter !== "all" ? ` with status "${statusFilter}"` : ""}.</p>
       ) : (
         <table className="complaint-table">
           <thead>
@@ -135,7 +137,7 @@ const Complaints = () => {
             </tr>
           </thead>
           <tbody>
-            {complaints.map((complaint) => (
+            {rows.map((complaint) => (
               <tr key={complaint.id}>
                 {canViewAll && (
                   <td>
@@ -147,7 +149,11 @@ const Complaints = () => {
                 <td>{complaint.category}</td>
                 <td>{complaint.description}</td>
                 <td>{complaint.location}</td>
-                <td>{complaint.status}</td>
+                <td>
+                  <span className={`status-badge status-${(complaint.status || "").replace(/_/g, "-")}`}>
+                    {complaint.status?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "—"}
+                  </span>
+                </td>
                 <td>
                   {complaint.timestamp
                     ? new Date(complaint.timestamp).toLocaleString()
@@ -176,9 +182,67 @@ const Complaints = () => {
             ))}
           </tbody>
         </table>
-      )}
-    </>
-  );
+      );
+
+    return (
+      <>
+        <div className="header">
+          <h2>{canViewAll ? "Complaints Dashboard" : "My Complaints"}</h2>
+          {canFile && <button onClick={() => setMode("form")}>+ Report Complaint</button>}
+        </div>
+
+        {loading || authLoading ? (
+          <p>Loading complaints...</p>
+        ) : error ? (
+          <p className="error">{error}</p>
+        ) : (
+          <>
+            <div className="complaints-tabs">
+              <button
+                type="button"
+                className={`tab-btn${activeTab === "active" ? " active" : ""}`}
+                onClick={() => { setActiveTab("active"); setStatusFilter("all"); }}
+              >
+                Active
+                {activeComplaints.length > 0 && (
+                  <span className="tab-count">{activeComplaints.length}</span>
+                )}
+              </button>
+              <button
+                type="button"
+                className={`tab-btn${activeTab === "resolved" ? " active" : ""}`}
+                onClick={() => { setActiveTab("resolved"); setStatusFilter("all"); }}
+              >
+                Resolved
+                {resolvedComplaints.length > 0 && (
+                  <span className="tab-count">{resolvedComplaints.length}</span>
+                )}
+              </button>
+            </div>
+
+            {activeTab === "active" && activeStatuses.length > 0 && (
+              <div className="status-filter-bar">
+                {["all", ...activeStatuses].map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    className={`filter-btn${statusFilter === s ? " active" : ""}`}
+                    onClick={() => setStatusFilter(s)}
+                  >
+                    {s === "all" ? "All" : s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {activeTab === "active"
+              ? renderTable(displayedActive, displayedActive.length === 0)
+              : renderTable(resolvedComplaints, resolvedComplaints.length === 0)}
+          </>
+        )}
+      </>
+    );
+  };
 
   const renderForm = () => (
     <>

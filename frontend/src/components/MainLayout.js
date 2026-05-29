@@ -56,6 +56,19 @@ const MainLayout = () => {
     <div className={`dashboard-layout ${showNotifications ? "with-notifications" : ""}`}>
       {/* Sidebar */}
       <nav className="sidebar" aria-label="Sidebar Navigation">
+        <div className="sidebar-user-info">
+          <div className="sidebar-user-avatar" aria-hidden="true">
+            {(userInfo?.fullName || userInfo?.full_name || userInfo?.name || userInfo?.email || "?")
+              .charAt(0)
+              .toUpperCase()}
+          </div>
+          <div className="sidebar-user-details">
+            <span className="sidebar-user-name">
+              {userInfo?.fullName || userInfo?.full_name || userInfo?.name || userInfo?.email || "User"}
+            </span>
+            <span className="sidebar-user-role">{role}</span>
+          </div>
+        </div>
         <h3 className="sidebar-title">Navigation</h3>
         <ul>
           {linksToRender.map(({ path, label, action }) => (

@@ -31,6 +31,7 @@ const Incidents = () => {
   const [incidents, setIncidents] = useState([]);
   const [mode, setMode] = useState("dashboard"); 
   const [selectedIncident, setSelectedIncident] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("all");
   const userInfo = JSON.parse(sessionStorage.getItem("userInfo"));
   const role = userInfo?.role || "resident";
   const canDelete = role === "staff" || role === "admin";
@@ -102,52 +103,79 @@ const Incidents = () => {
             </h2>
             <button onClick={() => setMode("form")}>+ Report Incident</button>
           </div>
-          <table className="incident-table">
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>Description</th>
-                <th>Location</th>
-                <th>Reported By</th>
-                
-                {role === "staff" && <th>Assigned To</th>}
-                {role === "resident" && <th>Logged By Officer</th>}
-                <th>Status</th>
-                <th>Timestamp</th>
-                {canDelete && <th>Actions</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {incidents.map((incident) => (
-                <tr key={incident.id} onClick={() => setSelectedIncident(incident)}>
-                  <td>{incident.type}</td>
-                  <td>{incident.description}</td>
-                  <td>{incident.location}</td>
-                  <td>{incident.reported_by_name}</td>
 
-                  {role === "staff" && (
-                    <td>{incident.assigned_to_name || "—"}</td>
-                  )}
-                  {role === "resident" && (
-                    <td>{incident.logged_by_officer || "—"}</td>
-                  )}
+          <div className="status-filter-bar">
+            {["all", ...Array.from(new Set(incidents.map((i) => i.status).filter(Boolean)))].map(
+              (s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className={`filter-btn${statusFilter === s ? " active" : ""}`}
+                  onClick={() => setStatusFilter(s)}
+                >
+                  {s === "all" ? "All" : s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                </button>
+              )
+            )}
+          </div>
 
-                  <td>{incident.status}</td>
-                  <td>{formatDateTime(incident.timestamp || incident.createdAt)}</td>
-                  {canDelete && (
-                    <td>
-                      <button
-                        type="button"
-                        onClick={(e) => handleDeleteIncident(incident.id, e)}
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {(() => {
+            const filtered =
+              statusFilter === "all"
+                ? incidents
+                : incidents.filter((i) => i.status === statusFilter);
+            return filtered.length === 0 ? (
+              <p>No incidents found{statusFilter !== "all" ? ` with status "${statusFilter}"` : ""}.</p>
+            ) : (
+              <table className="incident-table">
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th>Location</th>
+                    <th>Reported By</th>
+                    {role === "staff" && <th>Assigned To</th>}
+                    {role === "resident" && <th>Logged By Officer</th>}
+                    <th>Status</th>
+                    <th>Timestamp</th>
+                    {canDelete && <th>Actions</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((incident) => (
+                    <tr key={incident.id} onClick={() => setSelectedIncident(incident)}>
+                      <td>{incident.type}</td>
+                      <td>{incident.description}</td>
+                      <td>{incident.location}</td>
+                      <td>{incident.reported_by_name}</td>
+                      {role === "staff" && (
+                        <td>{incident.assigned_to_name || "—"}</td>
+                      )}
+                      {role === "resident" && (
+                        <td>{incident.logged_by_officer || "—"}</td>
+                      )}
+                      <td>
+                        <span className={`status-badge status-${(incident.status || "").replace(/_/g, "-")}`}>
+                          {incident.status?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "—"}
+                        </span>
+                      </td>
+                      <td>{formatDateTime(incident.timestamp || incident.createdAt)}</td>
+                      {canDelete && (
+                        <td>
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteIncident(incident.id, e)}
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            );
+          })()}
         </>
       )}
     </div>
