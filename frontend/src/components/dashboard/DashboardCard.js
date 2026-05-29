@@ -6,21 +6,25 @@ const DashboardCard = ({
   value = "…",
   variant = "accent",
   icon = null,
+  onClick,
 }) => {
   const cardId = `card-${label.replace(/\s+/g, "-").toLowerCase()}`;
+  const CardTag = onClick ? "button" : "div";
 
   return (
-    <div
-      className={`dashboard-card ${variant}`}
+    <CardTag
+      type={onClick ? "button" : undefined}
+      className={`dashboard-card ${variant}${onClick ? " is-clickable" : ""}`}
       aria-labelledby={cardId}
-      role="region"
+      role={onClick ? undefined : "region"}
+      onClick={onClick}
     >
       <h4 id={cardId}>
         {icon && <span className="card-icon" aria-hidden="true">{icon}</span>}{" "}
         {label}
       </h4>
       <p aria-live="polite">{value}</p>
-    </div>
+    </CardTag>
   );
 };
 
@@ -38,6 +42,7 @@ DashboardCard.propTypes = {
     "youth",
   ]),
   icon: PropTypes.node,
+  onClick: PropTypes.func,
 };
 
 export default DashboardCard;

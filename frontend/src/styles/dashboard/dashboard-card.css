@@ -9,9 +9,24 @@
   transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
+.dashboard-card.is-clickable {
+  appearance: none;
+  border: none;
+  cursor: pointer;
+  display: block;
+  font: inherit;
+  text-align: left;
+  width: 100%;
+}
+
 .dashboard-card:hover {
   transform: translateY(-4px);
   box-shadow: var(--shadow-card-hover);
+}
+
+.dashboard-card.is-clickable:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
 }
 
 .dashboard-card h4 {
