@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import SummaryCards from "../components/dashboard/SummaryCards";
-import IncidentQueue from "../components/dashboard/IncidentQueue";
-import ComplaintList from "../components/dashboard/ComplaintList";
+import DashboardFocusPanel from "../components/dashboard/DashboardFocusPanel";
 import ResidentForm from "../components/forms/ResidentForm";
 import { useUser } from "../context/UserContext"; 
 import { Navigate } from "react-router-dom";
@@ -9,7 +8,8 @@ import "./staff-dashboard.css";
 
 const StaffDashboard = ({ residents, loading }) => {
   const { role } = useUser();
-  const [activeForm, setActiveForm] = useState(null); 
+  const [activeForm, setActiveForm] = useState(null);
+  const [activeView, setActiveView] = useState("businesses");
 
   // 🚫 Redirect if not staff
   if (role !== "staff") {
@@ -40,9 +40,8 @@ const StaffDashboard = ({ residents, loading }) => {
         className={`staff-dashboard-content ${isOverlayActive ? "blurred" : ""}`}
         aria-hidden={isOverlayActive}
       >
-        <SummaryCards role={role} /> 
-        <IncidentQueue />
-        <ComplaintList />
+        <SummaryCards role={role} onCardClick={setActiveView} />
+        <DashboardFocusPanel view={activeView} />
       </div>
 
       {isOverlayActive && (

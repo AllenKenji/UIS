@@ -132,7 +132,7 @@ const DashboardFocusPanel = ({ view }) => {
     if (error) return <p className="error">{error}</p>;
 
     return businessRows.length === 0 ? (
-      <p>No businesses need evaluation right now.</p>
+      <p>No pending evaluation.</p>
     ) : (
       <table className="queue-table" aria-label="Businesses Pending Evaluation">
         <thead>
