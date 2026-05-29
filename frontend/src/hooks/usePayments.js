@@ -32,6 +32,62 @@ export function usePayments() {
     const businessesRef = collection(db, "businesses");
     const documentsRef = collection(db, "documents");
 
+    const normalizeStatus = (value) => String(value || "").trim().toLowerCase();
+
+    const normalizeChannel = (tx = {}) => {
+      const explicit = String(tx.method || tx.channel || "").trim();
+      if (explicit) return explicit;
+
+      const eventType = String(tx.eventType || "").toLowerCase();
+      if (
+        eventType.includes("paymongo") ||
+        eventType.includes("link.") ||
+        eventType.includes("payment.") ||
+        tx.paymentIntentId ||
+        tx.paymongoSourceId
+      ) {
+        return "PayMongo";
+      }
+
+      if (normalizeStatus(tx.paymentStatus || tx.status) === "paid") {
+        return "Cash";
+      }
+
+      return "—";
+    };
+
+    const findReceiptByTransaction = async (transactionId) => {
+      if (!transactionId) return null;
+      const receiptQuery = query(
+        collection(db, "receipts"),
+        where("transactionId", "==", transactionId)
+      );
+      const receiptSnap = await getDocs(receiptQuery);
+      return receiptSnap.empty ? null : receiptSnap.docs[0].data();
+    };
+
+    const findReceiptByEntity = async ({ businessId, documentId, referenceNumber }) => {
+      const candidates = [];
+      if (businessId) {
+        candidates.push(query(collection(db, "receipts"), where("businessId", "==", businessId)));
+      }
+      if (documentId) {
+        candidates.push(query(collection(db, "receipts"), where("documentId", "==", documentId)));
+      }
+      if (referenceNumber) {
+        candidates.push(query(collection(db, "receipts"), where("referenceNumber", "==", referenceNumber)));
+      }
+
+      for (const q of candidates) {
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          return snap.docs[0].data();
+        }
+      }
+
+      return null;
+    };
+
     const unsubPayments = onSnapshot(
       paymentsRef,
       async snapshot => {
@@ -44,17 +100,31 @@ export function usePayments() {
         // Enrich with receipt numbers
         const enrichedPayments = await Promise.all(
           rawPayments.map(async tx => {
-            if (tx.transactionId) {
-              const receiptQuery = query(
-                collection(db, "receipts"),
-                where("transactionId", "==", tx.transactionId)
-              );
-              const receiptSnap = await getDocs(receiptQuery);
-              if (!receiptSnap.empty) {
-                tx.receiptNumber = receiptSnap.docs[0].data().receiptNumber;
-              }
+            let receiptData = await findReceiptByTransaction(tx.transactionId);
+
+            if (!receiptData) {
+              receiptData = await findReceiptByEntity({
+                businessId: tx.businessId,
+                documentId: tx.documentId,
+                referenceNumber: tx.referenceNumber,
+              });
             }
-            return tx;
+
+            const receiptNumber =
+              tx.receiptNumber ||
+              receiptData?.receiptNumber ||
+              null;
+            const method =
+              tx.method ||
+              receiptData?.method ||
+              tx.channel ||
+              null;
+
+            return {
+              ...tx,
+              receiptNumber,
+              method: normalizeChannel({ ...tx, method }),
+            };
           })
         );
 
@@ -91,20 +161,28 @@ export function usePayments() {
         const docs = await Promise.all(
           snapshot.docs.map(async docSnap => {
             const data = docSnap.data();
-            let receiptNumber = "—";
-            let method = data.method || "—";
+            let receiptNumber = data.receiptNumber || null;
+            let method = data.method || data.channel || null;
 
-            if (data.transactionId) {
-              const receiptQuery = query(
-                collection(db, "receipts"),
-                where("transactionId", "==", data.transactionId)
-              );
-              const receiptSnap = await getDocs(receiptQuery);
-              if (!receiptSnap.empty) {
-                const receiptData = receiptSnap.docs[0].data();
-                receiptNumber = receiptData.receiptNumber || receiptNumber;
-                method = receiptData.method || method; // ✅ pull method from receipt if available
-              }
+            let receiptData = await findReceiptByTransaction(data.transactionId);
+
+            if (!receiptData) {
+              receiptData = await findReceiptByEntity({
+                documentId: docSnap.id,
+                referenceNumber: data.referenceNumber,
+              });
+            }
+
+            if (!receiptData && data.documentId) {
+              receiptData = await findReceiptByEntity({
+                documentId: data.documentId,
+                referenceNumber: data.referenceNumber,
+              });
+            }
+
+            if (receiptData) {
+              receiptNumber = receiptData.receiptNumber || receiptNumber;
+              method = receiptData.method || method;
             }
 
             return {
@@ -116,7 +194,7 @@ export function usePayments() {
               amount: data.amount,
               paymentStatus: data.paymentStatus || data.status || "unpaid",
               receiptNumber,
-              method,
+              method: normalizeChannel({ ...data, method }),
             };
           })
         );
