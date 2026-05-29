@@ -15,6 +15,7 @@ import "./adminDashboard.css";
 const AdminDashboard = () => {
   const { isAdmin, role } = useUser();
   const [activeView, setActiveView] = useState("overview");
+  const [activeTab, setActiveTab] = useState("operations");
   
 
   if (!isAdmin) {
@@ -22,7 +23,7 @@ const AdminDashboard = () => {
   }
 
   return (
-    <section aria-label="Admin Dashboard">
+    <section className="dashboard admin-dashboard" aria-label="Admin Dashboard">
       <header className="dashboard-header">
         <h2>🧑‍💼 Barangay Captain Dashboard</h2>
         <p className="dashboard-subtitle">
@@ -30,41 +31,96 @@ const AdminDashboard = () => {
         </p>
       </header>
 
+      <div className="dashboard-tabs" role="tablist" aria-label="Admin dashboard tabs">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "operations"}
+          className={`dashboard-tab-btn ${activeTab === "operations" ? "active" : ""}`}
+          onClick={() => setActiveTab("operations")}
+        >
+          Operations
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "registry"}
+          className={`dashboard-tab-btn ${activeTab === "registry" ? "active" : ""}`}
+          onClick={() => setActiveTab("registry")}
+        >
+          Registry
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "documents"}
+          className={`dashboard-tab-btn ${activeTab === "documents" ? "active" : ""}`}
+          onClick={() => setActiveTab("documents")}
+        >
+          Documents
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "tools"}
+          className={`dashboard-tab-btn ${activeTab === "tools" ? "active" : ""}`}
+          onClick={() => setActiveTab("tools")}
+        >
+          Administrative Tools
+        </button>
+      </div>
+
       <div className="section-stack">
-        <DashboardSection
-          title="Registry Management"
-          icon="📦"
-          accent="accent"
-          layout="stack"
-          ariaLabel="Registry Management"
-        >
-          <SummaryCards role={role} onCardClick={setActiveView} />
-          <RegistryOverview />
-          <RegistryAudit />
-        </DashboardSection>
+        {activeTab === "operations" && (
+          <DashboardSection
+            title="Operations Queue"
+            icon="📋"
+            accent="danger"
+            layout="stack"
+            ariaLabel="Operations Queue"
+          >
+            <SummaryCards role={role} onCardClick={setActiveView} />
+            <DashboardFocusPanel view={activeView} />
+          </DashboardSection>
+        )}
 
-        <DashboardSection
-          title="Administrative Tools"
-          icon="⚙️"
-          accent="success"
-          layout="stack"
-          ariaLabel="Administrative Tools"
-        >
-          <RoleManager />
-          
-          {role === "admin" && <AnalyticsPanel role={role} />}
-        </DashboardSection>
+        {activeTab === "registry" && (
+          <DashboardSection
+            title="Registry Management"
+            icon="📦"
+            accent="accent"
+            layout="stack"
+            ariaLabel="Registry Management"
+          >
+            <RegistryOverview />
+            <RegistryAudit />
+          </DashboardSection>
+        )}
 
-        <DashboardSection
-          title="Dashboard Drill-down"
-          icon="📋"
-          accent="danger"
-          layout="stack"
-          ariaLabel="Dashboard Drill-down"
-        >
-          <DocumentQueue />
-          <DashboardFocusPanel view={activeView} />
-        </DashboardSection>
+        {activeTab === "documents" && (
+          <DashboardSection
+            title="Document Requests"
+            icon="📄"
+            accent="info"
+            layout="stack"
+            ariaLabel="Document Requests"
+          >
+            <DocumentQueue />
+          </DashboardSection>
+        )}
+
+        {activeTab === "tools" && (
+          <DashboardSection
+            title="Administrative Tools"
+            icon="⚙️"
+            accent="success"
+            layout="stack"
+            ariaLabel="Administrative Tools"
+          >
+            <RoleManager />
+            {role === "admin" && <AnalyticsPanel role={role} />}
+          </DashboardSection>
+        )}
       </div>
     </section>
   );
