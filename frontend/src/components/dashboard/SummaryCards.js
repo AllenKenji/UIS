@@ -48,6 +48,11 @@ const getYouthResidentsCount = async () => {
 
 const normalizeStatus = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
 
+const isPendingTransactionStatus = (value) => {
+  const status = normalizeStatus(value);
+  return ["for_payment", "awaiting_payment", "unpaid", "payment_submitted", "pending"].includes(status);
+};
+
 const countMatchingRecords = async (collectionName, predicate) => {
   const snapshot = await getDocs(collection(db, collectionName));
   return snapshot.docs.reduce((total, docSnap) => total + (predicate(docSnap.data() || {}) ? 1 : 0), 0);
@@ -79,6 +84,13 @@ const getSpecialDashboardCount = async (key) => {
     return countMatchingRecords("incidents", (incident) => normalizeStatus(incident.status) === "pending");
   }
 
+  if (key === "documents") {
+    return countMatchingRecords("documents", (document) => {
+      const status = document.paymentStatus || document.status || document.documentStatus;
+      return isPendingTransactionStatus(status);
+    });
+  }
+
   return null;
 };
 
@@ -102,6 +114,7 @@ const SummaryCards = ({ onCardClick } = {}) => {
     businesses: "Businesses Pending Evaluation",
     complaints: "Complaints Pending Review",
     incidents: "Incidents Pending",
+    documents: "Pending Document Transactions",
   };
 
   useEffect(() => {
@@ -167,7 +180,7 @@ const SummaryCards = ({ onCardClick } = {}) => {
 
     const safeQuery = async (key) => {
       try {
-        if (isStaffOrAdmin && ["residents", "businesses", "complaints", "incidents"].includes(key)) {
+        if (isStaffOrAdmin && ["residents", "businesses", "complaints", "incidents", "documents"].includes(key)) {
           const value = await getSpecialDashboardCount(key);
           return { key, value };
         }

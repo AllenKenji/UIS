@@ -4,6 +4,7 @@ import { db } from "../../services/firebase";
 import { ResidentsAPI } from "../../services/api";
 import ComplaintList from "./ComplaintList";
 import IncidentQueue from "./IncidentQueue";
+import DocumentQueue from "./DocumentQueue";
 
 const normalizeStatus = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
 
@@ -97,6 +98,10 @@ const DashboardFocusPanel = ({ view }) => {
 
   if (view === "incidents") {
     return <IncidentQueue statusFilter="pending" title="🚨 Incidents Pending" />;
+  }
+
+  if (view === "documents") {
+    return <DocumentQueue statusFilter="for_payment" title="📄 Pending Document Transactions" />;
   }
 
   if (view === "residents") {
