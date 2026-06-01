@@ -129,9 +129,8 @@ const isPaidCollectionRecord = (record) => {
 };
 
 const buildCollectionTransactionSet = async () => {
-  const [paymentsSnapshot, businessesSnapshot, documentsSnapshot] = await Promise.all([
+  const [paymentsSnapshot, documentsSnapshot] = await Promise.all([
     getDocs(collection(db, "payments")),
-    getDocs(collection(db, "businesses")),
     getDocs(collection(db, "documents")),
   ]);
 
@@ -141,19 +140,13 @@ const buildCollectionTransactionSet = async () => {
     ...docSnap.data(),
   }));
 
-  const businesses = businessesSnapshot.docs.map((docSnap) => ({
-    id: docSnap.id,
-    entityType: "business",
-    ...docSnap.data(),
-  }));
-
   const documents = documentsSnapshot.docs.map((docSnap) => ({
     id: docSnap.id,
     entityType: "document",
     ...docSnap.data(),
   }));
 
-  const merged = [...payments, ...businesses, ...documents];
+  const merged = [...payments, ...documents];
   const deduped = new Map();
 
   merged.forEach((record) => {

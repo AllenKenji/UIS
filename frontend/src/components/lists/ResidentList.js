@@ -108,6 +108,7 @@ const ResidentList = ({ residents, loading, onResidentDeleted, fetchResidents })
   return (
     <div className="resident-list">
       <h2>Resident Directory</h2>
+      <p><strong>Total Residents:</strong> {residentArray.length}</p>
 
       {/* 🔍 Filters */}
       <div className="filters">
