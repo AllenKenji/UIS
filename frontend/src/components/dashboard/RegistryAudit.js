@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../../services/firebase";
 import { useUser } from "../../context/UserContext";
+import { usePayments } from "../../hooks/usePayments";
 import { CATEGORIES, CATEGORY_VARIANTS, COLLECTION_PERMISSIONS } from "../../config/roles"; 
 import "../../styles/dashboard/registry-audit.css";
 
@@ -113,60 +114,29 @@ const getRecordDate = (key, record) => {
 
 const normalizeStatus = (value) => String(value || "").trim().toLowerCase();
 
-const getCollectionIdentityKey = (record) =>
-  record.transactionId ||
-  record.referenceNumber ||
-  record.receiptNumber ||
-  record.paymentIntentId ||
-  record.paymongoSourceId ||
-  record.documentId ||
-  record.businessId ||
-  `${record.entityType}:${record.id}`;
-
 const isPaidCollectionRecord = (record) => {
   const status = normalizeStatus(record.paymentStatus || record.status);
   return status === "paid" || status === "succeeded";
 };
 
-const buildCollectionTransactionSet = async () => {
-  const [paymentsSnapshot, documentsSnapshot] = await Promise.all([
-    getDocs(collection(db, "payments")),
-    getDocs(collection(db, "documents")),
-  ]);
+const resolveCollectionDate = (record) => {
+  const candidates = [
+    record.datePaid,
+    record.paidAt,
+    record.paymentDate,
+    record.createdAt,
+    record.date,
+    record.updatedAt,
+  ];
 
-  const payments = paymentsSnapshot.docs.map((docSnap) => ({
-    id: docSnap.id,
-    entityType: "payment",
-    ...docSnap.data(),
-  }));
-
-  const documents = documentsSnapshot.docs.map((docSnap) => ({
-    id: docSnap.id,
-    entityType: "document",
-    ...docSnap.data(),
-  }));
-
-  const merged = [...payments, ...documents];
-  const deduped = new Map();
-
-  merged.forEach((record) => {
-    const key = getCollectionIdentityKey(record);
-    if (!key) {
-      return;
+  for (const candidate of candidates) {
+    const parsed = toDate(candidate);
+    if (parsed) {
+      return parsed;
     }
+  }
 
-    const existing = deduped.get(key);
-    if (!existing) {
-      deduped.set(key, record);
-      return;
-    }
-
-    if (existing.entityType !== "payment" && record.entityType === "payment") {
-      deduped.set(key, record);
-    }
-  });
-
-  return Array.from(deduped.values());
+  return null;
 };
 
 const getYouthResidentsCount = async (start, end) => {
@@ -186,6 +156,7 @@ const getYouthResidentsCount = async (start, end) => {
 
 const RegistryAudit = () => {
   const { can } = useUser(); 
+  const { transactions = [] } = usePayments();
   const [stats, setStats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [periodType, setPeriodType] = useState("monthly");
@@ -225,15 +196,10 @@ const RegistryAudit = () => {
             }
 
             if (key === "collections") {
-              const transactions = await buildCollectionTransactionSet();
               const total = transactions.reduce((sum, record) => {
-                const dateValue =
-                  record.datePaid ||
-                  record.paymentDate ||
-                  record.paidAt ||
-                  record.timestamp;
+                const collectionDate = resolveCollectionDate(record);
 
-                if (!isPaidCollectionRecord(record) || !isWithinRange(dateValue, start, end)) {
+                if (!isPaidCollectionRecord(record) || !collectionDate || collectionDate < start || collectionDate >= end) {
                   return sum;
                 }
                 return sum + parseAmount(record.amount);
@@ -264,7 +230,7 @@ const RegistryAudit = () => {
     return () => {
       cancelled = true;
     };
-  }, [can, periodType, selectedMonth, selectedYear]);
+  }, [can, periodType, selectedMonth, selectedYear, transactions]);
 
   const activePeriodLabel = buildPeriodWindow(periodType, selectedMonth, selectedYear).label;
 

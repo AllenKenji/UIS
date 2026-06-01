@@ -91,7 +91,7 @@ export function useReports() {
 
     const paidTransactions = scopedTransactions.filter((tx) => {
       const status = normalizeStatus(tx.paymentStatus || tx.status);
-      return status === "paid" || status === "approved";
+      return status === "paid" || status === "succeeded";
     });
 
     const pendingTransactions = scopedTransactions.filter((tx) => {

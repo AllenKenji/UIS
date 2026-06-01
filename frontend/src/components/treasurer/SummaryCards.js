@@ -50,7 +50,7 @@ function SummaryCards() {
   const normalizeStatus = (value) => String(value || "").trim().toLowerCase();
   const isPaid = (tx) => {
     const status = normalizeStatus(tx.paymentStatus || tx.status);
-    return status === "paid" || status === "approved";
+    return status === "paid" || status === "succeeded";
   };
   const isPending = (tx) => {
     const status = normalizeStatus(tx.paymentStatus || tx.status);
