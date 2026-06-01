@@ -1,75 +1,189 @@
 /* ===============================
-🧾 Audit Dashboard Layout
+Audit Dashboard Layout
 ================================ */
 .audit-dashboard {
-  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  color: var(--color-text);
 }
 
-.audit-dashboard .tool-section {
-  background-color: var(--card-bg);
-  padding: 1rem;
-  border-radius: 6px;
-  border: 1px solid var(--border);
+.audit-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.5rem;
+  border-radius: 16px;
+  border: 1px solid var(--color-border);
+  background: linear-gradient(135deg, rgba(139, 69, 19, 0.12), rgba(30, 64, 175, 0.08));
+  box-shadow: var(--shadow-card);
 }
 
-.audit-dashboard .tool-section h3 {
-  margin-bottom: 1rem;
-  font-size: 1.2rem;
-  color: var(--accent);
+.audit-kicker {
+  margin: 0 0 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-dilg);
 }
 
-.audit-dashboard .audit-tools {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 2rem;
-  margin-top: 2rem;
+.audit-hero h2 {
+  margin: 0;
+  font-size: 2rem;
+  color: var(--color-text-strong);
 }
 
-/* ===============================
-📋 Compliance & Usage Stats
-================================ */
-.compliance-report ul,
-.system-usage-stats ul {
-  list-style: none;
-  padding: 0;
-  margin-top: 1rem;
+.audit-hero p {
+  margin: 0.6rem 0 0;
+  max-width: 56rem;
+  color: var(--color-text);
 }
 
-.compliance-report li,
-.system-usage-stats li {
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--border);
+.audit-hero-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
-/* ===============================
-📊 Registry Snapshot
-================================ */
-.registry-snapshot table {
-  width: 100%;
-  margin-top: 1rem;
-  border-collapse: collapse;
-}
-
-.registry-snapshot th,
-.registry-snapshot td {
-  padding: 0.75rem;
-  border: 1px solid var(--border);
-  text-align: left;
-}
-
-/* ===============================
-📤 Audit Export Panel
-================================ */
+.audit-primary-btn,
+.audit-secondary-btn,
+.audit-page-link,
 .audit-export-panel button {
-  background-color: var(--accent);
-  color: #fff;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  padding: 0.7rem 1rem;
+  font-weight: 600;
   cursor: pointer;
-  margin-top: 1rem;
+  transition: transform 0.15s ease, background-color 0.2s ease, border-color 0.2s ease;
 }
 
+.audit-primary-btn,
+.audit-export-panel button {
+  background: var(--color-dilg);
+  color: #fff;
+  border-color: var(--color-dilg);
+}
+
+.audit-primary-btn:hover,
 .audit-export-panel button:hover {
-  background-color: var(--accent-hover);
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.audit-secondary-btn,
+.audit-page-link {
+  background: var(--gradient-card);
+  color: var(--color-text-strong);
+}
+
+.audit-page-nav {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.audit-page-link.active {
+  background: rgba(139, 69, 19, 0.12);
+  border-color: var(--color-dilg);
+  color: var(--color-dilg);
+}
+
+.audit-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.audit-tools {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+
+.tool-section {
+  background: var(--gradient-card);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 1.25rem;
+  box-shadow: var(--shadow-card);
+  min-width: 0;
+}
+
+.audit-span-2 {
+  grid-column: span 2;
+}
+
+.tool-section h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1.2rem;
+  color: var(--color-text-strong);
+}
+
+.audit-section-copy {
+  margin: 0 0 1rem;
+  color: var(--color-text);
+}
+
+.audit-stacked-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.audit-export-panel p {
+  margin: 0 0 1rem;
+}
+
+@media (max-width: 1024px) {
+  .audit-hero {
+    flex-direction: column;
+  }
+
+  .audit-tools {
+    grid-template-columns: 1fr;
+  }
+
+  .audit-span-2 {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .audit-dashboard {
+    padding: 1rem;
+  }
+
+  .audit-hero {
+    padding: 1rem;
+  }
+
+  .audit-hero h2 {
+    font-size: 1.55rem;
+  }
+
+  .audit-page-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+  }
+
+  .audit-page-link {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .audit-hero-actions,
+  .audit-export-panel {
+    width: 100%;
+  }
+
+  .audit-primary-btn,
+  .audit-secondary-btn,
+  .audit-export-panel button {
+    width: 100%;
+  }
 }

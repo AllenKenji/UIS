@@ -20,8 +20,13 @@ const links = {
   viewAllComplaints: { path: "/allComplaints", label: "🗣️ Complaints", action: "viewAllComplaints" },
   createAccount: { path: "/accounts/new", label: "➕ Create Account", action: "createAccount" },
   treasurer: { path: "/treasurer", label: "💰 Finance", action: "viewFinancialRecords" },
-  audit: { path: "/audit", label: "📊 Audit", action: "auditBarangayData" },
+  adminAudit: { path: "/admin/audit", label: "📊 Audit Center", action: "auditBarangayData" },
+  dilgAuditOverview: { path: "/audit", label: "🕵️ Audit Overview", action: "auditBarangayData" },
+  dilgAuditRegistry: { path: "/audit/registry", label: "📋 Registry Audit", action: "auditBarangayData" },
+  dilgAuditDocuments: { path: "/audit/documents", label: "📑 Document Audit", action: "auditBarangayData" },
+  dilgAuditExports: { path: "/audit/exports", label: "📤 Export Reports", action: "auditBarangayData" },
   cfdpSurvey: { path: "/cfdp-survey", label: "🧭 CFDP Survey", action: "viewCfdpSurvey" },
+  skDashboard: { path: "/youth", label: "🧒 SK Dashboard", action: "viewDashboard" },
   youth: { path: "/youth", label: "🏠 Dashboard", action: "viewDashboard" },
   youthRegistry: { path: "/youth/registry", label: "📋 Youth Registry", action: "viewDashboard" },
   youthPrograms: { path: "/youth/programs", label: "🎯 Programs", action: "viewDashboard" },
@@ -47,6 +52,8 @@ const links = {
 const sidebarLinks = {
   admin: [
     links.dashboard("/admin"),
+    links.adminAudit,
+    links.skDashboard,
     links.cfdpSurvey,
     links.residents,
     links.businesses,
@@ -56,7 +63,6 @@ const sidebarLinks = {
     links.fileComplaint,
     links.createAccount,
     links.treasurer,
-    links.audit,
   ],
   staff: [
     links.dashboard("/staff"),
@@ -104,7 +110,10 @@ const sidebarLinks = {
     links.cfdpSurvey,
   ],
   dilg: [
-    links.audit,
+    links.dilgAuditOverview,
+    links.dilgAuditRegistry,
+    links.dilgAuditDocuments,
+    links.dilgAuditExports,
     links.cfdpSurvey,
   ],
   resident: [

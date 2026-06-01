@@ -173,8 +173,15 @@ const AppRoutes = ({ isDarkMode, toggleDarkMode }) => {
             <Route path="/youth/events/add" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKAddEventPage /></ProtectedRoute>} />
             <Route path="/youth/feedback" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
 
-            {/* DILG Auditor */}
-            <Route path="/audit" element={<ProtectedRoute allowedRoles={["dilg"]}><AuditView /></ProtectedRoute>} />
+            {/* Admin + DILG Audit Center */}
+            <Route path="/admin/audit" element={<ProtectedRoute allowedRoles={["admin"]}><AuditView /></ProtectedRoute>} />
+            <Route path="/admin/audit/registry" element={<ProtectedRoute allowedRoles={["admin"]}><AuditView /></ProtectedRoute>} />
+            <Route path="/admin/audit/documents" element={<ProtectedRoute allowedRoles={["admin"]}><AuditView /></ProtectedRoute>} />
+            <Route path="/admin/audit/exports" element={<ProtectedRoute allowedRoles={["admin"]}><AuditView /></ProtectedRoute>} />
+            <Route path="/audit" element={<ProtectedRoute allowedRoles={["admin", "dilg"]}><AuditView /></ProtectedRoute>} />
+            <Route path="/audit/registry" element={<ProtectedRoute allowedRoles={["admin", "dilg"]}><AuditView /></ProtectedRoute>} />
+            <Route path="/audit/documents" element={<ProtectedRoute allowedRoles={["admin", "dilg"]}><AuditView /></ProtectedRoute>} />
+            <Route path="/audit/exports" element={<ProtectedRoute allowedRoles={["admin", "dilg"]}><AuditView /></ProtectedRoute>} />
 
             {/* Embedded CFDP Survey System */}
             <Route
