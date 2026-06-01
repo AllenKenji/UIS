@@ -187,21 +187,21 @@ const SKDashboard = () => {
             {shouldShowSection("programs") ? (
               <section className="tool-section" ref={programsRef}>
                 <h3>🎯 Program List</h3>
-                <ProgramList programs={programs} readOnly />
+                <ProgramList programs={programs} />
               </section>
             ) : null}
 
             {shouldShowSection("events") ? (
               <section className="tool-section" ref={eventsRef}>
                 <h3>📅 Event Calendar</h3>
-                <EventCalendar events={events} readOnly />
+                <EventCalendar events={events} />
               </section>
             ) : null}
 
             {shouldShowSection("feedback") ? (
               <section className="tool-section" ref={feedbackRef}>
                 <h3>💬 Youth Feedback</h3>
-                <YouthFeedbackForm feedbackItems={feedback} readOnly />
+                <YouthFeedbackForm feedbackItems={feedback} />
               </section>
             ) : null}
           </div>

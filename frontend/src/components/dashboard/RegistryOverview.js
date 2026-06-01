@@ -62,8 +62,14 @@ const RegistryOverview = () => {
       const results = {};
 
       for (const key of REGISTRY_KEYS) {
-        const permission = COLLECTION_PERMISSIONS[key];
-        if (!permission || !can(permission)) {
+        const permissions = COLLECTION_PERMISSIONS[key];
+        const hasPermission =
+          !permissions ||
+          (Array.isArray(permissions)
+            ? permissions.some((perm) => can(perm))
+            : can(permissions));
+
+        if (!hasPermission) {
           results[key] = "N/A";
           continue;
         }
