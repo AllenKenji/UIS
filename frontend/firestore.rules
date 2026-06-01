@@ -4,25 +4,29 @@ service cloud.firestore {
     return request.auth != null;
   }
 
+  function normalizeRole(role) {
+    return role is string ? role.lower() : "";
+  }
+
   // 🔑 Resolve role: trust claim only when it is one of the known roles.
   // If claim is missing or malformed, fall back to /users and then resident.
   function userRole() {
-    let claimRole = request.auth.token.role;
+    let claimRole = normalizeRole(request.auth.token.role);
     return claimRole in ["admin", "staff", "secretary", "treasurer", "sk", "dilg", "resident"]
       ? claimRole
       : (exists(/databases/(default)/documents/users/$(request.auth.uid))
-          ? get(/databases/(default)/documents/users/$(request.auth.uid)).data.role
+          ? normalizeRole(get(/databases/(default)/documents/users/$(request.auth.uid)).data.role)
           : "resident");
   }
 
-  // 🎭 Role helpers (supports legacy mixed-case values in Firestore)
-  function isAdmin()       { return isAuthenticated() && userRole() in ["admin", "Admin", "ADMIN"]; }
-  function isSecretary()   { return isAuthenticated() && userRole() in ["secretary", "Secretary", "SECRETARY"]; }
-  function isStaff()       { return isAuthenticated() && userRole() in ["staff", "Staff", "STAFF"]; }
-  function isTreasurer()   { return isAuthenticated() && userRole() in ["treasurer", "Treasurer", "TREASURER"]; }
-  function isSK()          { return isAuthenticated() && userRole() in ["sk", "SK"]; }
-  function isDILG()        { return isAuthenticated() && userRole() in ["dilg", "DILG"]; }
-  function isResident()    { return isAuthenticated() && userRole() in ["resident", "Resident", "RESIDENT"]; }
+  // 🎭 Role helpers
+  function isAdmin()       { return isAuthenticated() && userRole() == "admin"; }
+  function isSecretary()   { return isAuthenticated() && userRole() == "secretary"; }
+  function isStaff()       { return isAuthenticated() && userRole() == "staff"; }
+  function isTreasurer()   { return isAuthenticated() && userRole() == "treasurer"; }
+  function isSK()          { return isAuthenticated() && userRole() == "sk"; }
+  function isDILG()        { return isAuthenticated() && userRole() == "dilg"; }
+  function isResident()    { return isAuthenticated() && userRole() == "resident"; }
 
   function isAdminOrSecretary() { return isAuthenticated() && (isAdmin() || isSecretary()); }
   function isAdminOrStaff()     { return isAuthenticated() && (isAdmin() || isStaff()); }

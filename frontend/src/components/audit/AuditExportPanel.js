@@ -4,17 +4,35 @@ import { db } from "../../services/firebase";
 import { AuditAPI } from "../../services/api";
 
 const safePdfText = (value) => String(value ?? "").replace(/[^\x20-\x7E]/g, "");
+const normalizeListPayload = (data) => {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.items)) return data.items;
+  if (Array.isArray(data?.results)) return data.results;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
+};
+
+const safeCount = async (collectionName) => {
+  try {
+    const snap = await getCountFromServer(collection(db, collectionName));
+    return snap.data().count;
+  } catch (error) {
+    console.warn(`Failed to count ${collectionName}:`, error);
+    return "N/A";
+  }
+};
 
 const AuditExportPanel = () => {
   const handleExport = async () => {
     try {
-      const [residents, businesses, documents, logins, logs] = await Promise.all([
-        getCountFromServer(collection(db, "residents")),
-        getCountFromServer(collection(db, "businesses")),
-        getCountFromServer(collection(db, "documents")),
-        getCountFromServer(collection(db, "logins")),
+      const [residents, businesses, documents, logins, logsResponse] = await Promise.all([
+        safeCount("residents"),
+        safeCount("businesses"),
+        safeCount("documents"),
+        safeCount("logins"),
         AuditAPI.list().catch(() => []),
       ]);
+      const logs = normalizeListPayload(logsResponse);
 
       const generatedAt = new Date();
       const generatedAtLabel = generatedAt.toLocaleString();
@@ -22,10 +40,10 @@ const AuditExportPanel = () => {
 
       const summaryLines = [
         `Generated: ${generatedAtLabel}`,
-        `Residents: ${residents.data().count}`,
-        `Businesses: ${businesses.data().count}`,
-        `Documents: ${documents.data().count}`,
-        `Login Events: ${logins.data().count}`,
+        `Residents: ${residents}`,
+        `Businesses: ${businesses}`,
+        `Documents: ${documents}`,
+        `Login Events: ${logins}`,
         `Document Audit Logs: ${Array.isArray(logs) ? logs.length : 0}`,
       ];
 
