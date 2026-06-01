@@ -5,6 +5,7 @@ import ResidentForm from "../components/forms/ResidentForm";
 import { useUser } from "../context/UserContext"; 
 import { Navigate } from "react-router-dom";
 import "./staff-dashboard.css";
+import "../styles/dashboard/role-dashboard.css";
 
 const StaffDashboard = ({ residents, loading }) => {
   const { role } = useUser();
@@ -22,7 +23,7 @@ const StaffDashboard = ({ residents, loading }) => {
   const isOverlayActive = Boolean(activeForm);
 
   return (
-    <section className="dashboard staff-dashboard">
+    <section className="dashboard staff-dashboard role-dashboard role-staff">
       <header className="dashboard-header flex-between">
         <div className="header-info">
           <h2>👩‍💻 Staff Dashboard</h2>

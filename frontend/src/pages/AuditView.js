@@ -45,29 +45,32 @@ const AuditView = () => {
     let cancelled = false;
 
     const loadMetrics = async () => {
-      try {
-        const [residents, businesses, documents, logins, logs] = await Promise.all([
-          getCountFromServer(collection(db, "residents")),
-          getCountFromServer(collection(db, "businesses")),
-          getCountFromServer(collection(db, "documents")),
-          getCountFromServer(collection(db, "logins")),
-          AuditAPI.list().catch(() => []),
-        ]);
+      const readCount = async (key) => {
+        try {
+          const snap = await getCountFromServer(collection(db, key));
+          return snap.data().count;
+        } catch (error) {
+          console.warn(`Failed to load ${key} count:`, error);
+          return "N/A";
+        }
+      };
 
-        if (!cancelled) {
-          setMetrics({
-            residents: residents.data().count,
-            businesses: businesses.data().count,
-            documents: documents.data().count,
-            logins: logins.data().count,
-            auditLogs: Array.isArray(logs) ? logs.length : "N/A",
-          });
-        }
-      } catch (error) {
-        console.warn("Failed to load audit metrics:", error);
-        if (!cancelled) {
-          setMetrics((prev) => ({ ...prev, auditLogs: "N/A" }));
-        }
+      const [residents, businesses, documents, logins, logs] = await Promise.all([
+        readCount("residents"),
+        readCount("businesses"),
+        readCount("documents"),
+        readCount("logins"),
+        AuditAPI.list().catch(() => []),
+      ]);
+
+      if (!cancelled) {
+        setMetrics({
+          residents,
+          businesses,
+          documents,
+          logins,
+          auditLogs: Array.isArray(logs) ? logs.length : "N/A",
+        });
       }
     };
 

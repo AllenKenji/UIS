@@ -12,13 +12,13 @@ const formatDateTime = (value) => {
   return date.toLocaleString();
 };
 
-const YouthFeedbackForm = ({ feedbackItems = [] }) => {
+const YouthFeedbackForm = ({ feedbackItems = [], readOnly = false }) => {
   const { userInfo, role } = useUser();
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [updatingId, setUpdatingId] = useState(null);
 
-  const canModerate = role === "admin" || role === "sk";
+  const canModerate = !readOnly && (role === "admin" || role === "sk");
 
   const latestFeedback = [...feedbackItems]
     .sort((a, b) => {
@@ -87,15 +87,17 @@ const YouthFeedbackForm = ({ feedbackItems = [] }) => {
 
   return (
     <div className="youth-feedback-form">
-      <form onSubmit={handleSubmit}>
-        <textarea
-          rows="4"
-          placeholder="Share youth concerns, requests, or proposals..."
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-        />
-        <button type="submit" disabled={sending}>{sending ? "Sending..." : "Send"}</button>
-      </form>
+      {!readOnly ? (
+        <form onSubmit={handleSubmit}>
+          <textarea
+            rows="4"
+            placeholder="Share youth concerns, requests, or proposals..."
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+          />
+          <button type="submit" disabled={sending}>{sending ? "Sending..." : "Send"}</button>
+        </form>
+      ) : null}
 
       {latestFeedback.length > 0 ? (
         <div className="sk-feed-list">

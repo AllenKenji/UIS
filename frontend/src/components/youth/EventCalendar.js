@@ -21,7 +21,7 @@ const toInputDate = (value) => {
   return date ? date.toISOString().slice(0, 10) : "";
 };
 
-const EventCalendar = ({ events = [], formOnly = false }) => {
+const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
   const [form, setForm] = useState({ title: "", date: "", location: "" });
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -104,37 +104,41 @@ const EventCalendar = ({ events = [], formOnly = false }) => {
 
   return (
     <div className="event-calendar">
-      <h4 className="sk-form-title">{editingId ? "Edit Event" : "Add Event"}</h4>
-      <form id="add-event-form" className="sk-inline-form" onSubmit={handleSubmit}>
-        <input
-          type="text"
-          placeholder="Event title"
-          value={form.title}
-          onChange={(e) => handleChange("title", e.target.value)}
-        />
-        <input
-          type="date"
-          value={form.date}
-          onChange={(e) => handleChange("date", e.target.value)}
-        />
-        <input
-          type="text"
-          placeholder="Location"
-          value={form.location}
-          onChange={(e) => handleChange("location", e.target.value)}
-        />
-        <button type="submit" disabled={saving}>{saving ? "Saving..." : editingId ? "Update Event" : "Add Event"}</button>
-        {editingId ? (
-          <button type="button" className="sk-secondary-btn" onClick={clearForm}>
-            Cancel Edit
-          </button>
-        ) : null}
-      </form>
+      {!readOnly ? (
+        <>
+          <h4 className="sk-form-title">{editingId ? "Edit Event" : "Add Event"}</h4>
+          <form id="add-event-form" className="sk-inline-form" onSubmit={handleSubmit}>
+            <input
+              type="text"
+              placeholder="Event title"
+              value={form.title}
+              onChange={(e) => handleChange("title", e.target.value)}
+            />
+            <input
+              type="date"
+              value={form.date}
+              onChange={(e) => handleChange("date", e.target.value)}
+            />
+            <input
+              type="text"
+              placeholder="Location"
+              value={form.location}
+              onChange={(e) => handleChange("location", e.target.value)}
+            />
+            <button type="submit" disabled={saving}>{saving ? "Saving..." : editingId ? "Update Event" : "Add Event"}</button>
+            {editingId ? (
+              <button type="button" className="sk-secondary-btn" onClick={clearForm}>
+                Cancel Edit
+              </button>
+            ) : null}
+          </form>
+        </>
+      ) : null}
 
       {formOnly ? (
         <p className="sk-empty-state">Event list is hidden in add mode.</p>
       ) : sortedEvents.length === 0 ? (
-        <p className="sk-empty-state">No events yet. Add an SK event to start the calendar.</p>
+        <p className="sk-empty-state">{readOnly ? "No events available yet." : "No events yet. Add an SK event to start the calendar."}</p>
       ) : (
         <ul>
           {sortedEvents.map((item) => (
@@ -144,14 +148,16 @@ const EventCalendar = ({ events = [], formOnly = false }) => {
                 <span>{formatDate(item.date || item.eventDate)}</span>
                 <span>{item.location || "Location not set"}</span>
               </div>
-              <div className="sk-item-actions">
-                <button type="button" className="sk-secondary-btn" onClick={() => handleEdit(item)}>
-                  Edit
-                </button>
-                <button type="button" className="sk-danger-btn" onClick={() => handleDelete(item.id)}>
-                  Delete
-                </button>
-              </div>
+              {!readOnly ? (
+                <div className="sk-item-actions">
+                  <button type="button" className="sk-secondary-btn" onClick={() => handleEdit(item)}>
+                    Edit
+                  </button>
+                  <button type="button" className="sk-danger-btn" onClick={() => handleDelete(item.id)}>
+                    Delete
+                  </button>
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>

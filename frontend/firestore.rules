@@ -45,6 +45,9 @@ service cloud.firestore {
       
       // Secretaries can read all residents 
       allow read: if isSecretary();
+
+      // DILG can read residents for audit oversight
+      allow read: if isDILG();
     }
 
     // 💼 Businesses 
@@ -104,6 +107,9 @@ service cloud.firestore {
 
       // Treasurer can read documents for financial reporting (needed by usePayments hook)
       allow read: if isTreasurer();
+
+      // DILG can read documents for audit oversight
+      allow read: if isDILG();
     }
     
     // 📄 Document Types
@@ -167,6 +173,7 @@ service cloud.firestore {
     // 📊 Logins
     match /logins/{docId} {
       allow read: if isAdminOrStaff();
+      allow read: if isDILG();
     }
 
     // 💰 Fees
@@ -187,6 +194,7 @@ service cloud.firestore {
     // 💰 Collections (payment intake records)
     match /collections/{docId} {
       allow read: if isAdmin() || isTreasurer();
+      allow read: if isDILG();
       allow write: if isAdmin() || isTreasurer();
     }
 
@@ -200,6 +208,9 @@ service cloud.firestore {
 
       // Staff/Admin/Treasurer/Secretary can manage all payments
       allow read, create, update, delete: if isAdminOrStaff() || isTreasurer() || isSecretary();
+
+      // DILG can read payments for audit oversight
+      allow read: if isDILG();
     }
     
 		// Receipts

@@ -93,14 +93,14 @@ export const ROLE_PERMISSIONS = Object.freeze(
 // 🔐 Collection → permission mapping
 // Each collection can map to one or more permissions
 export const COLLECTION_PERMISSIONS = Object.freeze({
-  residents:  ["manageResidents"],
-  businesses: ["viewBusinesses"],
+  residents:  ["manageResidents", "auditBarangayData"],
+  businesses: ["viewBusinesses", "auditBarangayData"],
   complaints: ["viewAllComplaints", "fileComplaints", "viewOwnComplaints", "manageComplaints"], 
   incidents:  ["viewIncidents", "reportIncidents"], 
-  documents:  ["viewDocuments", "viewOwnDocuments", "requestDocuments"],
+  documents:  ["viewDocuments", "viewOwnDocuments", "requestDocuments", "auditBarangayData"],
   logins:     ["auditBarangayData"], 
-  youth:      ["youthRegistryAccess"],
-  collections:["viewFinancialRecords"],
+  youth:      ["youthRegistryAccess", "auditBarangayData"],
+  collections:["viewFinancialRecords", "auditBarangayData"],
 });
 
 // 🔄 Auto-derived ROLE_COLLECTIONS (handles arrays of permissions)

@@ -1,18 +1,9 @@
 import { collection, getCountFromServer } from "firebase/firestore";
+import jsPDF from "jspdf";
 import { db } from "../../services/firebase";
 import { AuditAPI } from "../../services/api";
 
-const downloadTextFile = (fileName, content) => {
-  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-};
+const safePdfText = (value) => String(value ?? "").replace(/[^\x20-\x7E]/g, "");
 
 const AuditExportPanel = () => {
   const handleExport = async () => {
@@ -25,19 +16,36 @@ const AuditExportPanel = () => {
         AuditAPI.list().catch(() => []),
       ]);
 
-      const generatedAt = new Date().toLocaleString();
-      const content = [
-        "Barangay Audit Summary",
-        `Generated: ${generatedAt}`,
-        "",
+      const generatedAt = new Date();
+      const generatedAtLabel = generatedAt.toLocaleString();
+      const dateTag = generatedAt.toISOString().slice(0, 10);
+
+      const summaryLines = [
+        `Generated: ${generatedAtLabel}`,
         `Residents: ${residents.data().count}`,
         `Businesses: ${businesses.data().count}`,
         `Documents: ${documents.data().count}`,
         `Login Events: ${logins.data().count}`,
         `Document Audit Logs: ${Array.isArray(logs) ? logs.length : 0}`,
-      ].join("\n");
+      ];
 
-      downloadTextFile(`barangay_audit_summary_${new Date().toISOString().slice(0, 10)}.txt`, content);
+      const doc = new jsPDF({ unit: "pt", format: "a4" });
+      const left = 48;
+      let y = 60;
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.text(safePdfText("Barangay Audit Summary"), left, y);
+
+      y += 24;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      summaryLines.forEach((line) => {
+        doc.text(safePdfText(line), left, y);
+        y += 18;
+      });
+
+      doc.save(`barangay_audit_summary_${dateTag}.pdf`);
     } catch (error) {
       console.error("Audit export failed:", error);
       window.alert("Failed to export audit summary.");
@@ -48,7 +56,7 @@ const AuditExportPanel = () => {
     <div className="audit-export-panel">
       <h3>📤 Export Tools</h3>
       <p>Download a current audit summary for compliance reviews, offline validation, and reporting.</p>
-      <button type="button" onClick={handleExport}>Download Audit Summary</button>
+      <button type="button" onClick={handleExport}>Download Audit Summary (PDF)</button>
     </div>
   );
 };

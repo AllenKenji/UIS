@@ -3,6 +3,7 @@ import { ResidentsAPI, ComplaintsAPI, api } from "../services/api";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../services/firebase";
 import "./resident.css";
+import "../styles/dashboard/role-dashboard.css";
 
 const DEFAULT_AVATAR = "/assets/default-avatar.png";
 
@@ -172,7 +173,12 @@ const ResidentDashboard = ({ residentId }) => {
   } = resident;
 
   return (
-    <div className="resident-dashboard-page">
+    <div className="dashboard resident-dashboard-page role-dashboard role-resident">
+      <header className="dashboard-header">
+        <h2>🏠 Resident Dashboard</h2>
+        <p>Review your profile and track your businesses, documents, incidents, and complaints.</p>
+      </header>
+
       <div className="resident-dashboard-actions">
         <button
           type="button"

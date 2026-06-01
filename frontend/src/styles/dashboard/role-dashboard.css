@@ -1,0 +1,148 @@
+.role-dashboard {
+  --role-accent: var(--color-accent);
+  --role-accent-soft: rgba(37, 99, 235, 0.12);
+  --role-accent-soft-2: rgba(14, 165, 233, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  padding: 1.5rem;
+  color: var(--color-text);
+}
+
+.role-admin {
+  --role-accent: #2563eb;
+  --role-accent-soft: rgba(37, 99, 235, 0.12);
+  --role-accent-soft-2: rgba(14, 165, 233, 0.08);
+}
+
+.role-staff {
+  --role-accent: #059669;
+  --role-accent-soft: rgba(5, 150, 105, 0.14);
+  --role-accent-soft-2: rgba(16, 185, 129, 0.08);
+}
+
+.role-secretary {
+  --role-accent: #b45309;
+  --role-accent-soft: rgba(180, 83, 9, 0.14);
+  --role-accent-soft-2: rgba(245, 158, 11, 0.08);
+}
+
+.role-treasurer {
+  --role-accent: #0f766e;
+  --role-accent-soft: rgba(15, 118, 110, 0.14);
+  --role-accent-soft-2: rgba(20, 184, 166, 0.08);
+}
+
+.role-resident {
+  --role-accent: #be185d;
+  --role-accent-soft: rgba(190, 24, 93, 0.14);
+  --role-accent-soft-2: rgba(236, 72, 153, 0.08);
+}
+
+.role-dashboard .dashboard-header,
+.role-dashboard > header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 1.25rem;
+  border-radius: 16px;
+  border: 1px solid var(--color-border);
+  background: linear-gradient(135deg, var(--role-accent-soft), var(--role-accent-soft-2));
+  box-shadow: var(--shadow-card, 0 10px 28px rgba(15, 23, 42, 0.08));
+}
+
+.role-dashboard .dashboard-header h1,
+.role-dashboard .dashboard-header h2,
+.role-dashboard > header h1,
+.role-dashboard > header h2 {
+  margin: 0;
+  color: var(--color-text-strong, var(--color-text));
+}
+
+.role-dashboard .dashboard-header p,
+.role-dashboard > header p,
+.role-dashboard .dashboard-subtitle {
+  margin: 0;
+  color: var(--color-text);
+}
+
+.role-dashboard .dashboard-tabs,
+.role-dashboard .sk-nav-grid {
+  margin-bottom: 0;
+}
+
+.role-dashboard .dashboard-tab-btn.active,
+.role-dashboard .profile-toggle-btn,
+.role-dashboard .btn-staff,
+.role-dashboard .reports-section button,
+.role-dashboard .header-buttons button {
+  background: var(--role-accent);
+  border-color: var(--role-accent);
+  color: #fff;
+}
+
+.role-dashboard .dashboard-tab-btn.active:hover,
+.role-dashboard .profile-toggle-btn:hover,
+.role-dashboard .btn-staff:hover,
+.role-dashboard .reports-section button:hover,
+.role-dashboard .header-buttons button:hover {
+  filter: brightness(1.06);
+}
+
+.role-dashboard .dashboard-section,
+.role-dashboard .staff-dashboard-content > *,
+.role-dashboard .chart-section,
+.role-dashboard .resident-records section,
+.role-dashboard .summary-cards .card,
+.role-dashboard .transactions-table,
+.role-dashboard .disbursement-table,
+.role-dashboard .reports-section,
+.role-dashboard .revenue-chart,
+.role-dashboard .resident-resume {
+  background: var(--gradient-card, var(--color-card-bg));
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-card, 0 10px 28px rgba(15, 23, 42, 0.08));
+}
+
+.role-dashboard .chart-section,
+.role-dashboard .transactions-table,
+.role-dashboard .disbursement-table,
+.role-dashboard .reports-section,
+.role-dashboard .revenue-chart,
+.role-dashboard .resident-records section {
+  border-top: 4px solid var(--role-accent);
+}
+
+.role-dashboard .summary-cards .card h3,
+.role-dashboard .summary-cards .card p,
+.role-dashboard .chart-section h3,
+.role-dashboard .revenue-chart h2,
+.role-dashboard .transactions-table h2,
+.role-dashboard .disbursement-table h2,
+.role-dashboard .reports-section h2,
+.role-dashboard .resident-records section h2 {
+  color: var(--color-text-strong, var(--color-text));
+}
+
+.role-dashboard .section-stack,
+.role-dashboard .charts-container,
+.role-dashboard .staff-dashboard-content,
+.role-dashboard .resident-records {
+  gap: 1.2rem;
+}
+
+.role-dashboard .resident-dashboard-actions {
+  margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .role-dashboard {
+    padding: 1rem;
+  }
+
+  .role-dashboard .dashboard-header,
+  .role-dashboard > header {
+    padding: 1rem;
+  }
+}

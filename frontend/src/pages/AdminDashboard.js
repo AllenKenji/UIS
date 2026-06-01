@@ -11,6 +11,7 @@ import { Navigate } from "react-router-dom";
 import DashboardSection from "../components/layout/DashboardSection";
 
 import "./adminDashboard.css";
+import "../styles/dashboard/role-dashboard.css";
 
 const AdminDashboard = () => {
   const { isAdmin, role } = useUser();
@@ -23,7 +24,7 @@ const AdminDashboard = () => {
   }
 
   return (
-    <section className="dashboard admin-dashboard" aria-label="Admin Dashboard">
+    <section className="dashboard admin-dashboard role-dashboard role-admin" aria-label="Admin Dashboard">
       <header className="dashboard-header">
         <h2>🧑‍💼 Barangay Captain Dashboard</h2>
         <p className="dashboard-subtitle">

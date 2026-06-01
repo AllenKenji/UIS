@@ -4,17 +4,21 @@ import TransactionsTable from "../components/treasurer/TransactionsTable";
 import DisbursementTable from "../components/treasurer/DisbursementTable";
 import ReportsSection from "../components/treasurer/ReportsSection";
 import "../styles/treasurer.css"
+import "../styles/dashboard/role-dashboard.css";
 
 function TreasurerDashboard() {
   return (
-    <div className="treasurer-dashboard">
-      <h1>Treasurer Dashboard</h1>
+    <section className="dashboard treasurer-dashboard role-dashboard role-treasurer" aria-label="Treasurer Dashboard">
+      <header className="dashboard-header">
+        <h2>💰 Treasurer Dashboard</h2>
+        <p>Monitor collections, disbursements, and financial reporting.</p>
+      </header>
       <SummaryCards />
       <RevenueChart />
       <TransactionsTable />
       <DisbursementTable />
       <ReportsSection />
-    </div>
+    </section>
   );
 }
 

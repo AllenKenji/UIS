@@ -6,6 +6,7 @@ import DocumentTypeChart from "../components/secretary/DocumentTypeChart";
 import PaymentStatusChart from "../components/secretary/PaymentStatusChart";
 import MonthlyTrendChart from "../components/secretary/MonthlyTrendChart";
 import "../styles/secretary.css"
+import "../styles/dashboard/role-dashboard.css";
 
 const SecretaryDashboard = () => {
   const { docs: documents } = useAllDocuments();
@@ -23,8 +24,8 @@ const SecretaryDashboard = () => {
   };
 
   return (
-    <section className="dashboard secretary-dashboard">
-      <header>
+    <section className="dashboard secretary-dashboard role-dashboard role-secretary">
+      <header className="dashboard-header">
         <h2>📑 Secretary Dashboard</h2>
         <p>Overview of resident requests and payment facilitation.</p>
       </header>
