@@ -35,6 +35,20 @@ const getResidentAge = (resident) => {
   return age;
 };
 
+const formatCurrency = (value) =>
+  new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
+  }).format(Number(value) || 0);
+
+const parseAmount = (value) => {
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) return numeric;
+  const cleaned = String(value ?? "").replace(/[^\d.-]/g, "");
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 const buildPeriodWindow = (periodType, selectedMonth, selectedYear) => {
   if (periodType === "yearly") {
     const year = Number(selectedYear) || new Date().getFullYear();
@@ -65,6 +79,16 @@ const isWithinRange = (value, start, end) => {
 };
 
 const getRecordDate = (key, record) => {
+  if (key === "businesses") {
+    return (
+      record.submittedAt ||
+      record.createdAt ||
+      record.timestamp ||
+      record.created_at ||
+      record.updatedAt
+    );
+  }
+
   if (key === "collections") {
     return (
       record.datePaid ||
@@ -119,6 +143,13 @@ const RegistryAudit = () => {
 
       const results = await Promise.all(
         Object.entries(CATEGORIES).map(async ([key, label]) => {
+          const displayCategory =
+            key === "logins"
+              ? "Login"
+              : key === "collections"
+                ? "Collections"
+                : label;
+
           const permissions = COLLECTION_PERMISSIONS[key];
 
           // ✅ FIX: allow access if ANY permission matches
@@ -126,24 +157,27 @@ const RegistryAudit = () => {
             !permissions || permissions.some((perm) => can(perm));
 
           if (!hasPermission) {
-            return { category: label, total: "N/A", periodLabel: label };
+            return { key, category: displayCategory, total: "N/A", periodLabel: label };
           }
 
           try {
             if (key === "youth") {
               const youthCount = await getYouthResidentsCount(start, end);
-              return { category: label, total: youthCount, periodLabel: label };
+              return { key, category: displayCategory, total: youthCount, periodLabel: label };
             }
 
             if (key === "collections") {
               const snapshot = await getDocs(collection(db, "payments"));
-              const total = snapshot.docs.reduce((count, docSnap) => {
+              const total = snapshot.docs.reduce((sum, docSnap) => {
                 const data = docSnap.data() || {};
                 const status = String(data.status || data.paymentStatus || "").trim().toLowerCase();
                 const isPaid = status === "paid";
-                return isPaid && isWithinRange(getRecordDate(key, data), start, end) ? count + 1 : count;
+                if (!isPaid || !isWithinRange(getRecordDate(key, data), start, end)) {
+                  return sum;
+                }
+                return sum + parseAmount(data.amount);
               }, 0);
-              return { category: label, total, periodLabel: label };
+              return { key, category: displayCategory, total, periodLabel: label };
             }
 
             const snapshot = await getDocs(collection(db, key));
@@ -151,10 +185,10 @@ const RegistryAudit = () => {
               const data = docSnap.data() || {};
               return isWithinRange(getRecordDate(key, data), start, end) ? count + 1 : count;
             }, 0);
-            return { category: label, total, periodLabel: label };
+            return { key, category: displayCategory, total, periodLabel: label };
           } catch (err) {
             console.warn(`⚠️ Error fetching ${key}:`, err.message);
-            return { category: label, total: "N/A", periodLabel: label };
+            return { key, category: displayCategory, total: "N/A", periodLabel: label };
           }
         })
       );
@@ -216,10 +250,15 @@ const RegistryAudit = () => {
       ) : (
         <ul>
           {stats.map((entry, index) => {
-            const variant = CATEGORY_VARIANTS[entry.category] || "neutral";
+            const baseCategoryLabel = CATEGORIES[entry.key] || entry.category;
+            const variant = CATEGORY_VARIANTS[baseCategoryLabel] || "neutral";
+            const totalValue =
+              entry.key === "collections" && entry.total !== "N/A"
+                ? formatCurrency(entry.total)
+                : entry.total;
             return (
               <li key={index} className={`audit-entry ${variant}`}>
-                <strong>{entry.category}</strong>: {entry.total} entries<br />
+                <strong>{entry.category}</strong>: {totalValue}{entry.key === "collections" ? "" : " entries"}<br />
                 <small>Period: {activePeriodLabel}</small>
               </li>
             );

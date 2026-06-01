@@ -73,6 +73,8 @@ const DashboardFocusPanel = ({ view }) => {
     [residents]
   );
 
+  const totalResidents = residents.length;
+
   const youthRows = useMemo(
     () =>
       residents.filter((resident) => {
@@ -306,27 +308,32 @@ const DashboardFocusPanel = ({ view }) => {
     if (loading) return <p>Loading residents added today...</p>;
     if (error) return <p className="error">{error}</p>;
 
-    return residentRows.length === 0 ? (
-      <p>No residents were added today.</p>
-    ) : (
-      <table className="queue-table" aria-label="Residents Added Today">
-        <thead>
-          <tr>
-            <th>Resident</th>
-            <th>Barangay</th>
-            <th>Added</th>
-          </tr>
-        </thead>
-        <tbody>
-          {residentRows.map((resident) => (
-            <tr key={resident.id || resident.uid || resident.fullName}>
-              <td>{resident.fullName || resident.name || "—"}</td>
-              <td>{resident.address?.barangay || resident.barangay || "—"}</td>
-              <td>{toDate(resident.createdAt || resident.timestamp || resident.created_at)?.toLocaleString() || "—"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    return (
+      <>
+        <p><strong>Total Residents:</strong> {totalResidents}</p>
+        {residentRows.length === 0 ? (
+          <p>No residents were added today.</p>
+        ) : (
+          <table className="queue-table" aria-label="Residents Added Today">
+            <thead>
+              <tr>
+                <th>Resident</th>
+                <th>Barangay</th>
+                <th>Added</th>
+              </tr>
+            </thead>
+            <tbody>
+              {residentRows.map((resident) => (
+                <tr key={resident.id || resident.uid || resident.fullName}>
+                  <td>{resident.fullName || resident.name || "—"}</td>
+                  <td>{resident.address?.barangay || resident.barangay || "—"}</td>
+                  <td>{toDate(resident.createdAt || resident.timestamp || resident.created_at)?.toLocaleString() || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </>
     );
   }
 
