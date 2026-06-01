@@ -111,6 +111,61 @@ const getRecordDate = (key, record) => {
   );
 };
 
+const normalizeStatus = (value) => String(value || "").trim().toLowerCase();
+
+const isPaidCollectionRecord = (record) => {
+  const status = normalizeStatus(record.status || record.paymentStatus);
+  return status === "paid" || status === "approved";
+};
+
+const buildCollectionTransactionSet = async () => {
+  const [paymentsSnapshot, businessesSnapshot, documentsSnapshot] = await Promise.all([
+    getDocs(collection(db, "payments")),
+    getDocs(collection(db, "businesses")),
+    getDocs(collection(db, "documents")),
+  ]);
+
+  const payments = paymentsSnapshot.docs.map((docSnap) => ({
+    id: docSnap.id,
+    entityType: "payment",
+    ...docSnap.data(),
+  }));
+
+  const businesses = businessesSnapshot.docs.map((docSnap) => ({
+    id: docSnap.id,
+    entityType: "business",
+    ...docSnap.data(),
+  }));
+
+  const documents = documentsSnapshot.docs.map((docSnap) => ({
+    id: docSnap.id,
+    entityType: "document",
+    ...docSnap.data(),
+  }));
+
+  const merged = [...payments, ...businesses, ...documents];
+  const deduped = new Map();
+
+  merged.forEach((record) => {
+    const key = record.transactionId || record.id;
+    if (!key) {
+      return;
+    }
+
+    const existing = deduped.get(key);
+    if (!existing) {
+      deduped.set(key, record);
+      return;
+    }
+
+    if (existing.entityType !== "payment" && record.entityType === "payment") {
+      deduped.set(key, record);
+    }
+  });
+
+  return Array.from(deduped.values());
+};
+
 const getYouthResidentsCount = async (start, end) => {
   const snapshot = await getDocs(collection(db, "residents"));
   const residents = snapshot.docs.map((doc) => doc.data() || {});
@@ -167,15 +222,20 @@ const RegistryAudit = () => {
             }
 
             if (key === "collections") {
-              const snapshot = await getDocs(collection(db, "payments"));
-              const total = snapshot.docs.reduce((sum, docSnap) => {
-                const data = docSnap.data() || {};
-                const status = String(data.status || data.paymentStatus || "").trim().toLowerCase();
-                const isPaid = status === "paid";
-                if (!isPaid || !isWithinRange(getRecordDate(key, data), start, end)) {
+              const transactions = await buildCollectionTransactionSet();
+              const total = transactions.reduce((sum, record) => {
+                const dateValue =
+                  record.datePaid ||
+                  record.paymentDate ||
+                  record.paidAt ||
+                  record.timestamp ||
+                  record.createdAt ||
+                  record.date;
+
+                if (!isPaidCollectionRecord(record) || !isWithinRange(dateValue, start, end)) {
                   return sum;
                 }
-                return sum + parseAmount(data.amount);
+                return sum + parseAmount(record.amount);
               }, 0);
               return { key, category: displayCategory, total, periodLabel: label };
             }
