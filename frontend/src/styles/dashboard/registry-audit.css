@@ -13,6 +13,34 @@
   margin-bottom: var(--space-md);
 }
 
+.registry-audit-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+  margin-bottom: var(--space-sm);
+}
+
+.registry-audit-controls label {
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.registry-audit-controls select,
+.registry-audit-controls input {
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-card-muted);
+  color: var(--color-text);
+}
+
+.registry-audit-period-label {
+  margin: 0 0 var(--space-md);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+
 .registry-audit ul {
   list-style: none;
   padding: 0;
