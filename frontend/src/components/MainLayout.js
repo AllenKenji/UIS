@@ -31,8 +31,8 @@ const MainLayout = () => {
   }, []);
 
   const normalizedRole = role?.trim().toLowerCase();
-  const isSkModuleRoute = location.pathname.startsWith("/youth");
-  const linksToRender = isSkModuleRoute && ["sk", "admin"].includes(normalizedRole)
+  const isSkModuleRoute = normalizedRole === "sk" && location.pathname.startsWith("/youth");
+  const linksToRender = isSkModuleRoute
     ? sidebarLinks.sk || []
     : sidebarLinks[normalizedRole] || sidebarLinks.default || [];
 

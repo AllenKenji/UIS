@@ -164,14 +164,17 @@ const AppRoutes = ({ isDarkMode, toggleDarkMode }) => {
             <Route path="/treasurer/reports" element={<ProtectedRoute allowedRoles={["treasurer"]}><Reports /></ProtectedRoute>} />
             <Route path="/treasurer/settings" element={<ProtectedRoute allowedRoles={["treasurer"]}><Settings /></ProtectedRoute>} />
 
+            {/* Admin Youth Oversight */}
+            <Route path="/admin/youth" element={<ProtectedRoute allowedRoles={["admin"]}><SKDashboard /></ProtectedRoute>} />
+
             {/* SK */}
-            <Route path="/youth" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
-            <Route path="/youth/registry" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
-            <Route path="/youth/programs" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
-            <Route path="/youth/programs/add" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKAddProgramPage /></ProtectedRoute>} />
-            <Route path="/youth/events" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
-            <Route path="/youth/events/add" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKAddEventPage /></ProtectedRoute>} />
-            <Route path="/youth/feedback" element={<ProtectedRoute allowedRoles={["admin","sk"]}><SKDashboard /></ProtectedRoute>} />
+            <Route path="/youth" element={<ProtectedRoute allowedRoles={["sk"]}><SKDashboard /></ProtectedRoute>} />
+            <Route path="/youth/registry" element={<ProtectedRoute allowedRoles={["sk"]}><SKDashboard /></ProtectedRoute>} />
+            <Route path="/youth/programs" element={<ProtectedRoute allowedRoles={["sk"]}><SKDashboard /></ProtectedRoute>} />
+            <Route path="/youth/programs/add" element={<ProtectedRoute allowedRoles={["sk"]}><SKAddProgramPage /></ProtectedRoute>} />
+            <Route path="/youth/events" element={<ProtectedRoute allowedRoles={["sk"]}><SKDashboard /></ProtectedRoute>} />
+            <Route path="/youth/events/add" element={<ProtectedRoute allowedRoles={["sk"]}><SKAddEventPage /></ProtectedRoute>} />
+            <Route path="/youth/feedback" element={<ProtectedRoute allowedRoles={["sk"]}><SKDashboard /></ProtectedRoute>} />
 
             {/* Admin + DILG Audit Center */}
             <Route path="/admin/audit" element={<ProtectedRoute allowedRoles={["admin"]}><AuditView /></ProtectedRoute>} />

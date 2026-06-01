@@ -2,183 +2,240 @@
 🎒 SK Dashboard Layout
 ================================ */
 .sk-dashboard {
-  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  color: var(--color-text, var(--text));
+}
+
+.sk-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.35rem;
+  border-radius: 18px;
+  border: 1px solid var(--color-border, var(--border));
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.12), rgba(14, 165, 233, 0.08));
+  box-shadow: var(--shadow-card, 0 10px 28px rgba(15, 23, 42, 0.08));
 }
 
 .sk-header h2 {
   margin: 0;
+  font-size: 1.95rem;
+  color: var(--color-text-strong, var(--text));
 }
 
 .sk-header p {
-  margin: 0.5rem 0 0;
-  opacity: 0.8;
+  margin: 0;
+  max-width: 60rem;
+  color: var(--color-text, var(--text));
+  opacity: 0.9;
 }
 
 .sk-header-actions {
-  margin-top: 0.85rem;
   display: flex;
-  gap: 0.5rem;
+  gap: 0.75rem;
   flex-wrap: wrap;
 }
 
 .sk-form-title {
-  margin: 0.35rem 0 0.75rem;
+  margin: 0 0 0.85rem;
   font-size: 1rem;
+  color: var(--color-text-strong, var(--text));
 }
 
 .sk-summary-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 1rem;
-  margin-top: 1.25rem;
 }
 
 .sk-summary-card {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 1rem;
-  background: var(--card-bg);
+  border: 1px solid var(--color-border, var(--border));
+  border-radius: 16px;
+  padding: 1.1rem 1.15rem;
+  background: var(--gradient-card, var(--card-bg));
+  box-shadow: var(--shadow-card, 0 10px 28px rgba(15, 23, 42, 0.08));
 }
 
 .sk-summary-card h3 {
   margin: 0;
   font-size: 0.95rem;
+  color: var(--color-text, var(--text));
   opacity: 0.85;
 }
 
 .sk-summary-card p {
   margin: 0.5rem 0 0;
-  font-size: 1.6rem;
+  font-size: 1.85rem;
   font-weight: 700;
+  color: var(--color-text-strong, var(--text));
 }
 
 .sk-nav-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0.85rem;
-  margin-top: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.9rem;
 }
 
 .sk-nav-card {
   text-align: left;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--color-card-muted);
-  color: var(--text);
+  border: 1px solid var(--color-border, var(--border));
+  border-radius: 14px;
+  background: var(--gradient-card, var(--color-card-muted));
+  color: var(--color-text-strong, var(--text));
   cursor: pointer;
-  padding: 0.9rem;
+  padding: 1rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 1rem;
+  min-height: 84px;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .sk-nav-card:hover {
-  border-color: var(--accent);
+  transform: translateY(-2px);
+  border-color: var(--color-youth, var(--accent));
+  box-shadow: var(--shadow-card, 0 10px 28px rgba(15, 23, 42, 0.08));
 }
 
 .sk-nav-card.active {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent) inset;
+  border-color: var(--color-youth, var(--accent));
+  box-shadow: 0 0 0 1px var(--color-youth, var(--accent)) inset;
+}
+
+.sk-nav-card span,
+.sk-nav-card strong {
+  display: block;
+}
+
+.sk-nav-card strong {
+  font-size: 1.45rem;
+  line-height: 1;
 }
 
 .sk-dashboard .tool-section {
-  background-color: var(--card-bg);
-  padding: 1rem;
-  border-radius: 6px;
-  border: 1px solid var(--border);
+  background: var(--gradient-card, var(--card-bg));
+  padding: 1.2rem;
+  border-radius: 18px;
+  border: 1px solid var(--color-border, var(--border));
+  box-shadow: var(--shadow-card, 0 10px 28px rgba(15, 23, 42, 0.08));
+  min-width: 0;
 }
 
 .sk-form-page .tool-section {
-  margin-top: 1rem;
+  margin-top: 0;
 }
 
 .sk-dashboard .tool-section h3 {
-  margin-bottom: 1rem;
+  margin: 0 0 1rem;
   font-size: 1.2rem;
-  color: var(--accent);
+  color: var(--color-text-strong, var(--text));
 }
 
 .sk-dashboard .sk-tools {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 2rem;
-  margin-top: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 1.25rem;
 }
 
 .sk-inline-form {
   display: grid;
-  grid-template-columns: repeat(2, minmax(120px, 1fr));
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  grid-template-columns: repeat(2, minmax(160px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
 }
 
 .sk-inline-form input,
 .sk-inline-form select,
+.youth-feedback-form textarea,
 .sk-inline-form button {
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  padding: 0.55rem 0.6rem;
+  min-height: 46px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border, var(--border));
+  padding: 0.75rem 0.85rem;
   background: var(--card-bg);
-  color: var(--text);
+  color: var(--color-text, var(--text));
+  font: inherit;
 }
 
 .sk-inline-form button {
-  background: var(--accent);
+  background: var(--color-youth, var(--accent));
   color: #fff;
-  border: none;
+  border: 1px solid var(--color-youth, var(--accent));
   cursor: pointer;
 }
 
 .sk-secondary-btn,
 .sk-danger-btn {
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-  color: var(--text);
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border, var(--border));
+  background: var(--gradient-card, var(--card-bg));
+  color: var(--color-text-strong, var(--text));
   cursor: pointer;
-  padding: 0.4rem 0.55rem;
+  padding: 0.65rem 0.9rem;
+  font-weight: 600;
+  transition: transform 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.sk-secondary-btn:hover,
+.sk-inline-form button:hover,
+.youth-feedback-form button:hover,
+.sk-danger-btn:hover {
+  transform: translateY(-1px);
 }
 
 .sk-danger-btn {
   border-color: #c0392b;
   color: #c0392b;
+  background: rgba(192, 57, 43, 0.08);
 }
 
 .sk-item-actions {
-  margin-top: 0.55rem;
+  margin-top: 0.85rem;
   display: flex;
-  gap: 0.5rem;
+  gap: 0.65rem;
   flex-wrap: wrap;
 }
 
 .sk-inline-form button:disabled {
   opacity: 0.7;
   cursor: wait;
+  transform: none;
 }
 
 .sk-item-meta {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.65rem;
   flex-wrap: wrap;
   font-size: 0.85rem;
-  opacity: 0.75;
+  color: var(--color-text, var(--text));
+  opacity: 0.8;
 }
 
 .sk-empty-state {
-  opacity: 0.75;
-  margin: 0.5rem 0;
+  margin: 0.75rem 0 0;
+  padding: 0.95rem 1rem;
+  border-radius: 12px;
+  border: 1px dashed var(--color-border, var(--border));
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--color-text, var(--text));
+  opacity: 0.9;
 }
 
 .sk-feed-list {
-  margin-top: 0.85rem;
+  margin-top: 1rem;
   display: grid;
-  gap: 0.55rem;
+  gap: 0.85rem;
 }
 
 .sk-feed-item {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.65rem;
+  border: 1px solid var(--color-border, var(--border));
+  border-radius: 14px;
+  padding: 0.9rem 1rem;
   background: var(--card-bg);
 }
 
@@ -187,16 +244,23 @@
 }
 
 .sk-feed-item small {
-  opacity: 0.75;
+  display: block;
+  margin-top: 0.45rem;
+  opacity: 0.8;
 }
 
 /* ===============================
 🧑‍🎓 Youth Registry & Programs
 ================================ */
+.youth-registry {
+  overflow-x: auto;
+}
+
 .youth-registry table {
   width: 100%;
   margin-top: 1rem;
   border-collapse: collapse;
+  min-width: 36rem;
 }
 
 .youth-registry-filters {
@@ -212,11 +276,12 @@
 }
 
 .youth-registry-filters select {
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  min-height: 42px;
+  border: 1px solid var(--color-border, var(--border));
+  border-radius: 10px;
   background: var(--card-bg);
-  color: var(--text);
-  padding: 0.4rem 0.55rem;
+  color: var(--color-text, var(--text));
+  padding: 0.55rem 0.7rem;
 }
 
 .youth-registry-filters select:disabled {
@@ -233,15 +298,24 @@
 .youth-registry th,
 .youth-registry td {
   padding: 0.75rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-border, var(--border));
   text-align: left;
+}
+
+.youth-registry thead th {
+  background: rgba(14, 165, 233, 0.08);
+  color: var(--color-text-strong, var(--text));
+}
+
+.youth-registry tbody tr:nth-child(even) {
+  background: rgba(148, 163, 184, 0.04);
 }
 
 .youth-registry .sk-age-value {
   display: inline-block;
   min-width: 2ch;
   font-weight: 600;
-  color: var(--text);
+  color: var(--color-text-strong, var(--text));
 }
 
 .program-list ul,
@@ -249,12 +323,16 @@
   list-style: none;
   padding: 0;
   margin-top: 1rem;
+  display: grid;
+  gap: 0.85rem;
 }
 
 .program-list li,
 .event-calendar li {
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--border);
+  padding: 1rem;
+  border: 1px solid var(--color-border, var(--border));
+  border-radius: 14px;
+  background: var(--card-bg);
 }
 
 /* ===============================
@@ -262,24 +340,25 @@
 ================================ */
 .youth-feedback-form textarea {
   width: 100%;
-  padding: 0.75rem;
   margin-bottom: 1rem;
-  border-radius: 4px;
-  border: 1px solid var(--border);
+  min-height: 140px;
   resize: vertical;
+  box-sizing: border-box;
 }
 
 .youth-feedback-form button {
-  background-color: var(--accent);
+  min-height: 46px;
+  background-color: var(--color-youth, var(--accent));
   color: #fff;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
+  border: 1px solid var(--color-youth, var(--accent));
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
   cursor: pointer;
+  font-weight: 600;
 }
 
 .youth-feedback-form button:hover {
-  background-color: var(--accent-hover);
+  background-color: var(--color-youth, var(--accent-hover, var(--accent)));
 }
 
 @media (max-width: 768px) {
@@ -287,20 +366,45 @@
     padding: 1rem;
   }
 
-  .sk-inline-form {
+  .sk-header {
+    padding: 1rem;
+  }
+
+  .sk-header h2 {
+    font-size: 1.55rem;
+  }
+
+  .sk-summary-grid,
+  .sk-nav-grid,
+  .sk-dashboard .sk-tools {
     grid-template-columns: 1fr;
   }
 
-  .sk-dashboard .sk-tools {
-    gap: 1rem;
+  .sk-inline-form {
+    grid-template-columns: 1fr;
   }
 
   .sk-header-actions {
     flex-direction: column;
   }
 
+  .sk-header-actions .sk-secondary-btn,
+  .sk-inline-form button,
+  .sk-item-actions button,
+  .youth-feedback-form button {
+    width: 100%;
+  }
+
   .youth-registry-filters {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .youth-registry table {
+    min-width: 32rem;
+  }
+
+  .sk-item-actions {
+    flex-direction: column;
   }
 }

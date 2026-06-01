@@ -26,7 +26,7 @@ const links = {
   dilgAuditDocuments: { path: "/audit/documents", label: "📑 Document Audit", action: "auditBarangayData" },
   dilgAuditExports: { path: "/audit/exports", label: "📤 Export Reports", action: "auditBarangayData" },
   cfdpSurvey: { path: "/cfdp-survey", label: "🧭 CFDP Survey", action: "viewCfdpSurvey" },
-  skDashboard: { path: "/youth", label: "🧒 SK Dashboard", action: "viewDashboard" },
+  skDashboard: { path: "/admin/youth", label: "🧒 Youth Oversight", action: "viewDashboard" },
   youth: { path: "/youth", label: "🏠 Dashboard", action: "viewDashboard" },
   youthRegistry: { path: "/youth/registry", label: "📋 Youth Registry", action: "viewDashboard" },
   youthPrograms: { path: "/youth/programs", label: "🎯 Programs", action: "viewDashboard" },
