@@ -186,7 +186,7 @@ const RegistryAudit = () => {
             !permissions || permissions.some((perm) => can(perm));
 
           if (!hasPermission) {
-            return { key, category: displayCategory, total: "N/A", periodLabel: label };
+            return null;
           }
 
           try {
@@ -221,7 +221,7 @@ const RegistryAudit = () => {
       );
 
       if (!cancelled) {
-        setStats(results);
+        setStats(results.filter(Boolean));
         setLoading(false);
       }
     };

@@ -149,6 +149,9 @@ service cloud.firestore {
 
       // Admin can read/update/delete ALL complaints
       allow read, update, delete: if isAdmin();
+
+      // DILG can read complaints for audit oversight
+      allow read: if isDILG();
     }
 
     // ⚠️ Incidents
@@ -172,6 +175,9 @@ service cloud.firestore {
 
       // Admin can read, update, and delete all incidents
       allow read, update, delete: if isAdmin();
+
+      // DILG can read incidents for audit oversight
+      allow read: if isDILG();
     }
 
     // 📊 Logins

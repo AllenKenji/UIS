@@ -3,6 +3,7 @@ import { collection, getCountFromServer, getDocs } from "firebase/firestore";
 import { db } from "../../services/firebase";
 import DashboardCard from "./DashboardCard";
 import { useUser } from "../../context/UserContext";
+import { AuditAPI } from "../../services/api";
 import { COLLECTION_PERMISSIONS } from "../../config/roles"; 
 import "../../styles/dashboard/registry-overview.css";
 
@@ -59,6 +60,19 @@ const RegistryOverview = () => {
 
   useEffect(() => {
     const fetchCounts = async () => {
+      try {
+        const summary = await AuditAPI.summary();
+        setCounts({
+          residents: summary?.residents ?? "N/A",
+          businesses: summary?.businesses ?? "N/A",
+          youth: summary?.youth ?? "N/A",
+        });
+        setLoading(false);
+        return;
+      } catch (error) {
+        console.warn("⚠️ Failed to load registry summary via API, falling back to Firestore:", error);
+      }
+
       const results = {};
 
       for (const key of REGISTRY_KEYS) {

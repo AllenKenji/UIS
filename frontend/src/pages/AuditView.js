@@ -45,6 +45,22 @@ const AuditView = () => {
     let cancelled = false;
 
     const loadMetrics = async () => {
+      try {
+        const summary = await AuditAPI.summary();
+        if (!cancelled) {
+          setMetrics({
+            residents: summary?.residents ?? "N/A",
+            businesses: summary?.businesses ?? "N/A",
+            documents: summary?.documents ?? "N/A",
+            logins: summary?.logins ?? "N/A",
+            auditLogs: summary?.auditLogs ?? "N/A",
+          });
+        }
+        return;
+      } catch (error) {
+        console.warn("Failed to load audit summary from API, falling back to Firestore:", error);
+      }
+
       const readCount = async (key) => {
         try {
           const snap = await getCountFromServer(collection(db, key));

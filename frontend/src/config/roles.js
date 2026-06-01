@@ -95,8 +95,8 @@ export const ROLE_PERMISSIONS = Object.freeze(
 export const COLLECTION_PERMISSIONS = Object.freeze({
   residents:  ["manageResidents", "auditBarangayData"],
   businesses: ["viewBusinesses", "auditBarangayData"],
-  complaints: ["viewAllComplaints", "fileComplaints", "viewOwnComplaints", "manageComplaints"], 
-  incidents:  ["viewIncidents", "reportIncidents"], 
+  complaints: ["viewAllComplaints", "fileComplaints", "viewOwnComplaints", "manageComplaints", "auditBarangayData"], 
+  incidents:  ["viewIncidents", "reportIncidents", "auditBarangayData"], 
   documents:  ["viewDocuments", "viewOwnDocuments", "requestDocuments", "auditBarangayData"],
   logins:     ["auditBarangayData"], 
   youth:      ["youthRegistryAccess", "auditBarangayData"],
