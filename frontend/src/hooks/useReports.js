@@ -76,6 +76,9 @@ export function useReports() {
     emptyTransactionsText,
     emptyDisbursementsText,
   }) => {
+    const safePdfText = (value) => String(value ?? "").replace(/[^\x20-\x7E]/g, "");
+    const formatCurrency = (amount) => `PHP ${(Number(amount) || 0).toLocaleString()}`;
+
     const scopedTransactions = transactions.filter((tx) => {
       const txDate = resolveTransactionDate(tx);
       return txDate && txDate >= start && txDate < end;
@@ -123,15 +126,15 @@ export function useReports() {
 
     const doc = new jsPDF();
     doc.setFontSize(14);
-    doc.text(`Barangay ${titleType} Report - ${report.period}`, 20, 20);
+    doc.text(safePdfText(`Barangay ${titleType} Report - ${report.period}`), 20, 20);
 
     doc.setFontSize(12);
-    doc.text(`Collections: ₱${report.collections || 0}`, 20, 40);
-    doc.text(`Pending Payments: ${report.pendingCount || 0}`, 20, 50);
-    doc.text(`Completed Payments: ${report.completedCount || 0}`, 20, 60);
-    doc.text(`Outstanding: ₱${report.outstandingAmount || 0}`, 20, 70);
-    doc.text(`Approved Disbursements: ₱${report.approvedDisbursementsAmount || 0}`, 20, 80);
-    doc.text(`Pending Disbursements: ₱${report.pendingDisbursementsAmount || 0}`, 20, 90);
+    doc.text(safePdfText(`Collections: ${formatCurrency(report.collections)}`), 20, 40);
+    doc.text(safePdfText(`Pending Payments: ${report.pendingCount || 0}`), 20, 50);
+    doc.text(safePdfText(`Completed Payments: ${report.completedCount || 0}`), 20, 60);
+    doc.text(safePdfText(`Outstanding: ${formatCurrency(report.outstandingAmount)}`), 20, 70);
+    doc.text(safePdfText(`Approved Disbursements: ${formatCurrency(report.approvedDisbursementsAmount)}`), 20, 80);
+    doc.text(safePdfText(`Pending Disbursements: ${formatCurrency(report.pendingDisbursementsAmount)}`), 20, 90);
 
     let y = 110;
     doc.setFontSize(11);
@@ -139,7 +142,7 @@ export function useReports() {
     y += 8;
 
     if (report.transactions.length === 0) {
-      doc.text(emptyTransactionsText, 25, y);
+      doc.text(safePdfText(emptyTransactionsText), 25, y);
       y += 10;
     } else {
       report.transactions.forEach((tx, i) => {
@@ -147,14 +150,14 @@ export function useReports() {
         const txDate = resolveTransactionDate(tx);
         const dateLabel = txDate ? txDate.toLocaleDateString() : "-";
         const name = tx.businessName || tx.ownerName || tx.residentName || "N/A";
-        const line = `${i + 1}. ${name} | ${status} | P${(Number(tx.amount) || 0).toLocaleString()} | ${dateLabel}`;
+        const line = `${i + 1}. ${name} | ${status} | ${formatCurrency(tx.amount)} | ${dateLabel}`;
 
         if (y > 280) {
           doc.addPage();
           y = 20;
         }
 
-        doc.text(line, 25, y);
+        doc.text(safePdfText(line), 25, y);
         y += 8;
       });
     }
@@ -167,15 +170,15 @@ export function useReports() {
     y += 8;
 
     if (report.disbursements.length === 0) {
-      doc.text(emptyDisbursementsText, 25, y);
+      doc.text(safePdfText(emptyDisbursementsText), 25, y);
     } else {
       report.disbursements.forEach((d, i) => {
-        const line = `${i + 1}. ${d.category || "Misc"} - P${Number(d.amount || 0).toLocaleString()} (${d.recipient || "N/A"})`;
+        const line = `${i + 1}. ${d.category || "Misc"} - ${formatCurrency(d.amount)} (${d.recipient || "N/A"})`;
         if (y > 280) {
           doc.addPage();
           y = 20;
         }
-        doc.text(line, 25, y);
+        doc.text(safePdfText(line), 25, y);
         y += 8;
       });
     }
