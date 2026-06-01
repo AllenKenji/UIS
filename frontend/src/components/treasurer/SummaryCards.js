@@ -14,33 +14,83 @@ function SummaryCard({ title, value, icon }) {
 }
 
 function SummaryCards() {
-  const { totals } = usePayments();
+  const { transactions = [] } = usePayments();
 
-  // Provide safe fallbacks
-  const collections = totals?.collections ?? 0;
-  const pendingCount = totals?.pendingCount ?? 0;
-  const completedCount = totals?.completedCount ?? 0;
-  const outstandingAmount = totals?.outstandingAmount ?? 0;
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const monthLabel = monthStart.toLocaleString("default", { month: "long", year: "numeric" });
+
+  const normalizeDate = (value) => {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (typeof value?.toDate === "function") return value.toDate();
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const resolveTransactionDate = (tx) => {
+    const dateCandidates = [
+      tx.datePaid,
+      tx.paidAt,
+      tx.paymentDate,
+      tx.createdAt,
+      tx.date,
+      tx.updatedAt,
+    ];
+
+    for (const candidate of dateCandidates) {
+      const parsed = normalizeDate(candidate);
+      if (parsed) return parsed;
+    }
+
+    return null;
+  };
+
+  const normalizeStatus = (value) => String(value || "").trim().toLowerCase();
+  const isPaid = (tx) => {
+    const status = normalizeStatus(tx.paymentStatus || tx.status);
+    return status === "paid" || status === "approved";
+  };
+  const isPending = (tx) => {
+    const status = normalizeStatus(tx.paymentStatus || tx.status);
+    return ["pending", "for_payment", "awaiting_payment", "unpaid", "payment_submitted"].includes(status);
+  };
+
+  const monthlyTransactions = transactions.filter((tx) => {
+    const txDate = resolveTransactionDate(tx);
+    if (!txDate) return false;
+    return txDate >= monthStart && txDate < nextMonthStart;
+  });
+
+  const collections = monthlyTransactions
+    .filter(isPaid)
+    .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+  const completedCount = monthlyTransactions.filter(isPaid).length;
+  const pendingCount = monthlyTransactions.filter(isPending).length;
+  const outstandingAmount = monthlyTransactions
+    .filter(isPending)
+    .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
 
   return (
     <div className="summary-cards">
       <SummaryCard 
-        title="Total Collections" 
+        title={`Collections (${monthLabel})`} 
         value={`₱${collections.toLocaleString()}`} 
         icon="💰" 
       />
       <SummaryCard 
-        title="Completed Payments" 
+        title={`Completed Payments (${monthLabel})`} 
         value={completedCount} 
         icon="✅" 
       />
       <SummaryCard 
-        title="Pending Payments" 
+        title={`Pending Payments (${monthLabel})`} 
         value={pendingCount} 
         icon="⏳" 
       />
       <SummaryCard 
-        title="Outstanding Balances" 
+        title={`Outstanding Balances (${monthLabel})`} 
         value={`₱${outstandingAmount.toLocaleString()}`} 
         icon="⚠️" 
       />

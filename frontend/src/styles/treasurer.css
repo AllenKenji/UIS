@@ -142,6 +142,25 @@
   margin-bottom: 1rem;
 }
 
+.reports-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.reports-controls label {
+  font-weight: 600;
+}
+
+.reports-controls input[type="month"] {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
 .reports-section button {
   background-color: #2563eb; /* blue */
   color: #ffffff;

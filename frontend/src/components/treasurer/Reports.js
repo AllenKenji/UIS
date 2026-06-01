@@ -18,16 +18,17 @@ function Reports() {
   const { generateMonthlyReport } = useReports();
   const [currentReport, setCurrentReport] = useState(null);
   const [archive, setArchive] = useState([]);
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
 
   const handleGenerate = () => {
-    const result = generateMonthlyReport();
+    const result = generateMonthlyReport(selectedMonth);
     setCurrentReport(result);
 
     setArchive(prev => [
       ...prev,
       {
         ...result,
-        month: new Date().toLocaleString("default", { month: "long", year: "numeric" })
+        month: result.month,
       }
     ]);
   };
@@ -84,8 +85,14 @@ function Reports() {
     <div className="treasurer-main">
       <header className="header">
         <h1>Reports</h1>
+        <input
+          type="month"
+          value={selectedMonth}
+          onChange={(e) => setSelectedMonth(e.target.value)}
+          aria-label="Select report month"
+        />
         <button className="generate-btn" onClick={handleGenerate}>
-          Generate Monthly Report (PDF)
+          Generate Selected Monthly Report (PDF)
         </button>
       </header>
 
@@ -94,6 +101,7 @@ function Reports() {
         <section className="summary">
           <h2>Current Report Summary</h2>
           <ul>
+            <li><strong>Report Month:</strong> {currentReport.month || "—"}</li>
             <li><strong>Total Collections:</strong> ₱{currentReport.collections?.toLocaleString() || 0}</li>
             <li><strong>Approved Disbursements:</strong> ₱{currentReport.disbursements?.filter(d => d.status === "approved").reduce((sum, d) => sum + (d.amount || 0), 0).toLocaleString()}</li>
             <li><strong>Pending Disbursements:</strong> ₱{currentReport.disbursements?.filter(d => d.status === "pending").reduce((sum, d) => sum + (d.amount || 0), 0).toLocaleString()}</li>
