@@ -8,6 +8,14 @@ import DocumentQueue from "./DocumentQueue";
 
 const normalizeStatus = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
 
+const parseAmount = (value) => {
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) return numeric;
+  const cleaned = String(value ?? "").replace(/[^\d.-]/g, "");
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 const toDate = (value) => {
   if (!value) return null;
   if (value instanceof Date) return value;
@@ -33,6 +41,7 @@ const isToday = (value) => {
 const DashboardFocusPanel = ({ view }) => {
   const [residents, setResidents] = useState([]);
   const [businesses, setBusinesses] = useState([]);
+  const [collections, setCollections] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -44,6 +53,25 @@ const DashboardFocusPanel = ({ view }) => {
   const businessRows = useMemo(
     () => businesses.filter((business) => normalizeStatus(business.status) !== "approved"),
     [businesses]
+  );
+
+  const collectionRows = useMemo(
+    () =>
+      collections
+        .map((payment) => {
+          const status = normalizeStatus(payment.status || payment.paymentStatus);
+          const paidDate = toDate(payment.datePaid || payment.paymentDate || payment.timestamp || payment.createdAt);
+          const isCollectedToday = status === "paid" && isToday(paidDate);
+          return {
+            ...payment,
+            paidDate,
+            amount: parseAmount(payment.amount),
+            isCollectedToday,
+          };
+        })
+        .filter((payment) => payment.isCollectedToday)
+        .sort((a, b) => (b.paidDate?.getTime?.() || 0) - (a.paidDate?.getTime?.() || 0)),
+    [collections]
   );
 
   useEffect(() => {
@@ -67,6 +95,13 @@ const DashboardFocusPanel = ({ view }) => {
           if (!cancelled) setBusinesses(rows);
           return;
         }
+
+        if (view === "collections") {
+          const snapshot = await getDocs(collection(db, "payments"));
+          const rows = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+          if (!cancelled) setCollections(rows);
+          return;
+        }
       } catch (err) {
         if (!cancelled) {
           console.error("❌ Failed to load dashboard panel records:", err);
@@ -77,7 +112,7 @@ const DashboardFocusPanel = ({ view }) => {
       }
     };
 
-    if (["residents", "businesses"].includes(view)) {
+    if (["residents", "businesses", "collections"].includes(view)) {
       fetchRows();
     } else {
       setLoading(false);
@@ -101,7 +136,39 @@ const DashboardFocusPanel = ({ view }) => {
   }
 
   if (view === "documents") {
-    return <DocumentQueue statusFilter="for_payment" title="📄 Pending Document Transactions" />;
+    return <DocumentQueue statusFilter="pending_transactions" title="📄 Pending Document Transactions" />;
+  }
+
+  if (view === "collections") {
+    if (loading) return <p>Loading today&apos;s collected transactions...</p>;
+    if (error) return <p className="error">{error}</p>;
+
+    return collectionRows.length === 0 ? (
+      <p>No collections recorded today.</p>
+    ) : (
+      <table className="queue-table" aria-label="Collections Today">
+        <thead>
+          <tr>
+            <th>Payer</th>
+            <th>Reference</th>
+            <th>Amount</th>
+            <th>Collected At</th>
+          </tr>
+        </thead>
+        <tbody>
+          {collectionRows.map((payment) => (
+            <tr key={payment.id}>
+              <td>{payment.payerName || payment.ownerName || payment.residentName || payment.fullName || "—"}</td>
+              <td>{payment.referenceNumber || payment.transactionId || payment.id || "—"}</td>
+              <td>
+                {new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(payment.amount || 0)}
+              </td>
+              <td>{payment.paidDate?.toLocaleString() || "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
   }
 
   if (view === "residents") {

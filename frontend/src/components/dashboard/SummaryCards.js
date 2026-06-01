@@ -37,12 +37,24 @@ const getResidentAge = (resident) => {
   return age;
 };
 
-const getYouthResidentsCount = async () => {
+const getYouthResidentsRegisteredTodayCount = async () => {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const startOfTomorrow = new Date(startOfToday);
+  startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+
   const snapshot = await getDocs(collection(db, "residents"));
   const residents = snapshot.docs.map((doc) => doc.data() || {});
   return residents.filter((resident) => {
     const age = getResidentAge(resident);
-    return typeof age === "number" && age >= YOUTH_MIN_AGE && age <= YOUTH_MAX_AGE;
+    const createdAt = toDate(resident.createdAt || resident.timestamp || resident.created_at);
+    const isRegisteredToday = Boolean(createdAt && createdAt >= startOfToday && createdAt < startOfTomorrow);
+    return (
+      typeof age === "number" &&
+      age >= YOUTH_MIN_AGE &&
+      age <= YOUTH_MAX_AGE &&
+      isRegisteredToday
+    );
   }).length;
 };
 
@@ -115,6 +127,8 @@ const SummaryCards = ({ onCardClick } = {}) => {
     complaints: "Complaints Pending Review",
     incidents: "Incidents Pending",
     documents: "Pending Document Transactions",
+    youth: "Youth Registered Today",
+    logins: "Persons Logged In Today",
   };
 
   useEffect(() => {
@@ -137,15 +151,30 @@ const SummaryCards = ({ onCardClick } = {}) => {
     const getLoginRecordsCount = async () => {
       const loginQuery = query(collection(db, "logins"), where("timestamp", ">=", startOfToday()));
       const snapshot = await getDocs(loginQuery);
-      return snapshot.docs.reduce((total, item) => {
+      const today = startOfToday();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const uniquePeople = new Set();
+
+      snapshot.docs.forEach((item) => {
         const data = item.data() || {};
-        const count = Number(data.count);
         const timestamp = parseTimestamp(data.timestamp);
-        if (!timestamp) {
-          return total;
+        const eventType = String(data.type || "login").trim().toLowerCase();
+
+        if (!timestamp || timestamp < today || timestamp >= tomorrow || eventType !== "login") {
+          return;
         }
-        return total + (Number.isFinite(count) && count > 0 ? count : 1);
-      }, 0);
+
+        const personKey =
+          String(data.user_id || "").trim() ||
+          String(data.user || "").trim().toLowerCase();
+
+        if (personKey) {
+          uniquePeople.add(personKey);
+        }
+      });
+
+      return uniquePeople.size;
     };
 
     const parseAmount = (value) => {
@@ -196,7 +225,7 @@ const SummaryCards = ({ onCardClick } = {}) => {
         }
 
         if (key === "youth") {
-          const value = await getYouthResidentsCount();
+          const value = await getYouthResidentsRegisteredTodayCount();
           return { key, value };
         }
 
@@ -251,7 +280,7 @@ const SummaryCards = ({ onCardClick } = {}) => {
         stats.map(({ key, label, value, variant, icon }, index) => (
           <DashboardCard
             key={key || index}
-            label={isStaffOrAdmin && labelByKey[key] ? labelByKey[key] : label}
+            label={((isStaffOrAdmin || key === "youth" || key === "logins") && labelByKey[key]) ? labelByKey[key] : label}
             value={value}
             variant={variant}
             icon={icon}

@@ -7,8 +7,13 @@ import "../../styles/dashboard/document-queue.css";
 
 const normalizeStatus = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
 
+const isPendingTransactionStatus = (value) => {
+  const status = normalizeStatus(value);
+  return ["for_payment", "awaiting_payment", "unpaid", "payment_submitted", "pending"].includes(status);
+};
+
 const normalizeRequest = (docId, data = {}) => {
-  const normalizedStatus = normalizeStatus(data.status);
+  const normalizedStatus = normalizeStatus(data.paymentStatus || data.status || data.documentStatus);
   return {
     id: docId,
     ...data,
@@ -52,6 +57,8 @@ const DocumentQueue = ({ statusFilter = "pending", title = "📄 Pending Documen
         const filtered =
           statusFilter === "all"
             ? data
+            : statusFilter === "pending_transactions"
+              ? data.filter((request) => isPendingTransactionStatus(request.status))
             : data.filter((request) => normalizeStatus(request.status) === normalizeStatus(statusFilter));
         setRequests(filtered);
       } catch (err) {
@@ -80,6 +87,9 @@ const DocumentQueue = ({ statusFilter = "pending", title = "📄 Pending Documen
           r.id === selectedRequest.id ? { ...r, status: normalizedStatus } : r
         );
         if (statusFilter === "all") return updated;
+        if (statusFilter === "pending_transactions") {
+          return updated.filter((r) => isPendingTransactionStatus(r.status));
+        }
         return updated.filter((r) => normalizeStatus(r.status) === normalizeStatus(statusFilter));
       });
       closeModal();
