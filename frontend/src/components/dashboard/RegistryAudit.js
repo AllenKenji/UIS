@@ -3,6 +3,7 @@ import { collection, getDocs } from "firebase/firestore";
 import { db } from "../../services/firebase";
 import { useUser } from "../../context/UserContext";
 import { usePayments } from "../../hooks/usePayments";
+import { AuditAPI } from "../../services/api";
 import { CATEGORIES, CATEGORY_VARIANTS, COLLECTION_PERMISSIONS } from "../../config/roles"; 
 import "../../styles/dashboard/registry-audit.css";
 
@@ -221,7 +222,27 @@ const RegistryAudit = () => {
       );
 
       if (!cancelled) {
-        setStats(results.filter(Boolean));
+        const visibleResults = results.filter(Boolean);
+
+        if (visibleResults.length === 0 && can("auditBarangayData")) {
+          try {
+            const summary = await AuditAPI.summary();
+            const fallbackResults = [
+              { key: "residents", category: "Residents", total: summary?.residents ?? 0, periodLabel: "Residents" },
+              { key: "businesses", category: "Businesses", total: summary?.businesses ?? 0, periodLabel: "Businesses" },
+              { key: "documents", category: "Documents", total: summary?.documents ?? 0, periodLabel: "Documents" },
+              { key: "logins", category: "Login", total: summary?.logins ?? 0, periodLabel: "Login / Day" },
+              { key: "youth", category: "Youth Registry", total: summary?.youth ?? 0, periodLabel: "Youth Registry" },
+            ];
+            setStats(fallbackResults);
+          } catch (error) {
+            console.warn("⚠️ Failed to load registry audit summary fallback:", error);
+            setStats([]);
+          }
+        } else {
+          setStats(visibleResults);
+        }
+
         setLoading(false);
       }
     };

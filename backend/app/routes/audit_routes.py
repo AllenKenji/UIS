@@ -50,17 +50,61 @@ def _resident_age(record):
     return years
 
 @router.get("/", tags=["Audit"])
-def list_audit_logs(limit: int = 50):
+def list_audit_logs(
+    limit: int = 50,
+    _: str = Depends(require_permission("auditBarangayData")),
+):
     """
     Return the latest document audit logs.
     """
     try:
-        logs = (
+        logs = list(
             get_db().collection("document_audit")
             .order_by("timestamp", direction="DESCENDING")
             .limit(limit)
             .stream()
         )
+
+        # If explicit audit logs are empty, derive timeline-like entries from documents
+        # so oversight roles still see document activity history.
+        if not logs:
+            docs = list(get_db().collection("documents").stream())
+            derived_logs = []
+
+            for doc in docs:
+                data = doc.to_dict() or {}
+                status = str(data.get("status") or "").lower()
+                if status == "approved":
+                    action = "issued"
+                elif status == "rejected":
+                    action = "rejected"
+                elif status == "paid":
+                    action = "payment_confirmed"
+                elif status in {"for_payment", "payment_submitted"}:
+                    action = "payment_pending"
+                else:
+                    action = "requested"
+
+                derived_logs.append(
+                    {
+                        "id": doc.id,
+                        "doc_id": doc.id,
+                        "document_type": data.get("documentType") or "N/A",
+                        "action": action,
+                        "performed_by": data.get("issuedBy") or "System",
+                        "resident_name": data.get("residentName"),
+                        "resident_id": data.get("residentId"),
+                        "timestamp": data.get("updatedAt") or data.get("createdAt"),
+                    }
+                )
+
+            def _sort_key(item):
+                parsed = _to_datetime(item.get("timestamp"))
+                return parsed or datetime.min
+
+            derived_logs.sort(key=_sort_key, reverse=True)
+            return derived_logs[:limit]
+
         return [log.to_dict() for log in logs]
     except Exception as e:
         logger.error("❌ Error fetching audit logs: %s", str(e), exc_info=True)
