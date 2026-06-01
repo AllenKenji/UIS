@@ -113,9 +113,19 @@ const getRecordDate = (key, record) => {
 
 const normalizeStatus = (value) => String(value || "").trim().toLowerCase();
 
+const getCollectionIdentityKey = (record) =>
+  record.transactionId ||
+  record.referenceNumber ||
+  record.receiptNumber ||
+  record.paymentIntentId ||
+  record.paymongoSourceId ||
+  record.documentId ||
+  record.businessId ||
+  `${record.entityType}:${record.id}`;
+
 const isPaidCollectionRecord = (record) => {
-  const status = normalizeStatus(record.status || record.paymentStatus);
-  return status === "paid" || status === "approved";
+  const status = normalizeStatus(record.paymentStatus || record.status);
+  return status === "paid" || status === "succeeded";
 };
 
 const buildCollectionTransactionSet = async () => {
@@ -147,7 +157,7 @@ const buildCollectionTransactionSet = async () => {
   const deduped = new Map();
 
   merged.forEach((record) => {
-    const key = record.transactionId || record.id;
+    const key = getCollectionIdentityKey(record);
     if (!key) {
       return;
     }
@@ -228,9 +238,7 @@ const RegistryAudit = () => {
                   record.datePaid ||
                   record.paymentDate ||
                   record.paidAt ||
-                  record.timestamp ||
-                  record.createdAt ||
-                  record.date;
+                  record.timestamp;
 
                 if (!isPaidCollectionRecord(record) || !isWithinRange(dateValue, start, end)) {
                   return sum;
