@@ -15,20 +15,26 @@ import {
 ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Title, Tooltip, Legend);
 
 function Reports() {
-  const { generateMonthlyReport } = useReports();
+  const { generateMonthlyReport, generateYearlyReport } = useReports();
   const [currentReport, setCurrentReport] = useState(null);
   const [archive, setArchive] = useState([]);
+  const [reportType, setReportType] = useState("monthly");
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
 
   const handleGenerate = () => {
-    const result = generateMonthlyReport(selectedMonth);
+    const result =
+      reportType === "yearly"
+        ? generateYearlyReport(selectedYear)
+        : generateMonthlyReport(selectedMonth);
+
     setCurrentReport(result);
 
     setArchive(prev => [
       ...prev,
       {
         ...result,
-        month: result.month,
+        month: result.period,
       }
     ]);
   };
@@ -85,14 +91,33 @@ function Reports() {
     <div className="treasurer-main">
       <header className="header">
         <h1>Reports</h1>
-        <input
-          type="month"
-          value={selectedMonth}
-          onChange={(e) => setSelectedMonth(e.target.value)}
-          aria-label="Select report month"
-        />
+        <select
+          value={reportType}
+          onChange={(e) => setReportType(e.target.value)}
+          aria-label="Select report type"
+        >
+          <option value="monthly">Monthly</option>
+          <option value="yearly">Yearly</option>
+        </select>
+        {reportType === "yearly" ? (
+          <input
+            type="number"
+            min="2000"
+            max="9999"
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+            aria-label="Select report year"
+          />
+        ) : (
+          <input
+            type="month"
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            aria-label="Select report month"
+          />
+        )}
         <button className="generate-btn" onClick={handleGenerate}>
-          Generate Selected Monthly Report (PDF)
+          {reportType === "yearly" ? "Generate Selected Yearly Report (PDF)" : "Generate Selected Monthly Report (PDF)"}
         </button>
       </header>
 
@@ -101,7 +126,7 @@ function Reports() {
         <section className="summary">
           <h2>Current Report Summary</h2>
           <ul>
-            <li><strong>Report Month:</strong> {currentReport.month || "—"}</li>
+            <li><strong>Report Period:</strong> {currentReport.period || "—"}</li>
             <li><strong>Total Collections:</strong> ₱{currentReport.collections?.toLocaleString() || 0}</li>
             <li><strong>Approved Disbursements:</strong> ₱{currentReport.disbursements?.filter(d => d.status === "approved").reduce((sum, d) => sum + (d.amount || 0), 0).toLocaleString()}</li>
             <li><strong>Pending Disbursements:</strong> ₱{currentReport.disbursements?.filter(d => d.status === "pending").reduce((sum, d) => sum + (d.amount || 0), 0).toLocaleString()}</li>

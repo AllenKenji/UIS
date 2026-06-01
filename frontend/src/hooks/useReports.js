@@ -57,53 +57,73 @@ export function useReports() {
     return { source, start, end, monthLabel };
   };
 
-  function generateMonthlyReport(monthValue) {
-    const { source, start, end, monthLabel } = resolveMonthWindow(monthValue);
+  const resolveYearWindow = (yearValue) => {
+    const currentYear = new Date().getFullYear();
+    const year = Number(yearValue);
+    const safeYear = Number.isInteger(year) && year >= 2000 && year <= 9999 ? year : currentYear;
+    const start = new Date(safeYear, 0, 1);
+    const end = new Date(safeYear + 1, 0, 1);
+    return { source: String(safeYear), start, end, yearLabel: String(safeYear) };
+  };
 
-    const monthlyTransactions = transactions.filter((tx) => {
+  const buildReportForWindow = ({
+    start,
+    end,
+    periodLabel,
+    periodType,
+    source,
+    fileNamePrefix,
+    emptyTransactionsText,
+    emptyDisbursementsText,
+  }) => {
+    const scopedTransactions = transactions.filter((tx) => {
       const txDate = resolveTransactionDate(tx);
       return txDate && txDate >= start && txDate < end;
     });
 
-    const monthlyDisbursements = disbursements.filter((entry) => {
+    const scopedDisbursements = disbursements.filter((entry) => {
       const disbDate = resolveDisbursementDate(entry);
       return disbDate && disbDate >= start && disbDate < end;
     });
 
-    const paidTransactions = monthlyTransactions.filter((tx) => {
+    const paidTransactions = scopedTransactions.filter((tx) => {
       const status = normalizeStatus(tx.paymentStatus || tx.status);
       return status === "paid" || status === "approved";
     });
 
-    const pendingTransactions = monthlyTransactions.filter((tx) => {
+    const pendingTransactions = scopedTransactions.filter((tx) => {
       const status = normalizeStatus(tx.paymentStatus || tx.status);
       return ["pending", "for_payment", "awaiting_payment", "unpaid", "payment_submitted"].includes(status);
     });
 
-    const approvedDisbursements = monthlyDisbursements.filter(
+    const approvedDisbursements = scopedDisbursements.filter(
       (d) => normalizeStatus(d.status) === "approved"
     );
-    const pendingDisbursements = monthlyDisbursements.filter(
+    const pendingDisbursements = scopedDisbursements.filter(
       (d) => normalizeStatus(d.status) === "pending"
     );
 
     const report = {
-      month: monthLabel,
-      monthValue: source,
+      period: periodLabel,
+      periodType,
+      periodValue: source,
+      month: periodType === "monthly" ? periodLabel : undefined,
+      year: periodType === "yearly" ? periodLabel : undefined,
       collections: paidTransactions.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0),
       pendingCount: pendingTransactions.length,
       completedCount: paidTransactions.length,
       outstandingAmount: pendingTransactions.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0),
-      transactions: monthlyTransactions,
-      disbursements: monthlyDisbursements,
+      transactions: scopedTransactions,
+      disbursements: scopedDisbursements,
       approvedDisbursementsAmount: approvedDisbursements.reduce((sum, d) => sum + (Number(d.amount) || 0), 0),
       pendingDisbursementsAmount: pendingDisbursements.reduce((sum, d) => sum + (Number(d.amount) || 0), 0),
     };
 
-    // Create PDF
+    const titleType = periodType === "yearly" ? "Yearly" : "Monthly";
+
     const doc = new jsPDF();
     doc.setFontSize(14);
-    doc.text(`Barangay Monthly Report - ${report.month}`, 20, 20);
+    doc.text(`Barangay ${titleType} Report - ${report.period}`, 20, 20);
 
     doc.setFontSize(12);
     doc.text(`Collections: ₱${report.collections || 0}`, 20, 40);
@@ -119,15 +139,15 @@ export function useReports() {
     y += 8;
 
     if (report.transactions.length === 0) {
-      doc.text("No transactions for this month.", 25, y);
+      doc.text(emptyTransactionsText, 25, y);
       y += 10;
     } else {
       report.transactions.forEach((tx, i) => {
-        const status = tx.paymentStatus || tx.status || "—";
+        const status = tx.paymentStatus || tx.status || "-";
         const txDate = resolveTransactionDate(tx);
-        const dateLabel = txDate ? txDate.toLocaleDateString() : "—";
+        const dateLabel = txDate ? txDate.toLocaleDateString() : "-";
         const name = tx.businessName || tx.ownerName || tx.residentName || "N/A";
-        const line = `${i + 1}. ${name} | ${status} | ₱${(Number(tx.amount) || 0).toLocaleString()} | ${dateLabel}`;
+        const line = `${i + 1}. ${name} | ${status} | P${(Number(tx.amount) || 0).toLocaleString()} | ${dateLabel}`;
 
         if (y > 280) {
           doc.addPage();
@@ -147,10 +167,10 @@ export function useReports() {
     y += 8;
 
     if (report.disbursements.length === 0) {
-      doc.text("No disbursements for this month.", 25, y);
+      doc.text(emptyDisbursementsText, 25, y);
     } else {
       report.disbursements.forEach((d, i) => {
-        const line = `${i + 1}. ${d.category || "Misc"} - ₱${Number(d.amount || 0).toLocaleString()} (${d.recipient || "N/A"})`;
+        const line = `${i + 1}. ${d.category || "Misc"} - P${Number(d.amount || 0).toLocaleString()} (${d.recipient || "N/A"})`;
         if (y > 280) {
           doc.addPage();
           y = 20;
@@ -160,11 +180,40 @@ export function useReports() {
       });
     }
 
-    // Save PDF
-    doc.save(`Monthly_Report_${source}.pdf`);
+    doc.save(`${fileNamePrefix}_${source}.pdf`);
 
     return report;
+  };
+
+  function generateMonthlyReport(monthValue) {
+    const { source, start, end, monthLabel } = resolveMonthWindow(monthValue);
+
+    return buildReportForWindow({
+      start,
+      end,
+      periodLabel: monthLabel,
+      periodType: "monthly",
+      source,
+      fileNamePrefix: "Monthly_Report",
+      emptyTransactionsText: "No transactions for this month.",
+      emptyDisbursementsText: "No disbursements for this month.",
+    });
   }
 
-  return { generateMonthlyReport };
+  function generateYearlyReport(yearValue) {
+    const { source, start, end, yearLabel } = resolveYearWindow(yearValue);
+
+    return buildReportForWindow({
+      start,
+      end,
+      periodLabel: yearLabel,
+      periodType: "yearly",
+      source,
+      fileNamePrefix: "Yearly_Report",
+      emptyTransactionsText: "No transactions for this year.",
+      emptyDisbursementsText: "No disbursements for this year.",
+    });
+  }
+
+  return { generateMonthlyReport, generateYearlyReport };
 }

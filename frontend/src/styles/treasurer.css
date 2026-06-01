@@ -161,6 +161,15 @@
   color: var(--color-text);
 }
 
+.reports-controls input[type="number"],
+.reports-controls select {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
 .reports-section button {
   background-color: #2563eb; /* blue */
   color: #ffffff;
