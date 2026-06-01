@@ -52,27 +52,34 @@ const AuditTable = () => {
         setLogs(auditLogs);
         setStatus("");
       } else {
-        const docsResponse = await api.get("/api/documents");
-        const documents = normalizeListPayload(docsResponse.data);
-        const fallbackLogs = documents
-          .map(mapDocumentToAuditEntry)
-          .sort((a, b) => {
-            const aTime = toDateValue(a.timestamp)?.getTime() || 0;
-            const bTime = toDateValue(b.timestamp)?.getTime() || 0;
-            return bTime - aTime;
-          })
-          .slice(0, 50);
+        try {
+          const docsResponse = await api.get("/api/documents");
+          const documents = normalizeListPayload(docsResponse.data);
+          const fallbackLogs = documents
+            .map(mapDocumentToAuditEntry)
+            .sort((a, b) => {
+              const aTime = toDateValue(a.timestamp)?.getTime() || 0;
+              const bTime = toDateValue(b.timestamp)?.getTime() || 0;
+              return bTime - aTime;
+            })
+            .slice(0, 50);
 
-        setLogs(fallbackLogs);
-        setStatus(
-          fallbackLogs.length > 0
-            ? "Showing recent document activity while audit log entries are being populated."
-            : "No audit records found."
-        );
+          setLogs(fallbackLogs);
+          setStatus(
+            fallbackLogs.length > 0
+              ? "Showing recent document activity while audit log entries are being populated."
+              : "No audit records found."
+          );
+        } catch (fallbackErr) {
+          console.warn("⚠️ Fallback document activity fetch failed:", fallbackErr?.message || fallbackErr);
+          setLogs([]);
+          setStatus("No audit records found.");
+        }
       }
     } catch (err) {
       const errorMsg = err.response?.data?.detail || err.message;
       console.error("❌ Error fetching audit logs:", errorMsg);
+      setLogs([]);
       setStatus("❌ Failed to load audit logs.");
     } finally {
       setLoading(false);

@@ -215,7 +215,7 @@ const RegistryAudit = () => {
             return { key, category: displayCategory, total, periodLabel: label };
           } catch (err) {
             console.warn(`⚠️ Error fetching ${key}:`, err.message);
-            return { key, category: displayCategory, total: "N/A", periodLabel: label };
+            return { key, category: displayCategory, total: 0, periodLabel: label };
           }
         })
       );
