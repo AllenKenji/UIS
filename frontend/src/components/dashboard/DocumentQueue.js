@@ -113,37 +113,39 @@ const DocumentQueue = ({ statusFilter = "pending", title = "📄 Pending Documen
       ) : requests.length === 0 ? (
         <p>No pending requests available.</p>
       ) : (
-        <table className="queue-table" aria-label="Document Requests Table">
-          <thead>
-            <tr>
-              <th>Resident</th>
-              <th>Type</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {requests.map((req) => (
-              <tr key={req.id}>
-                <td>{req.residentName}</td>
-                <td>{req.documentType}</td>
-                <td>
-                  <span className={`status-badge ${normalizeStatus(req.status).replace(/_/g, "-")} ${normalizeStatus(req.status)}`}>
-                    {toStatusLabel(req.status)}
-                  </span>
-                </td>
-                <td>
-                  <button
-                    className="review-btn"
-                    onClick={() => handleReview(req)}
-                  >
-                    Review
-                  </button>
-                </td>
+        <div className="queue-table-wrap">
+          <table className="queue-table" aria-label="Document Requests Table">
+            <thead>
+              <tr>
+                <th>Resident</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Action</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {requests.map((req) => (
+                <tr key={req.id}>
+                  <td>{req.residentName}</td>
+                  <td>{req.documentType}</td>
+                  <td>
+                    <span className={`status-badge ${normalizeStatus(req.status).replace(/_/g, "-")} ${normalizeStatus(req.status)}`}>
+                      {toStatusLabel(req.status)}
+                    </span>
+                  </td>
+                  <td>
+                    <button
+                      className="review-btn"
+                      onClick={() => handleReview(req)}
+                    >
+                      Review
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {/* Portal for modal */}

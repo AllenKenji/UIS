@@ -221,28 +221,30 @@ const DashboardFocusPanel = ({ view }) => {
     return collectionRows.length === 0 ? (
       <p>No collections recorded today.</p>
     ) : (
-      <table className="queue-table" aria-label="Collections Today">
-        <thead>
-          <tr>
-            <th>Payer</th>
-            <th>Reference</th>
-            <th>Amount</th>
-            <th>Collected At</th>
-          </tr>
-        </thead>
-        <tbody>
-          {collectionRows.map((payment) => (
-            <tr key={payment.id}>
-              <td>{payment.payerName || payment.ownerName || payment.residentName || payment.fullName || "—"}</td>
-              <td>{payment.referenceNumber || payment.transactionId || payment.id || "—"}</td>
-              <td>
-                {new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(payment.amount || 0)}
-              </td>
-              <td>{payment.paidDate?.toLocaleString() || "—"}</td>
+      <div className="queue-table-wrap">
+        <table className="queue-table" aria-label="Collections Today">
+          <thead>
+            <tr>
+              <th>Payer</th>
+              <th>Reference</th>
+              <th>Amount</th>
+              <th>Collected At</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {collectionRows.map((payment) => (
+              <tr key={payment.id}>
+                <td>{payment.payerName || payment.ownerName || payment.residentName || payment.fullName || "—"}</td>
+                <td>{payment.referenceNumber || payment.transactionId || payment.id || "—"}</td>
+                <td>
+                  {new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(payment.amount || 0)}
+                </td>
+                <td>{payment.paidDate?.toLocaleString() || "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     );
   }
 
@@ -253,24 +255,26 @@ const DashboardFocusPanel = ({ view }) => {
     return loginRows.length === 0 ? (
       <p>No persons logged in today.</p>
     ) : (
-      <table className="queue-table" aria-label="Persons Logged In Today">
-        <thead>
-          <tr>
-            <th>Person</th>
-            <th>Role</th>
-            <th>Latest Login</th>
-          </tr>
-        </thead>
-        <tbody>
-          {loginRows.map((login) => (
-            <tr key={login.key}>
-              <td>{login.name}</td>
-              <td>{String(login.role || "—").replace(/_/g, " ")}</td>
-              <td>{login.timestamp?.toLocaleString() || "—"}</td>
+      <div className="queue-table-wrap">
+        <table className="queue-table" aria-label="Persons Logged In Today">
+          <thead>
+            <tr>
+              <th>Person</th>
+              <th>Role</th>
+              <th>Latest Login</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {loginRows.map((login) => (
+              <tr key={login.key}>
+                <td>{login.name}</td>
+                <td>{String(login.role || "—").replace(/_/g, " ")}</td>
+                <td>{login.timestamp?.toLocaleString() || "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     );
   }
 
@@ -281,26 +285,28 @@ const DashboardFocusPanel = ({ view }) => {
     return youthRows.length === 0 ? (
       <p>No youth registrations recorded today.</p>
     ) : (
-      <table className="queue-table" aria-label="Youth Registered Today">
-        <thead>
-          <tr>
-            <th>Resident</th>
-            <th>Age</th>
-            <th>Barangay</th>
-            <th>Registered</th>
-          </tr>
-        </thead>
-        <tbody>
-          {youthRows.map((resident) => (
-            <tr key={resident.id || resident.uid || resident.fullName}>
-              <td>{resident.fullName || resident.name || "—"}</td>
-              <td>{getResidentAge(resident) ?? "—"}</td>
-              <td>{resident.address?.barangay || resident.barangay || "—"}</td>
-              <td>{toDate(resident.createdAt || resident.timestamp || resident.created_at)?.toLocaleString() || "—"}</td>
+      <div className="queue-table-wrap">
+        <table className="queue-table" aria-label="Youth Registered Today">
+          <thead>
+            <tr>
+              <th>Resident</th>
+              <th>Age</th>
+              <th>Barangay</th>
+              <th>Registered</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {youthRows.map((resident) => (
+              <tr key={resident.id || resident.uid || resident.fullName}>
+                <td>{resident.fullName || resident.name || "—"}</td>
+                <td>{getResidentAge(resident) ?? "—"}</td>
+                <td>{resident.address?.barangay || resident.barangay || "—"}</td>
+                <td>{toDate(resident.createdAt || resident.timestamp || resident.created_at)?.toLocaleString() || "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     );
   }
 
@@ -314,24 +320,26 @@ const DashboardFocusPanel = ({ view }) => {
         {residentRows.length === 0 ? (
           <p>No residents were added today.</p>
         ) : (
-          <table className="queue-table" aria-label="Residents Added Today">
-            <thead>
-              <tr>
-                <th>Resident</th>
-                <th>Barangay</th>
-                <th>Added</th>
-              </tr>
-            </thead>
-            <tbody>
-              {residentRows.map((resident) => (
-                <tr key={resident.id || resident.uid || resident.fullName}>
-                  <td>{resident.fullName || resident.name || "—"}</td>
-                  <td>{resident.address?.barangay || resident.barangay || "—"}</td>
-                  <td>{toDate(resident.createdAt || resident.timestamp || resident.created_at)?.toLocaleString() || "—"}</td>
+          <div className="queue-table-wrap">
+            <table className="queue-table" aria-label="Residents Added Today">
+              <thead>
+                <tr>
+                  <th>Resident</th>
+                  <th>Barangay</th>
+                  <th>Added</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {residentRows.map((resident) => (
+                  <tr key={resident.id || resident.uid || resident.fullName}>
+                    <td>{resident.fullName || resident.name || "—"}</td>
+                    <td>{resident.address?.barangay || resident.barangay || "—"}</td>
+                    <td>{toDate(resident.createdAt || resident.timestamp || resident.created_at)?.toLocaleString() || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </>
     );
@@ -344,24 +352,26 @@ const DashboardFocusPanel = ({ view }) => {
     return businessRows.length === 0 ? (
       <p>No pending evaluation.</p>
     ) : (
-      <table className="queue-table" aria-label="Businesses Pending Evaluation">
-        <thead>
-          <tr>
-            <th>Owner</th>
-            <th>Business</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {businessRows.map((business) => (
-            <tr key={business.id}>
-              <td>{business.ownerName || business.owner || "—"}</td>
-              <td>{business.businessName || business.name || "—"}</td>
-              <td>{business.status || "—"}</td>
+      <div className="queue-table-wrap">
+        <table className="queue-table" aria-label="Businesses Pending Evaluation">
+          <thead>
+            <tr>
+              <th>Owner</th>
+              <th>Business</th>
+              <th>Status</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {businessRows.map((business) => (
+              <tr key={business.id}>
+                <td>{business.ownerName || business.owner || "—"}</td>
+                <td>{business.businessName || business.name || "—"}</td>
+                <td>{business.status || "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     );
   }
 

@@ -31,8 +31,14 @@
   margin-bottom: 14px;
 }
 
+.transactions-table .table-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
 .transactions-table table { 
   width: 100%; 
+  min-width: 840px;
   border-collapse: collapse; 
   font-size: 0.95rem; 
 } 
@@ -60,4 +66,15 @@
 
 .transactions-table td { 
   color: var(--color-text); 
+}
+
+@media (max-width: 768px) {
+  .transactions-table table {
+    font-size: 0.85rem;
+  }
+
+  .transactions-table th,
+  .transactions-table td {
+    padding: 8px 10px;
+  }
 }

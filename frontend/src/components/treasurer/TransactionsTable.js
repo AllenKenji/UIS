@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { usePayments } from "../../hooks/usePayments";
 import "../../styles/treasurer/transactions-table.css";
 
@@ -63,15 +63,13 @@ function TransactionsTable() {
     return "—";
   };
 
-  const filteredTransactions = useMemo(() => {
-    return transactions.filter((tx) => {
-      const group = resolveEntityGroup(tx);
-      if (!group || group !== entityTab) return false;
+  const filteredTransactions = transactions.filter((tx) => {
+    const group = resolveEntityGroup(tx);
+    if (!group || group !== entityTab) return false;
 
-      if (statusTab === "paid") return isPaidStatus(tx);
-      return isPendingStatus(tx);
-    });
-  }, [transactions, entityTab, statusTab]);
+    if (statusTab === "paid") return isPaidStatus(tx);
+    return isPendingStatus(tx);
+  });
 
   const formatDate = (dateValue) => {
     if (!dateValue) return "—";
@@ -139,57 +137,59 @@ function TransactionsTable() {
       {filteredTransactions.length === 0 ? (
         <p>No transactions available.</p>
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Business Name / Document</th>
-              <th>Owner Name</th>
-              <th>Type</th>
-              <th>Amount</th>
-              <th>Status</th>
-              <th>Channel</th>
-              <th>Receipt #</th>
-              <th>Date Paid</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredTransactions.map((tx) => (
-              <tr
-                key={tx.customPaymentId || tx.id}
-                className={`status-${tx.paymentStatus || tx.status}`}
-              >
-                {/* Business Name */}
-                <td>{tx.businessName || "Barangay document"}</td>
-
-                {/* Owner Name */}
-                <td>{tx.ownerName || tx.residentName || "Unknown"}</td>
-
-                {/* Entity Type/Category */}
-                <td>{tx.entityCategory || tx.businessType || tx.documentType || tx.description || "—"}</td>
-
-                {/* Amount */}
-                <td>₱{(tx.amount || 0).toLocaleString()}</td>
-
-                {/* Status */}
-                <td>{tx.paymentStatus || tx.status || "—"}</td>
-
-                {/* Channel */}
-                <td>{getChannelLabel(tx)}</td>
-
-                {/* Receipt Number (from receipts collection) */}
-                <td>{getReceiptLabel(tx)}</td>
-
-                {/* Date Paid */}
-                <td>
-                  {(tx.paymentStatus === "paid" || tx.status === "paid")
-                    ? formatDate(tx.datePaid || tx.createdAt)
-                    : "—"}
-                </td> 
-
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Business Name / Document</th>
+                <th>Owner Name</th>
+                <th>Type</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Channel</th>
+                <th>Receipt #</th>
+                <th>Date Paid</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredTransactions.map((tx) => (
+                <tr
+                  key={tx.customPaymentId || tx.id}
+                  className={`status-${tx.paymentStatus || tx.status}`}
+                >
+                  {/* Business Name */}
+                  <td>{tx.businessName || "Barangay document"}</td>
+
+                  {/* Owner Name */}
+                  <td>{tx.ownerName || tx.residentName || "Unknown"}</td>
+
+                  {/* Entity Type/Category */}
+                  <td>{tx.entityCategory || tx.businessType || tx.documentType || tx.description || "—"}</td>
+
+                  {/* Amount */}
+                  <td>₱{(tx.amount || 0).toLocaleString()}</td>
+
+                  {/* Status */}
+                  <td>{tx.paymentStatus || tx.status || "—"}</td>
+
+                  {/* Channel */}
+                  <td>{getChannelLabel(tx)}</td>
+
+                  {/* Receipt Number (from receipts collection) */}
+                  <td>{getReceiptLabel(tx)}</td>
+
+                  {/* Date Paid */}
+                  <td>
+                    {isPaidStatus(tx)
+                      ? formatDate(tx.datePaid || tx.createdAt)
+                      : "—"}
+                  </td>
+
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

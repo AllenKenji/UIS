@@ -45,6 +45,7 @@
   padding: 0.5rem 0.9rem;
   font-weight: 600;
   cursor: pointer;
+  min-height: 44px;
 }
 
 .dashboard-tab-btn.active {
@@ -116,6 +117,19 @@
 
 /* Responsive adjustments */
 @media (max-width: var(--bp-md)) {
+  .dashboard-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    scroll-snap-type: x proximity;
+  }
+
+  .dashboard-tab-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    scroll-snap-align: start;
+  }
+
   .dashboard-section.grid-2 {
     grid-template-columns: 1fr;
   }

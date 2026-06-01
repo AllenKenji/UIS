@@ -140,7 +140,7 @@
   background: #fff;
   padding: 20px;
   border-radius: 8px;
-  width: 400px;
+  width: min(400px, 92vw);
   max-height: 85vh;
   overflow-y: auto;
   text-align: center;
@@ -264,4 +264,29 @@
   height: 60px;
   object-fit: contain;
   border-bottom: 1px solid #000;
+}
+
+@media (max-width: 768px) {
+  .resident-list {
+    padding: 12px;
+  }
+
+  .filters {
+    justify-content: stretch;
+  }
+
+  .filters input,
+  .filters select,
+  .filters button {
+    width: 100%;
+  }
+
+  .fingerprint-section {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .finger-box {
+    width: 100%;
+  }
 }

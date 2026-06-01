@@ -27,6 +27,11 @@
   border-collapse: collapse;
 }
 
+.queue-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
 .queue-table th,
 .queue-table td {
   padding: var(--space-sm) var(--space-md);
@@ -101,6 +106,7 @@
   cursor: pointer;
   transition: background-color 0.2s ease;
   color: #fff;
+  min-height: 44px;
 }
 
 .review-btn {
@@ -212,6 +218,10 @@
     white-space: nowrap;
   }
 
+  .queue-table-wrap {
+    overflow-x: auto;
+  }
+
   .queue-table th,
   .queue-table td {
     padding: 0.5rem 0.625rem;
@@ -221,5 +231,14 @@
   .modal {
     width: 100%;
     max-width: 100%;
+  }
+
+  .modal-footer {
+    flex-direction: column;
+  }
+
+  .modal-footer .approve-btn,
+  .modal-footer .reject-btn {
+    width: 100%;
   }
 }

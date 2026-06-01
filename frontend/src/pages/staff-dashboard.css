@@ -29,7 +29,7 @@
   padding: var(--space-lg);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
-  min-width: 400px;
+  width: min(400px, 92vw);
   max-height: 80vh;
   overflow-y: auto;
   position: relative;
