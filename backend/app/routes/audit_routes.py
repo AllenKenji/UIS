@@ -102,6 +102,11 @@ def _resolve_payment_date(payment: dict):
             return parsed
     return None
 
+
+def _is_paid_status(payment: dict) -> bool:
+    status = str(payment.get("paymentStatus") or payment.get("status") or "").strip().lower()
+    return status in {"paid", "succeeded"}
+
 @router.get("/", tags=["Audit"])
 def list_audit_logs(
     limit: int = 50,
@@ -200,11 +205,18 @@ def get_audit_summary(
         period_start, period_end = _resolve_period_window(periodType, year, month)
         payments = list(db.collection("payments").stream())
         collections_amount = 0.0
+
+        # Mirror frontend dedupe behavior: unique by transactionId, else by doc id.
+        unique_payments: dict[str, dict] = {}
         for payment_doc in payments:
             payment = payment_doc.to_dict() or {}
-            status = str(payment.get("paymentStatus") or payment.get("status") or "").strip().lower()
+            key = str(payment.get("transactionId") or payment_doc.id)
+            if key not in unique_payments:
+                unique_payments[key] = payment
+
+        for payment in unique_payments.values():
             paid_date = _resolve_payment_date(payment)
-            if status in {"paid", "succeeded"} and paid_date and period_start <= paid_date < period_end:
+            if _is_paid_status(payment) and paid_date and period_start <= paid_date < period_end:
                 collections_amount += _to_number(payment.get("amount"))
 
         response["collectionsAmount"] = round(collections_amount, 2)
