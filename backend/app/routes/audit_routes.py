@@ -49,6 +49,18 @@ def _resident_age(record):
         years -= 1
     return years
 
+
+def _to_number(value):
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        cleaned = "".join(ch for ch in value if ch.isdigit() or ch in ".-")
+        try:
+            return float(cleaned) if cleaned else 0.0
+        except ValueError:
+            return 0.0
+    return 0.0
+
 @router.get("/", tags=["Audit"])
 def list_audit_logs(
     limit: int = 50,
@@ -134,8 +146,20 @@ def get_audit_summary(_: str = Depends(require_permission("auditBarangayData")))
             "businesses": len(list(db.collection("businesses").stream())),
             "documents": len(list(db.collection("documents").stream())),
             "logins": len(list(db.collection("logins").stream())),
+            "complaints": len(list(db.collection("complaints").stream())),
+            "incidents": len(list(db.collection("incidents").stream())),
             "auditLogs": len(list(db.collection("document_audit").stream())),
         }
+
+        payments = list(db.collection("payments").stream())
+        collections_amount = 0.0
+        for payment_doc in payments:
+            payment = payment_doc.to_dict() or {}
+            status = str(payment.get("paymentStatus") or payment.get("status") or "").strip().lower()
+            if status in {"paid", "succeeded"}:
+                collections_amount += _to_number(payment.get("amount"))
+
+        response["collectionsAmount"] = round(collections_amount, 2)
 
         return response
     except Exception as e:

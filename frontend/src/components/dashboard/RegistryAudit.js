@@ -158,17 +158,23 @@ const getYouthResidentsCount = async (start, end) => {
 const buildFallbackAuditEntries = (summary = {}) => [
   { key: "residents", category: "Residents", total: summary?.residents ?? 0, periodLabel: "Residents" },
   { key: "businesses", category: "Businesses", total: summary?.businesses ?? 0, periodLabel: "Businesses" },
+  { key: "complaints", category: "Complaints", total: summary?.complaints ?? 0, periodLabel: "Complaints" },
+  { key: "incidents", category: "Incidents", total: summary?.incidents ?? 0, periodLabel: "Incidents" },
   { key: "documents", category: "Documents", total: summary?.documents ?? 0, periodLabel: "Documents" },
   { key: "logins", category: "Login", total: summary?.logins ?? 0, periodLabel: "Login / Day" },
   { key: "youth", category: "Youth Registry", total: summary?.youth ?? 0, periodLabel: "Youth Registry" },
+  { key: "collections", category: "Collections", total: summary?.collectionsAmount ?? 0, periodLabel: "Collections / Day" },
 ];
 
 const SUMMARY_KEY_MAP = {
   residents: "residents",
   businesses: "businesses",
+  complaints: "complaints",
+  incidents: "incidents",
   documents: "documents",
   logins: "logins",
   youth: "youth",
+  collections: "collectionsAmount",
 };
 
 const RegistryAudit = () => {
