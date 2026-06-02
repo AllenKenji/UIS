@@ -219,13 +219,21 @@ const RegistryAudit = () => {
             }
 
             if (key === "collections") {
-              try {
-                const summary = await AuditAPI.summary(
-                  periodType === "yearly"
-                    ? { periodType: "yearly", year: selectedYear }
-                    : { periodType: "monthly", month: selectedMonth }
-                );
+              const total = transactions.reduce((sum, record) => {
+                const collectionDate = resolveCollectionDate(record);
 
+                if (!isPaidCollectionRecord(record) || !collectionDate || collectionDate < start || collectionDate >= end) {
+                  return sum;
+                }
+                return sum + parseAmount(record.amount);
+              }, 0);
+
+              if (total > 0) {
+                return { key, category: displayCategory, total, periodLabel: label };
+              }
+
+              try {
+                const summary = await AuditAPI.summary();
                 return {
                   key,
                   category: displayCategory,
@@ -237,16 +245,7 @@ const RegistryAudit = () => {
                 console.warn("⚠️ Failed to load collections summary fallback:", summaryError);
               }
 
-              const total = transactions.reduce((sum, record) => {
-                const collectionDate = resolveCollectionDate(record);
-
-                if (!isPaidCollectionRecord(record) || !collectionDate || collectionDate < start || collectionDate >= end) {
-                  return sum;
-                }
-                return sum + parseAmount(record.amount);
-              }, 0);
-
-              return { key, category: displayCategory, total, periodLabel: label, hadReadError: total === 0 };
+              return { key, category: displayCategory, total, periodLabel: label };
             }
 
             const snapshot = await getDocs(collection(db, key));
