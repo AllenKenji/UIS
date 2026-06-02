@@ -6,6 +6,25 @@ import { useUser } from "../../context/UserContext";
 import { DisbursementsAPI } from "../../services/api";
 import "../../styles/sk.css";
 
+const toDate = (value) => {
+  if (!value) return null;
+  if (typeof value.toDate === "function") return value.toDate();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const formatDate = (value) => {
+  const date = toDate(value);
+  if (!date) return "Date not set";
+  return date.toLocaleDateString();
+};
+
+const toInputDate = (value) => {
+  const date = toDate(value);
+  if (!date) return "";
+  return date.toISOString().slice(0, 10);
+};
+
 const DISBURSEMENT_CATEGORIES = [
   "Salaries",
   "Supplies",
