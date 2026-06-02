@@ -126,7 +126,7 @@ def _is_within_range(value: Optional[datetime], start: datetime, end: datetime) 
 
 def _is_paid_status(payment: dict) -> bool:
     status = str(payment.get("paymentStatus") or payment.get("status") or "").strip().lower()
-    return status in {"paid", "succeeded"}
+    return status == "paid"
 
 
 def _normalize_status(value) -> str:
@@ -192,7 +192,7 @@ def _build_collection_amount(db, period_start: datetime, period_end: datetime) -
     collections_amount = 0.0
     for tx in unique.values():
         status = _normalize_status(tx.get("paymentStatus") or tx.get("status"))
-        if status not in {"paid", "succeeded"}:
+        if status != "paid":
             continue
 
         date_value = _resolve_collection_date(tx)
