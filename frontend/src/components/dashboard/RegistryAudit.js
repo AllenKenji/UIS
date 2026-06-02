@@ -163,6 +163,14 @@ const buildFallbackAuditEntries = (summary = {}) => [
   { key: "youth", category: "Youth Registry", total: summary?.youth ?? 0, periodLabel: "Youth Registry" },
 ];
 
+const SUMMARY_KEY_MAP = {
+  residents: "residents",
+  businesses: "businesses",
+  documents: "documents",
+  logins: "logins",
+  youth: "youth",
+};
+
 const RegistryAudit = () => {
   const { can } = useUser(); 
   const { transactions = [] } = usePayments();
@@ -224,13 +232,36 @@ const RegistryAudit = () => {
             return { key, category: displayCategory, total, periodLabel: label };
           } catch (err) {
             console.warn(`⚠️ Error fetching ${key}:`, err.message);
-            return { key, category: displayCategory, total: 0, periodLabel: label };
+            return { key, category: displayCategory, total: 0, periodLabel: label, hadReadError: true };
           }
         })
       );
 
       if (!cancelled) {
-        const visibleResults = results.filter(Boolean);
+        let visibleResults = results.filter(Boolean);
+
+        if (can("auditBarangayData")) {
+          const keysNeedingSummary = visibleResults
+            .filter((entry) => entry.hadReadError && SUMMARY_KEY_MAP[entry.key])
+            .map((entry) => entry.key);
+
+          if (keysNeedingSummary.length > 0) {
+            try {
+              const summary = await AuditAPI.summary();
+              visibleResults = visibleResults.map((entry) => {
+                if (!keysNeedingSummary.includes(entry.key)) return entry;
+                const summaryKey = SUMMARY_KEY_MAP[entry.key];
+                return {
+                  ...entry,
+                  total: summary?.[summaryKey] ?? entry.total,
+                  hadReadError: false,
+                };
+              });
+            } catch (error) {
+              console.warn("⚠️ Failed to patch registry audit with summary data:", error);
+            }
+          }
+        }
 
         if (visibleResults.length === 0 && can("auditBarangayData")) {
           try {
