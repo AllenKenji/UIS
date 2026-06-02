@@ -32,6 +32,7 @@ const DISBURSEMENT_CATEGORIES = [
   "Infrastructure",
   "Health Programs",
   "Miscellaneous",
+  "Others",
 ];
 
 const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {

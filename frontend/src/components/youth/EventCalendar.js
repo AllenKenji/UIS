@@ -30,6 +30,7 @@ const DISBURSEMENT_CATEGORIES = [
   "Infrastructure",
   "Health Programs",
   "Miscellaneous",
+  "Others",
 ];
 
 const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
