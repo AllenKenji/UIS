@@ -8,6 +8,7 @@ function Disbursements() {
   const { disbursements = [], totals = {}, byCategory = {} } = useDisbursements();
   const [showForm, setShowForm] = useState(false);
   const [selectedDisbursement, setSelectedDisbursement] = useState(null);
+  const [activeStatusTab, setActiveStatusTab] = useState("pending");
   const [users, setUsers] = useState([]);
 
   useEffect(() => { 
@@ -35,6 +36,17 @@ function Disbursements() {
       console.error("Failed to delete disbursement", err);
     } 
   };
+
+  const normalizeStatus = (value) => String(value || "").trim().toLowerCase();
+
+  const filteredDisbursements = disbursements.filter((item) => {
+    const status = normalizeStatus(item.status);
+    if (activeStatusTab === "approved") return status === "approved";
+    return status === "pending";
+  });
+
+  const pendingCount = disbursements.filter((item) => normalizeStatus(item.status) === "pending").length;
+  const approvedCount = disbursements.filter((item) => normalizeStatus(item.status) === "approved").length;
 
   return (
     <div className="treasurer-main">
@@ -83,7 +95,29 @@ function Disbursements() {
       {/* Detailed Transactions */}
       <section className="transactions">
         <h2>Transaction Details</h2>
-        {disbursements.length === 0 ? (
+
+        <div className="transactions-tabs" role="tablist" aria-label="Disbursement status tabs">
+          <button
+            type="button"
+            role="tab"
+            className={activeStatusTab === "pending" ? "active" : ""}
+            aria-selected={activeStatusTab === "pending"}
+            onClick={() => setActiveStatusTab("pending")}
+          >
+            Pending ({pendingCount})
+          </button>
+          <button
+            type="button"
+            role="tab"
+            className={activeStatusTab === "approved" ? "active" : ""}
+            aria-selected={activeStatusTab === "approved"}
+            onClick={() => setActiveStatusTab("approved")}
+          >
+            Approved ({approvedCount})
+          </button>
+        </div>
+
+        {filteredDisbursements.length === 0 ? (
           <p>No transactions available.</p>
         ) : (
           <table className="transactions-table">
@@ -100,7 +134,7 @@ function Disbursements() {
               </tr>
             </thead>
             <tbody>
-              {disbursements.map(d => (
+              {filteredDisbursements.map(d => (
                 <tr
                   key={d.id}
                   onClick={() => setSelectedDisbursement(d)}

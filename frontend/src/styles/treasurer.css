@@ -68,6 +68,29 @@
   margin-bottom: 1rem;
 }
 
+.transactions-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.transactions-tabs button {
+  border: 1px solid #d0d7de;
+  background: #ffffff;
+  color: #1f2937;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.transactions-tabs button.active {
+  border-color: var(--color-success);
+  background: rgba(56, 161, 105, 0.15);
+  font-weight: 700;
+}
+
 .transactions-table table {
   width: 100%;
   border-collapse: collapse;

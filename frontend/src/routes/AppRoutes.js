@@ -159,10 +159,10 @@ const AppRoutes = ({ isDarkMode, toggleDarkMode }) => {
 
             {/* Treasurer */}
             <Route path="/treasurer" element={<ProtectedRoute allowedRoles={["admin","treasurer"]}><TreasurerDashboard /></ProtectedRoute>} />
-            <Route path="/treasurer/incoming" element={<ProtectedRoute allowedRoles={["treasurer"]}><Collections /></ProtectedRoute>} />
-            <Route path="/treasurer/expenses" element={<ProtectedRoute allowedRoles={["treasurer"]}><Disbursements /></ProtectedRoute>} />
-            <Route path="/treasurer/reports" element={<ProtectedRoute allowedRoles={["treasurer"]}><Reports /></ProtectedRoute>} />
-            <Route path="/treasurer/settings" element={<ProtectedRoute allowedRoles={["treasurer"]}><Settings /></ProtectedRoute>} />
+            <Route path="/treasurer/incoming" element={<ProtectedRoute allowedRoles={["admin", "treasurer"]}><Collections /></ProtectedRoute>} />
+            <Route path="/treasurer/expenses" element={<ProtectedRoute allowedRoles={["admin", "treasurer"]}><Disbursements /></ProtectedRoute>} />
+            <Route path="/treasurer/reports" element={<ProtectedRoute allowedRoles={["admin", "treasurer"]}><Reports /></ProtectedRoute>} />
+            <Route path="/treasurer/settings" element={<ProtectedRoute allowedRoles={["admin", "treasurer"]}><Settings /></ProtectedRoute>} />
 
             {/* Admin Youth Oversight */}
             <Route path="/admin/youth" element={<ProtectedRoute allowedRoles={["admin"]}><SKDashboard /></ProtectedRoute>} />
