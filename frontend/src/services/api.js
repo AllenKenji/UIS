@@ -515,6 +515,14 @@ export const NotificationsAPI = {
       business_name: businessName,
     }).then((res) => res.data),
 
+  createSkExpense: (activityType, title, category, amount) =>
+    api.post("/api/notifications/sk-expense", {
+      activity_type: activityType,
+      title,
+      category,
+      amount,
+    }).then((res) => res.data),
+
   createBusinessStatusUpdate: (status, residentUid, businessName, businessId, firestoreId) => {
     const payload = {
       status,

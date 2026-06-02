@@ -17,6 +17,31 @@ router = APIRouter(prefix="/paymongo", tags=["Payments"])
 PAYMONGO_WEBHOOK_SECRET = os.getenv("PAYMONGO_WEBHOOK_SECRET", "")
 
 
+def _string_or_none(value):
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _build_payment_message(kind: str, status: str, owner_name=None, type_name=None, item_name=None) -> str:
+    resolved_kind = _string_or_none(kind) or "Payment"
+    resolved_status = _string_or_none(status) or "updated"
+    resolved_owner = _string_or_none(owner_name) or "Unknown owner"
+    resolved_type = _string_or_none(type_name)
+    resolved_item = _string_or_none(item_name)
+
+    descriptor = None
+    if resolved_type and resolved_item and resolved_type != resolved_item:
+        descriptor = f"{resolved_type} ({resolved_item})"
+    else:
+        descriptor = resolved_type or resolved_item
+
+    if descriptor:
+        return f"{resolved_kind} payment {resolved_status} by {resolved_owner} for {descriptor}"
+    return f"{resolved_kind} payment {resolved_status} by {resolved_owner}"
+
+
 async def _notify_payment_roles(message: str, event_type: str = "payment_update"):
     for target_role in ("admin", "treasurer", "staff"):
         try:
@@ -202,7 +227,13 @@ async def paymongo_webhook(request: Request):
                 )
 
                 await _notify_payment_roles(
-                    f"Business payment {status} ({metadata.get('businessId')})",
+                    _build_payment_message(
+                        "Business",
+                        status,
+                        owner_name=business_data.get("ownerName"),
+                        type_name=business_data.get("businessType"),
+                        item_name=business_data.get("businessName"),
+                    ),
                     "payment_update",
                 )
 
@@ -230,7 +261,13 @@ async def paymongo_webhook(request: Request):
                     method="paymongo"
                 )
                 await _notify_payment_roles(
-                    f"Document payment {status} ({metadata.get('documentId')})",
+                    _build_payment_message(
+                        "Document",
+                        status,
+                        owner_name=doc_data.get("ownerName") or doc_data.get("residentName"),
+                        type_name=doc_data.get("documentType"),
+                        item_name=doc_data.get("businessName"),
+                    ),
                     "payment_update",
                 )
             else:
@@ -260,7 +297,13 @@ async def paymongo_webhook(request: Request):
                     method="paymongo" 
                 )
                 await _notify_payment_roles(
-                    f"Business payment {status} ({business_data.get('businessId') or reference_number})",
+                    _build_payment_message(
+                        "Business",
+                        status,
+                        owner_name=business_data.get("ownerName"),
+                        type_name=business_data.get("businessType"),
+                        item_name=business_data.get("businessName"),
+                    ),
                     "payment_update",
                 )
             else:
@@ -286,7 +329,13 @@ async def paymongo_webhook(request: Request):
                         method="paymongo"
                     )
                     await _notify_payment_roles(
-                        f"Document payment {status} ({doc_data.get('documentId') or reference_number})",
+                        _build_payment_message(
+                            "Document",
+                            status,
+                            owner_name=doc_data.get("ownerName") or doc_data.get("residentName"),
+                            type_name=doc_data.get("documentType"),
+                            item_name=doc_data.get("businessName"),
+                        ),
                         "payment_update",
                     )
                 else:
@@ -324,7 +373,13 @@ async def paymongo_webhook(request: Request):
                 )
 
                 await _notify_payment_roles(
-                    f"Business payment {status} ({business_data.get('businessId') or matched_link_id})",
+                    _build_payment_message(
+                        "Business",
+                        status,
+                        owner_name=business_data.get("ownerName"),
+                        type_name=business_data.get("businessType"),
+                        item_name=business_data.get("businessName"),
+                    ),
                     "payment_update",
                 )
             else:
@@ -385,7 +440,13 @@ async def record_business_payment(payload: dict):
         "method": method
     } 
     await _notify_payment_roles(
-        f"Business payment paid ({business_id})",
+        _build_payment_message(
+            "Business",
+            "paid",
+            owner_name=business_data.get("ownerName"),
+            type_name=business_data.get("businessType"),
+            item_name=business_data.get("businessName"),
+        ),
         "payment",
     )
     
@@ -460,7 +521,13 @@ async def record_document_payment(payload: dict):
             "method": method
         }
         await _notify_payment_roles(
-            f"Document payment paid ({document_id})",
+            _build_payment_message(
+                "Document",
+                "paid",
+                owner_name=doc_data.get("ownerName") or doc_data.get("residentName"),
+                type_name=doc_data.get("documentType"),
+                item_name=doc_data.get("businessName"),
+            ),
             "payment",
         )
         return response

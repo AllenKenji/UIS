@@ -3,7 +3,7 @@ import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from "
 import { toast } from "react-toastify";
 import { db } from "../../services/firebase";
 import { useUser } from "../../context/UserContext";
-import { DisbursementsAPI } from "../../services/api";
+import { NotificationsAPI } from "../../services/api";
 import "../../styles/sk.css";
 
 const toDate = (value) => {
@@ -116,7 +116,7 @@ const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
 
         if (String(role || "").trim().toLowerCase() === "sk") {
           try {
-            await DisbursementsAPI.create({
+            await addDoc(collection(db, "disbursements"), {
               category: form.category,
               amount: budget,
               date: new Date(form.date),
@@ -133,7 +133,20 @@ const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
               referenceNo: `SK-PROG-${Date.now()}`,
               sourceType: "sk_program",
               sourceId: createdProgram.id,
+              createdAt: serverTimestamp(),
             });
+
+            try {
+              await NotificationsAPI.createSkExpense(
+                "program",
+                form.title.trim(),
+                form.category,
+                budget,
+              );
+            } catch (notificationError) {
+              console.error("Failed to notify treasurer about program expense", notificationError);
+              toast.warning("Program and disbursement saved, but treasurer notification could not be created.");
+            }
           } catch (disbursementError) {
             console.error("Failed to create disbursement for program", disbursementError);
             toast.warning("Program saved, but disbursement record could not be created.");

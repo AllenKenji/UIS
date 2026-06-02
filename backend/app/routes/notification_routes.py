@@ -41,10 +41,25 @@ class BusinessStatusUpdatePayload(BaseModel):
     business_name: str | None = None
 
 
+class SkExpenseNotificationPayload(BaseModel):
+    activity_type: str
+    title: str
+    category: str | None = None
+    amount: float | int
+
+
 def _resident_message(event_type: str, count: int) -> str:
     if event_type == "login":
         return f"{count} resident logged in" if count == 1 else f"{count} residents logged in"
     return f"{count} resident logged out" if count == 1 else f"{count} residents logged out"
+
+
+def _format_currency(value: float | int) -> str:
+    try:
+        amount = float(value)
+    except (TypeError, ValueError):
+        amount = 0.0
+    return f"Php {amount:,.2f}"
 
 
 def _record_login_event(
@@ -615,6 +630,22 @@ async def document_request(resident_name: str, user: dict = Depends(get_current_
         {"role": "admin", "type": "document", "message": f"Document request submitted by {resident_name}"},
         {"role": "secretary", "type": "document", "message": "New document request submitted"},
     ])
+
+
+@router.post("/sk-expense", response_model=Notification)
+async def sk_expense_notification(payload: SkExpenseNotificationPayload, user: dict = Depends(get_current_user)):
+    activity_label = "event" if str(payload.activity_type or "").strip().lower() == "event" else "program"
+    category_suffix = f" under {payload.category}" if payload.category else ""
+    message = (
+        f"New SK {activity_label} expense added: {payload.title}{category_suffix} "
+        f"with a budget of {_format_currency(payload.amount)}"
+    )
+
+    return await NotificationService.notify(
+        role="treasurer",
+        type="sk_expense",
+        message=message,
+    )
 
 @router.delete("/actions/bulk-delete", response_model=dict)
 async def bulk_delete_notifications_actions(
