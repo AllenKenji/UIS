@@ -192,6 +192,10 @@ const RegistryAudit = () => {
     const fetchRegistryStats = async () => {
       setLoading(true);
       const { start, end } = buildPeriodWindow(periodType, selectedMonth, selectedYear);
+      const summaryParams =
+        periodType === "yearly"
+          ? { periodType: "yearly", year: Number(selectedYear) || new Date().getFullYear() }
+          : { periodType: "monthly", month: selectedMonth };
 
       const results = await Promise.all(
         Object.entries(CATEGORIES).map(async ([key, label]) => {
@@ -219,25 +223,8 @@ const RegistryAudit = () => {
             }
 
             if (key === "collections") {
-              const total = transactions.reduce((sum, record) => {
-                const collectionDate = resolveCollectionDate(record);
-
-                if (!isPaidCollectionRecord(record) || !collectionDate || collectionDate < start || collectionDate >= end) {
-                  return sum;
-                }
-                return sum + parseAmount(record.amount);
-              }, 0);
-
-              if (total > 0) {
-                return { key, category: displayCategory, total, periodLabel: label };
-              }
-
               try {
-                const summary = await AuditAPI.summary(
-                  periodType === "yearly"
-                    ? { periodType: "yearly", year: Number(selectedYear) || new Date().getFullYear() }
-                    : { periodType: "monthly", month: selectedMonth }
-                );
+                const summary = await AuditAPI.summary(summaryParams);
                 return {
                   key,
                   category: displayCategory,
@@ -248,6 +235,15 @@ const RegistryAudit = () => {
               } catch (summaryError) {
                 console.warn("⚠️ Failed to load collections summary fallback:", summaryError);
               }
+
+              const total = transactions.reduce((sum, record) => {
+                const collectionDate = resolveCollectionDate(record);
+
+                if (!isPaidCollectionRecord(record) || !collectionDate || collectionDate < start || collectionDate >= end) {
+                  return sum;
+                }
+                return sum + parseAmount(record.amount);
+              }, 0);
 
               return { key, category: displayCategory, total, periodLabel: label };
             }
@@ -275,7 +271,7 @@ const RegistryAudit = () => {
 
           if (keysNeedingSummary.length > 0) {
             try {
-              const summary = await AuditAPI.summary();
+              const summary = await AuditAPI.summary(summaryParams);
               visibleResults = visibleResults.map((entry) => {
                 if (!keysNeedingSummary.includes(entry.key)) return entry;
                 const summaryKey = SUMMARY_KEY_MAP[entry.key];
@@ -293,7 +289,7 @@ const RegistryAudit = () => {
 
         if (visibleResults.length === 0 && can("auditBarangayData")) {
           try {
-            const summary = await AuditAPI.summary();
+            const summary = await AuditAPI.summary(summaryParams);
             setStats(buildFallbackAuditEntries(summary));
           } catch (error) {
             console.warn("⚠️ Failed to load registry audit summary fallback:", error);

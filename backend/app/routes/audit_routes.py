@@ -103,6 +103,27 @@ def _resolve_payment_date(payment: dict):
     return None
 
 
+def _resolve_record_date(key: str, record: dict):
+    if key == "businesses":
+        candidates = ("submittedAt", "createdAt", "timestamp", "created_at", "updatedAt")
+    elif key == "collections":
+        candidates = ("datePaid", "paymentDate", "timestamp", "createdAt")
+    elif key == "logins":
+        candidates = ("timestamp", "createdAt")
+    else:
+        candidates = ("createdAt", "timestamp", "created_at", "updatedAt", "date")
+
+    for field in candidates:
+        parsed = _to_datetime(record.get(field))
+        if parsed:
+            return parsed
+    return None
+
+
+def _is_within_range(value: Optional[datetime], start: datetime, end: datetime) -> bool:
+    return bool(value and start <= value < end)
+
+
 def _is_paid_status(payment: dict) -> bool:
     status = str(payment.get("paymentStatus") or payment.get("status") or "").strip().lower()
     return status in {"paid", "succeeded"}
@@ -181,28 +202,45 @@ def get_audit_summary(
     Uses server-side Firestore access to avoid client rule read issues.
     """
     try:
+        period_start, period_end = _resolve_period_window(periodType, year, month)
         db = get_db()
-        residents_docs = list(db.collection("residents").stream())
 
+        def _count_in_period(collection_name: str):
+            docs = list(db.collection(collection_name).stream())
+            return sum(
+                1
+                for item in docs
+                if _is_within_range(
+                    _resolve_record_date(collection_name, item.to_dict() or {}),
+                    period_start,
+                    period_end,
+                )
+            )
+
+        residents_docs = list(db.collection("residents").stream())
+        residents_count = 0
         youth_count = 0
         for resident_doc in residents_docs:
             data = resident_doc.to_dict() or {}
+            created_at = _resolve_record_date("residents", data)
+            if not _is_within_range(created_at, period_start, period_end):
+                continue
+            residents_count += 1
             age = _resident_age(data)
             if isinstance(age, int) and 15 <= age <= 24:
                 youth_count += 1
 
         response = {
-            "residents": len(residents_docs),
+            "residents": residents_count,
             "youth": youth_count,
-            "businesses": len(list(db.collection("businesses").stream())),
-            "documents": len(list(db.collection("documents").stream())),
-            "logins": len(list(db.collection("logins").stream())),
-            "complaints": len(list(db.collection("complaints").stream())),
-            "incidents": len(list(db.collection("incidents").stream())),
-            "auditLogs": len(list(db.collection("document_audit").stream())),
+            "businesses": _count_in_period("businesses"),
+            "documents": _count_in_period("documents"),
+            "logins": _count_in_period("logins"),
+            "complaints": _count_in_period("complaints"),
+            "incidents": _count_in_period("incidents"),
+            "auditLogs": _count_in_period("document_audit"),
         }
 
-        period_start, period_end = _resolve_period_window(periodType, year, month)
         payments = list(db.collection("payments").stream())
         collections_amount = 0.0
 
