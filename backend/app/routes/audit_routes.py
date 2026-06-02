@@ -128,6 +128,81 @@ def _is_paid_status(payment: dict) -> bool:
     status = str(payment.get("paymentStatus") or payment.get("status") or "").strip().lower()
     return status in {"paid", "succeeded"}
 
+
+def _normalize_status(value) -> str:
+    return str(value or "").strip().lower()
+
+
+def _is_unpaid_business(record: dict) -> bool:
+    payment_status = _normalize_status(record.get("paymentStatus"))
+    status = _normalize_status(record.get("status"))
+    return payment_status == "unpaid" or status == "for_payment"
+
+
+def _resolve_collection_date(record: dict):
+    for key in ("datePaid", "paidAt", "paymentDate", "createdAt", "date", "updatedAt"):
+        parsed = _to_datetime(record.get(key))
+        if parsed:
+            return parsed
+    return None
+
+
+def _build_collection_amount(db, period_start: datetime, period_end: datetime) -> float:
+    payments = [
+        {"id": snap.id, "entityType": "payment", **(snap.to_dict() or {})}
+        for snap in db.collection("payments").stream()
+    ]
+
+    businesses = [
+        {
+            "id": snap.id,
+            "entityType": "business",
+            "amount": (snap.to_dict() or {}).get("amount"),
+            "paymentStatus": "unpaid",
+            **(snap.to_dict() or {}),
+        }
+        for snap in db.collection("businesses").stream()
+        if _is_unpaid_business(snap.to_dict() or {})
+    ]
+
+    documents = [
+        {
+            "id": snap.id,
+            "entityType": "document",
+            "amount": (snap.to_dict() or {}).get("amount"),
+            "paymentStatus": (snap.to_dict() or {}).get("paymentStatus") or (snap.to_dict() or {}).get("status") or "unpaid",
+            **(snap.to_dict() or {}),
+        }
+        for snap in db.collection("documents").stream()
+    ]
+
+    merged = [*payments, *businesses, *documents]
+    unique: dict[str, dict] = {}
+
+    for tx in merged:
+        key = str(tx.get("transactionId") or tx.get("id"))
+        if key not in unique:
+            unique[key] = tx
+            continue
+
+        existing = unique[key]
+        if existing.get("entityType") != "payment" and tx.get("entityType") == "payment":
+            unique[key] = tx
+
+    collections_amount = 0.0
+    for tx in unique.values():
+        status = _normalize_status(tx.get("paymentStatus") or tx.get("status"))
+        if status not in {"paid", "succeeded"}:
+            continue
+
+        date_value = _resolve_collection_date(tx)
+        if not date_value or not (period_start <= date_value < period_end):
+            continue
+
+        collections_amount += _to_number(tx.get("amount"))
+
+    return round(collections_amount, 2)
+
 @router.get("/", tags=["Audit"])
 def list_audit_logs(
     limit: int = 50,
@@ -241,23 +316,7 @@ def get_audit_summary(
             "auditLogs": _count_in_period("document_audit"),
         }
 
-        payments = list(db.collection("payments").stream())
-        collections_amount = 0.0
-
-        # Mirror frontend dedupe behavior: unique by transactionId, else by doc id.
-        unique_payments: dict[str, dict] = {}
-        for payment_doc in payments:
-            payment = payment_doc.to_dict() or {}
-            key = str(payment.get("transactionId") or payment_doc.id)
-            if key not in unique_payments:
-                unique_payments[key] = payment
-
-        for payment in unique_payments.values():
-            paid_date = _resolve_payment_date(payment)
-            if _is_paid_status(payment) and paid_date and period_start <= paid_date < period_end:
-                collections_amount += _to_number(payment.get("amount"))
-
-        response["collectionsAmount"] = round(collections_amount, 2)
+        response["collectionsAmount"] = _build_collection_amount(db, period_start, period_end)
 
         return response
     except Exception as e:
