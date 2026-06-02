@@ -1,6 +1,6 @@
 # app/routes/audit_routes.py
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from backend.app.utils.firestore_utils import get_db
 from backend.app.core.auth import require_permission
 import logging
@@ -60,6 +60,43 @@ def _to_number(value):
         except ValueError:
             return 0.0
     return 0.0
+
+
+def _resolve_period_window(period_type: str | None, year: int | None, month: str | None):
+    now = datetime.utcnow()
+    normalized = (period_type or "").strip().lower()
+
+    if normalized == "yearly":
+        safe_year = year if isinstance(year, int) and 2000 <= year <= 9999 else now.year
+        return datetime(safe_year, 1, 1), datetime(safe_year + 1, 1, 1)
+
+    if normalized == "monthly":
+        source = month or now.strftime("%Y-%m")
+        try:
+            year_part, month_part = source.split("-")
+            safe_year = int(year_part)
+            safe_month = int(month_part)
+            if not (1 <= safe_month <= 12):
+                raise ValueError
+            start = datetime(safe_year, safe_month, 1)
+            end = datetime(
+                safe_year + (1 if safe_month == 12 else 0),
+                1 if safe_month == 12 else safe_month + 1,
+                1,
+            )
+            return start, end
+        except Exception:
+            pass
+
+    return datetime(now.year, 1, 1), datetime(now.year + 1, 1, 1)
+
+
+def _resolve_payment_date(payment: dict):
+    for key in ("datePaid", "paidAt", "paymentDate", "createdAt", "timestamp", "updatedAt"):
+        parsed = _to_datetime(payment.get(key))
+        if parsed:
+            return parsed
+    return None
 
 @router.get("/", tags=["Audit"])
 def list_audit_logs(
@@ -124,7 +161,12 @@ def list_audit_logs(
 
 
 @router.get("/summary", tags=["Audit"])
-def get_audit_summary(_: str = Depends(require_permission("auditBarangayData"))):
+def get_audit_summary(
+    periodType: str | None = Query(None),
+    year: int | None = Query(None),
+    month: str | None = Query(None),
+    _: str = Depends(require_permission("auditBarangayData")),
+):
     """
     Return high-level audit counts for admin and DILG dashboards.
     Uses server-side Firestore access to avoid client rule read issues.
@@ -151,12 +193,14 @@ def get_audit_summary(_: str = Depends(require_permission("auditBarangayData")))
             "auditLogs": len(list(db.collection("document_audit").stream())),
         }
 
+        period_start, period_end = _resolve_period_window(periodType, year, month)
         payments = list(db.collection("payments").stream())
         collections_amount = 0.0
         for payment_doc in payments:
             payment = payment_doc.to_dict() or {}
             status = str(payment.get("paymentStatus") or payment.get("status") or "").strip().lower()
-            if status in {"paid", "succeeded"}:
+            paid_date = _resolve_payment_date(payment)
+            if status in {"paid", "succeeded"} and paid_date and period_start <= paid_date < period_end:
                 collections_amount += _to_number(payment.get("amount"))
 
         response["collectionsAmount"] = round(collections_amount, 2)

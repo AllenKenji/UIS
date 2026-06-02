@@ -233,7 +233,11 @@ const RegistryAudit = () => {
               }
 
               try {
-                const summary = await AuditAPI.summary();
+                const summary = await AuditAPI.summary(
+                  periodType === "yearly"
+                    ? { periodType: "yearly", year: Number(selectedYear) || new Date().getFullYear() }
+                    : { periodType: "monthly", month: selectedMonth }
+                );
                 return {
                   key,
                   category: displayCategory,
