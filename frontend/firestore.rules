@@ -232,5 +232,17 @@ service cloud.firestore {
       allow read: if isAuthenticated();
     }
 
+    // 💸 Disbursements
+    match /disbursements/{docId} {
+      // Treasurer and admin can review all disbursements.
+      allow read: if isAdmin() || isTreasurer();
+
+      // SK can create expense records for programs/events; treasurer/admin can also create manually.
+      allow create: if isAdmin() || isTreasurer() || isSK();
+
+      // Only treasurer/admin can update or remove expense records.
+      allow update, delete: if isAdmin() || isTreasurer();
+    }
+
   }
 }
