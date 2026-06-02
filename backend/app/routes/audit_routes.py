@@ -1,5 +1,5 @@
 # app/routes/audit_routes.py
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from backend.app.utils.firestore_utils import get_db
@@ -8,23 +8,24 @@ import logging
 
 router = APIRouter()
 logger = logging.getLogger("uvicorn.error")
+LOCAL_TZ = timezone(timedelta(hours=8))
 
 
 def _to_datetime(value):
     if value is None:
         return None
     if isinstance(value, datetime):
-        return value.astimezone(timezone.utc).replace(tzinfo=None) if value.tzinfo else value
+        return value.astimezone(LOCAL_TZ).replace(tzinfo=None) if value.tzinfo else value
     if hasattr(value, "to_datetime"):
         try:
             converted = value.to_datetime()
-            return converted.astimezone(timezone.utc).replace(tzinfo=None) if getattr(converted, "tzinfo", None) else converted
+            return converted.astimezone(LOCAL_TZ).replace(tzinfo=None) if getattr(converted, "tzinfo", None) else converted
         except Exception:
             return None
     if isinstance(value, str):
         try:
             parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-            return parsed.astimezone(timezone.utc).replace(tzinfo=None) if parsed.tzinfo else parsed
+            return parsed.astimezone(LOCAL_TZ).replace(tzinfo=None) if parsed.tzinfo else parsed
         except Exception:
             return None
     return None
@@ -45,7 +46,7 @@ def _resident_age(record):
     if not birth_date:
         return None
 
-    today = datetime.utcnow().date()
+    today = datetime.now(LOCAL_TZ).date()
     bday = birth_date.date()
     years = today.year - bday.year
     if (today.month, today.day) < (bday.month, bday.day):
@@ -66,7 +67,7 @@ def _to_number(value):
 
 
 def _resolve_period_window(period_type: Optional[str], year: Optional[int], month: Optional[str]):
-    now = datetime.utcnow()
+    now = datetime.now(LOCAL_TZ)
     normalized = (period_type or "").strip().lower()
 
     if normalized == "yearly":
@@ -95,7 +96,7 @@ def _resolve_period_window(period_type: Optional[str], year: Optional[int], mont
 
 
 def _resolve_payment_date(payment: dict):
-    for key in ("datePaid", "paidAt", "paymentDate", "createdAt", "timestamp", "updatedAt"):
+    for key in ("datePaid", "paidAt", "paymentDate", "createdAt", "date", "timestamp", "updatedAt"):
         parsed = _to_datetime(payment.get(key))
         if parsed:
             return parsed
