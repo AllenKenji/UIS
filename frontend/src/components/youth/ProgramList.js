@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { toast } from "react-toastify";
 import { db } from "../../services/firebase";
+import { useUser } from "../../context/UserContext";
+import { DisbursementsAPI } from "../../services/api";
 import "../../styles/sk.css";
 
 const toDate = (value) => {
@@ -24,7 +26,8 @@ const toInputDate = (value) => {
 };
 
 const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
-  const [form, setForm] = useState({ title: "", date: "", category: "", status: "Planned" });
+  const { role, userInfo } = useUser();
+  const [form, setForm] = useState({ title: "", date: "", category: "", status: "Planned", budget: "" });
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
@@ -41,7 +44,7 @@ const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
   };
 
   const clearForm = () => {
-    setForm({ title: "", date: "", category: "", status: "Planned" });
+    setForm({ title: "", date: "", category: "", status: "Planned", budget: "" });
     setEditingId(null);
   };
 
@@ -52,6 +55,7 @@ const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
       date: toInputDate(program.date),
       category: program.category || "",
       status: program.status || "Planned",
+      budget: program.budget != null ? String(program.budget) : "",
     });
   };
 
@@ -72,8 +76,9 @@ const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (!form.title.trim() || !form.date) {
-      toast.error("Program title and date are required.");
+    const budget = Number(form.budget);
+    if (!form.title.trim() || !form.date || !Number.isFinite(budget) || budget <= 0) {
+      toast.error("Program title, date, and budget are required.");
       return;
     }
 
@@ -85,17 +90,46 @@ const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
           date: form.date,
           category: form.category.trim() || "General",
           status: form.status,
+          budget,
           updatedAt: serverTimestamp(),
         });
         toast.success("Program updated.");
       } else {
-        await addDoc(collection(db, "sk_programs"), {
+        const createdProgram = await addDoc(collection(db, "sk_programs"), {
           title: form.title.trim(),
           date: form.date,
           category: form.category.trim() || "General",
           status: form.status,
+          budget,
           createdAt: serverTimestamp(),
         });
+
+        if (String(role || "").trim().toLowerCase() === "sk") {
+          try {
+            await DisbursementsAPI.create({
+              category: "Youth Programs",
+              amount: budget,
+              date: new Date(form.date),
+              recipient: form.title.trim(),
+              recipientName: form.title.trim(),
+              processedById: userInfo?.uid || null,
+              processedByName:
+                userInfo?.fullName ||
+                userInfo?.full_name ||
+                userInfo?.name ||
+                userInfo?.email ||
+                "SK Officer",
+              status: "pending",
+              referenceNo: `SK-PROG-${Date.now()}`,
+              sourceType: "sk_program",
+              sourceId: createdProgram.id,
+            });
+          } catch (disbursementError) {
+            console.error("Failed to create disbursement for program", disbursementError);
+            toast.warning("Program saved, but disbursement record could not be created.");
+          }
+        }
+
         toast.success("Program added.");
       }
       clearForm();
@@ -135,6 +169,14 @@ const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
               <option value="Ongoing">Ongoing</option>
               <option value="Completed">Completed</option>
             </select>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Budget"
+              value={form.budget}
+              onChange={(e) => handleChange("budget", e.target.value)}
+            />
             <button type="submit" disabled={saving}>{saving ? "Saving..." : editingId ? "Update Program" : "Add Program"}</button>
             {editingId ? (
               <button type="button" className="sk-secondary-btn" onClick={clearForm}>
@@ -158,6 +200,7 @@ const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
                 <span>{formatDate(program.date)}</span>
                 <span>{program.category || "General"}</span>
                 <span>{program.status || "Planned"}</span>
+                <span>Budget: ₱{Number(program.budget || 0).toLocaleString()}</span>
               </div>
               {!readOnly ? (
                 <div className="sk-item-actions">

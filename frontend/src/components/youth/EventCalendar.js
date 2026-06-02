@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { toast } from "react-toastify";
 import { db } from "../../services/firebase";
+import { useUser } from "../../context/UserContext";
+import { DisbursementsAPI } from "../../services/api";
 import "../../styles/sk.css";
 
 const toDate = (value) => {
@@ -22,7 +24,8 @@ const toInputDate = (value) => {
 };
 
 const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
-  const [form, setForm] = useState({ title: "", date: "", location: "" });
+  const { role, userInfo } = useUser();
+  const [form, setForm] = useState({ title: "", date: "", location: "", budget: "" });
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
@@ -39,7 +42,7 @@ const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
   };
 
   const clearForm = () => {
-    setForm({ title: "", date: "", location: "" });
+    setForm({ title: "", date: "", location: "", budget: "" });
     setEditingId(null);
   };
 
@@ -49,6 +52,7 @@ const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
       title: eventItem.title || "",
       date: toInputDate(eventItem.date || eventItem.eventDate),
       location: eventItem.location || "",
+      budget: eventItem.budget != null ? String(eventItem.budget) : "",
     });
   };
 
@@ -69,8 +73,9 @@ const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (!form.title.trim() || !form.date || !form.location.trim()) {
-      toast.error("Event title, date, and location are required.");
+    const budget = Number(form.budget);
+    if (!form.title.trim() || !form.date || !form.location.trim() || !Number.isFinite(budget) || budget <= 0) {
+      toast.error("Event title, date, location, and budget are required.");
       return;
     }
 
@@ -81,16 +86,45 @@ const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
           title: form.title.trim(),
           date: form.date,
           location: form.location.trim(),
+          budget,
           updatedAt: serverTimestamp(),
         });
         toast.success("Event updated.");
       } else {
-        await addDoc(collection(db, "sk_events"), {
+        const createdEvent = await addDoc(collection(db, "sk_events"), {
           title: form.title.trim(),
           date: form.date,
           location: form.location.trim(),
+          budget,
           createdAt: serverTimestamp(),
         });
+
+        if (String(role || "").trim().toLowerCase() === "sk") {
+          try {
+            await DisbursementsAPI.create({
+              category: "Youth Events",
+              amount: budget,
+              date: new Date(form.date),
+              recipient: form.title.trim(),
+              recipientName: form.title.trim(),
+              processedById: userInfo?.uid || null,
+              processedByName:
+                userInfo?.fullName ||
+                userInfo?.full_name ||
+                userInfo?.name ||
+                userInfo?.email ||
+                "SK Officer",
+              status: "pending",
+              referenceNo: `SK-EVT-${Date.now()}`,
+              sourceType: "sk_event",
+              sourceId: createdEvent.id,
+            });
+          } catch (disbursementError) {
+            console.error("Failed to create disbursement for event", disbursementError);
+            toast.warning("Event saved, but disbursement record could not be created.");
+          }
+        }
+
         toast.success("Event added.");
       }
       clearForm();
@@ -125,6 +159,14 @@ const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
               value={form.location}
               onChange={(e) => handleChange("location", e.target.value)}
             />
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Budget"
+              value={form.budget}
+              onChange={(e) => handleChange("budget", e.target.value)}
+            />
             <button type="submit" disabled={saving}>{saving ? "Saving..." : editingId ? "Update Event" : "Add Event"}</button>
             {editingId ? (
               <button type="button" className="sk-secondary-btn" onClick={clearForm}>
@@ -147,6 +189,7 @@ const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
               <div className="sk-item-meta">
                 <span>{formatDate(item.date || item.eventDate)}</span>
                 <span>{item.location || "Location not set"}</span>
+                <span>Budget: ₱{Number(item.budget || 0).toLocaleString()}</span>
               </div>
               {!readOnly ? (
                 <div className="sk-item-actions">
