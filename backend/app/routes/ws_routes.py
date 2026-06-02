@@ -240,13 +240,9 @@ async def websocket_notifications(websocket: WebSocket, token: str = Query(None)
     except WebSocketDisconnect:
         manager.disconnect(websocket)
         logger.info("❌ WebSocket disconnected")
-        if user_info and user_info.get("uid"):
-            asyncio.create_task(_emit_disconnect_logout_if_still_offline(str(user_info.get("uid")), str(user_info.get("role"))))
 
     except Exception as e:
         logger.error("❌ WebSocket error uid=%s: %s", user_info.get("user_id") if user_info else "unknown", e)
         if websocket.client_state != WebSocketState.CLOSED:
             await websocket.close(code=1011)
         manager.disconnect(websocket)
-        if user_info and user_info.get("uid"):
-            asyncio.create_task(_emit_disconnect_logout_if_still_offline(str(user_info.get("uid")), str(user_info.get("role"))))
