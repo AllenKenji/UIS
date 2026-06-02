@@ -16,7 +16,8 @@ class Notification(BaseModel):
         "complaint", "complaint_update",
         "business", "business_update",
         "document", "document_update",
-        "payment", "payment_update"
+        "payment", "payment_update",
+        "sk_expense"
     ]
     
     # Scope clarifies login/logout context
