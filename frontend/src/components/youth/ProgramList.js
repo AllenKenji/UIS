@@ -6,28 +6,18 @@ import { useUser } from "../../context/UserContext";
 import { DisbursementsAPI } from "../../services/api";
 import "../../styles/sk.css";
 
-const toDate = (value) => {
-  if (!value) return null;
-  if (typeof value.toDate === "function") return value.toDate();
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
-
-const formatDate = (value) => {
-  const date = toDate(value);
-  if (!date) return "Date not set";
-  return date.toLocaleDateString();
-};
-
-const toInputDate = (value) => {
-  const date = toDate(value);
-  if (!date) return "";
-  return date.toISOString().slice(0, 10);
-};
+const DISBURSEMENT_CATEGORIES = [
+  "Salaries",
+  "Supplies",
+  "Utilities",
+  "Infrastructure",
+  "Health Programs",
+  "Miscellaneous",
+];
 
 const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
   const { role, userInfo } = useUser();
-  const [form, setForm] = useState({ title: "", date: "", category: "", status: "Planned", budget: "" });
+  const [form, setForm] = useState({ title: "", date: "", category: "Miscellaneous", status: "Planned", budget: "" });
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
@@ -44,7 +34,7 @@ const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
   };
 
   const clearForm = () => {
-    setForm({ title: "", date: "", category: "", status: "Planned", budget: "" });
+    setForm({ title: "", date: "", category: "Miscellaneous", status: "Planned", budget: "" });
     setEditingId(null);
   };
 
@@ -53,7 +43,7 @@ const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
     setForm({
       title: program.title || "",
       date: toInputDate(program.date),
-      category: program.category || "",
+      category: program.category || "Miscellaneous",
       status: program.status || "Planned",
       budget: program.budget != null ? String(program.budget) : "",
     });
@@ -77,8 +67,8 @@ const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
   const handleSubmit = async (event) => {
     event.preventDefault();
     const budget = Number(form.budget);
-    if (!form.title.trim() || !form.date || !Number.isFinite(budget) || budget <= 0) {
-      toast.error("Program title, date, and budget are required.");
+    if (!form.title.trim() || !form.date || !form.category || !Number.isFinite(budget) || budget <= 0) {
+      toast.error("Program title, date, category, and budget are required.");
       return;
     }
 
@@ -88,7 +78,7 @@ const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
         await updateDoc(doc(db, "sk_programs", editingId), {
           title: form.title.trim(),
           date: form.date,
-          category: form.category.trim() || "General",
+          category: form.category,
           status: form.status,
           budget,
           updatedAt: serverTimestamp(),
@@ -98,7 +88,7 @@ const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
         const createdProgram = await addDoc(collection(db, "sk_programs"), {
           title: form.title.trim(),
           date: form.date,
-          category: form.category.trim() || "General",
+          category: form.category,
           status: form.status,
           budget,
           createdAt: serverTimestamp(),
@@ -107,7 +97,7 @@ const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
         if (String(role || "").trim().toLowerCase() === "sk") {
           try {
             await DisbursementsAPI.create({
-              category: "Youth Programs",
+              category: form.category,
               amount: budget,
               date: new Date(form.date),
               recipient: form.title.trim(),
@@ -158,12 +148,12 @@ const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
               value={form.date}
               onChange={(e) => handleChange("date", e.target.value)}
             />
-            <input
-              type="text"
-              placeholder="Category"
-              value={form.category}
-              onChange={(e) => handleChange("category", e.target.value)}
-            />
+            <select value={form.category} onChange={(e) => handleChange("category", e.target.value)} required>
+              <option value="">Select Category</option>
+              {DISBURSEMENT_CATEGORIES.map((category) => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
             <select value={form.status} onChange={(e) => handleChange("status", e.target.value)}>
               <option value="Planned">Planned</option>
               <option value="Ongoing">Ongoing</option>

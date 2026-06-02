@@ -6,26 +6,18 @@ import { useUser } from "../../context/UserContext";
 import { DisbursementsAPI } from "../../services/api";
 import "../../styles/sk.css";
 
-const toDate = (value) => {
-  if (!value) return null;
-  if (typeof value.toDate === "function") return value.toDate();
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
-
-const formatDate = (value) => {
-  const date = toDate(value);
-  return date ? date.toLocaleDateString() : "Date not set";
-};
-
-const toInputDate = (value) => {
-  const date = toDate(value);
-  return date ? date.toISOString().slice(0, 10) : "";
-};
+const DISBURSEMENT_CATEGORIES = [
+  "Salaries",
+  "Supplies",
+  "Utilities",
+  "Infrastructure",
+  "Health Programs",
+  "Miscellaneous",
+];
 
 const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
   const { role, userInfo } = useUser();
-  const [form, setForm] = useState({ title: "", date: "", location: "", budget: "" });
+  const [form, setForm] = useState({ title: "", date: "", location: "", category: "Miscellaneous", budget: "" });
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
@@ -42,7 +34,7 @@ const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
   };
 
   const clearForm = () => {
-    setForm({ title: "", date: "", location: "", budget: "" });
+    setForm({ title: "", date: "", location: "", category: "Miscellaneous", budget: "" });
     setEditingId(null);
   };
 
@@ -52,6 +44,7 @@ const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
       title: eventItem.title || "",
       date: toInputDate(eventItem.date || eventItem.eventDate),
       location: eventItem.location || "",
+      category: eventItem.category || "Miscellaneous",
       budget: eventItem.budget != null ? String(eventItem.budget) : "",
     });
   };
@@ -74,8 +67,8 @@ const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
   const handleSubmit = async (event) => {
     event.preventDefault();
     const budget = Number(form.budget);
-    if (!form.title.trim() || !form.date || !form.location.trim() || !Number.isFinite(budget) || budget <= 0) {
-      toast.error("Event title, date, location, and budget are required.");
+    if (!form.title.trim() || !form.date || !form.location.trim() || !form.category.trim() || !Number.isFinite(budget) || budget <= 0) {
+      toast.error("Event title, date, location, category, and budget are required.");
       return;
     }
 
@@ -86,6 +79,7 @@ const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
           title: form.title.trim(),
           date: form.date,
           location: form.location.trim(),
+          category: form.category.trim(),
           budget,
           updatedAt: serverTimestamp(),
         });
@@ -95,6 +89,7 @@ const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
           title: form.title.trim(),
           date: form.date,
           location: form.location.trim(),
+          category: form.category.trim(),
           budget,
           createdAt: serverTimestamp(),
         });
@@ -102,7 +97,7 @@ const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
         if (String(role || "").trim().toLowerCase() === "sk") {
           try {
             await DisbursementsAPI.create({
-              category: "Youth Events",
+              category: form.category,
               amount: budget,
               date: new Date(form.date),
               recipient: form.title.trim(),
@@ -159,6 +154,12 @@ const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
               value={form.location}
               onChange={(e) => handleChange("location", e.target.value)}
             />
+            <select value={form.category} onChange={(e) => handleChange("category", e.target.value)} required>
+              <option value="">Select Category</option>
+              {DISBURSEMENT_CATEGORIES.map((category) => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
             <input
               type="number"
               min="0"
@@ -189,6 +190,7 @@ const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
               <div className="sk-item-meta">
                 <span>{formatDate(item.date || item.eventDate)}</span>
                 <span>{item.location || "Location not set"}</span>
+                <span>{item.category || "Miscellaneous"}</span>
                 <span>Budget: ₱{Number(item.budget || 0).toLocaleString()}</span>
               </div>
               {!readOnly ? (
