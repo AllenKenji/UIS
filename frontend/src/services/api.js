@@ -288,8 +288,8 @@ export const AuditAPI = {
     api.get(endpoints.audit)
       .then((res) => res.data)
       .catch((err) => handleError(err, "Audit log fetch")),
-  summary: () =>
-    api.get(`${endpoints.audit}/summary`)
+  summary: (params = {}) =>
+    api.get(`${endpoints.audit}/summary`, { params })
       .then((res) => res.data)
       .catch((err) => handleError(err, "Audit summary fetch")),
   listByDoc: (docId) =>
