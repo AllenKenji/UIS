@@ -1,5 +1,6 @@
 # app/routes/audit_routes.py
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from backend.app.utils.firestore_utils import get_db
 from backend.app.core.auth import require_permission
@@ -13,15 +14,17 @@ def _to_datetime(value):
     if value is None:
         return None
     if isinstance(value, datetime):
-        return value
+        return value.astimezone(timezone.utc).replace(tzinfo=None) if value.tzinfo else value
     if hasattr(value, "to_datetime"):
         try:
-            return value.to_datetime()
+            converted = value.to_datetime()
+            return converted.astimezone(timezone.utc).replace(tzinfo=None) if getattr(converted, "tzinfo", None) else converted
         except Exception:
             return None
     if isinstance(value, str):
         try:
-            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return parsed.astimezone(timezone.utc).replace(tzinfo=None) if parsed.tzinfo else parsed
         except Exception:
             return None
     return None
@@ -62,7 +65,7 @@ def _to_number(value):
     return 0.0
 
 
-def _resolve_period_window(period_type: str | None, year: int | None, month: str | None):
+def _resolve_period_window(period_type: Optional[str], year: Optional[int], month: Optional[str]):
     now = datetime.utcnow()
     normalized = (period_type or "").strip().lower()
 
@@ -162,9 +165,9 @@ def list_audit_logs(
 
 @router.get("/summary", tags=["Audit"])
 def get_audit_summary(
-    periodType: str | None = Query(None),
-    year: int | None = Query(None),
-    month: str | None = Query(None),
+    periodType: Optional[str] = Query(None),
+    year: Optional[int] = Query(None),
+    month: Optional[str] = Query(None),
     _: str = Depends(require_permission("auditBarangayData")),
 ):
     """
