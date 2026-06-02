@@ -155,6 +155,14 @@ const getYouthResidentsCount = async (start, end) => {
   }).length;
 };
 
+const buildFallbackAuditEntries = (summary = {}) => [
+  { key: "residents", category: "Residents", total: summary?.residents ?? 0, periodLabel: "Residents" },
+  { key: "businesses", category: "Businesses", total: summary?.businesses ?? 0, periodLabel: "Businesses" },
+  { key: "documents", category: "Documents", total: summary?.documents ?? 0, periodLabel: "Documents" },
+  { key: "logins", category: "Login", total: summary?.logins ?? 0, periodLabel: "Login / Day" },
+  { key: "youth", category: "Youth Registry", total: summary?.youth ?? 0, periodLabel: "Youth Registry" },
+];
+
 const RegistryAudit = () => {
   const { can } = useUser(); 
   const { transactions = [] } = usePayments();
@@ -227,20 +235,13 @@ const RegistryAudit = () => {
         if (visibleResults.length === 0 && can("auditBarangayData")) {
           try {
             const summary = await AuditAPI.summary();
-            const fallbackResults = [
-              { key: "residents", category: "Residents", total: summary?.residents ?? 0, periodLabel: "Residents" },
-              { key: "businesses", category: "Businesses", total: summary?.businesses ?? 0, periodLabel: "Businesses" },
-              { key: "documents", category: "Documents", total: summary?.documents ?? 0, periodLabel: "Documents" },
-              { key: "logins", category: "Login", total: summary?.logins ?? 0, periodLabel: "Login / Day" },
-              { key: "youth", category: "Youth Registry", total: summary?.youth ?? 0, periodLabel: "Youth Registry" },
-            ];
-            setStats(fallbackResults);
+            setStats(buildFallbackAuditEntries(summary));
           } catch (error) {
             console.warn("⚠️ Failed to load registry audit summary fallback:", error);
-            setStats([]);
+            setStats(buildFallbackAuditEntries());
           }
         } else {
-          setStats(visibleResults);
+          setStats(visibleResults.length > 0 ? visibleResults : buildFallbackAuditEntries());
         }
 
         setLoading(false);
