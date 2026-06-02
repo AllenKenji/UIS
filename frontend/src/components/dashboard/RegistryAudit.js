@@ -227,6 +227,24 @@ const RegistryAudit = () => {
                 }
                 return sum + parseAmount(record.amount);
               }, 0);
+
+              if (total > 0) {
+                return { key, category: displayCategory, total, periodLabel: label };
+              }
+
+              try {
+                const summary = await AuditAPI.summary();
+                return {
+                  key,
+                  category: displayCategory,
+                  total: parseAmount(summary?.collectionsAmount),
+                  periodLabel: label,
+                  hadReadError: false,
+                };
+              } catch (summaryError) {
+                console.warn("⚠️ Failed to load collections summary fallback:", summaryError);
+              }
+
               return { key, category: displayCategory, total, periodLabel: label };
             }
 
