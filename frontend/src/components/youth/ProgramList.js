@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, getDocs, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { toast } from "react-toastify";
 import { db } from "../../services/firebase";
 import { useUser } from "../../context/UserContext";
@@ -74,6 +74,18 @@ const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
 
     try {
       await deleteDoc(doc(db, "sk_programs", programId));
+
+      // Keep treasurer expenses in sync by removing linked disbursement rows.
+      const linkedDisbursements = await getDocs(
+        query(collection(db, "disbursements"), where("sourceId", "==", programId))
+      );
+      const linkedDeleteTasks = linkedDisbursements.docs
+        .filter((entry) => String(entry.data()?.sourceType || "").trim().toLowerCase() === "sk_program")
+        .map((entry) => deleteDoc(doc(db, "disbursements", entry.id)));
+      if (linkedDeleteTasks.length > 0) {
+        await Promise.all(linkedDeleteTasks);
+      }
+
       toast.success("Program deleted.");
       if (editingId === programId) {
         clearForm();
