@@ -20,6 +20,8 @@ const roleRedirects = {
   treasurer: "/treasurer",
   sk: "/youth",
   dilg: "/audit",
+  surveyor: process.env.REACT_APP_CFDP_SURVEY_URL || "/cfdp-survey",
+  supervisor: process.env.REACT_APP_CFDP_SURVEY_URL || "/cfdp-survey",
 };
 
 const normalizeRole = (role) => (role?.trim().toLowerCase() || "resident");
@@ -72,6 +74,11 @@ const Login = () => {
 
   const redirectByRole = (role) => {
     const target = roleRedirects[normalizeRole(role)] || "/unauthorized";
+    if (/^https?:\/\//i.test(target)) {
+      window.location.assign(target);
+      return;
+    }
+
     navigate(target, { replace: true });
   };
 
