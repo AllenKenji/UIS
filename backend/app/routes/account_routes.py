@@ -236,7 +236,7 @@ async def provision_account_from_cfdp(
     response_model=SurveyHandoffResponse,
     status_code=status.HTTP_200_OK,
     summary="Create a survey login handoff",
-    description="Creates a short-lived signed URL that logs a surveyor or supervisor into CFDP.",
+    description="Creates a short-lived signed URL that logs an admin, surveyor, or supervisor into CFDP.",
 )
 async def create_survey_handoff(user: dict = Depends(get_current_user)) -> SurveyHandoffResponse:
     uid = str(user.get("uid") or "").strip()
@@ -248,8 +248,8 @@ async def create_survey_handoff(user: dict = Depends(get_current_user)) -> Surve
     profile = user_doc.to_dict() if user_doc.exists else {}
 
     role = str(profile.get("role") or user.get("role") or "").strip().lower()
-    if role not in {"surveyor", "supervisor"}:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Survey handoff is only available for surveyor and supervisor accounts")
+    if role not in {"admin", "surveyor", "supervisor"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Survey handoff is only available for admin, surveyor, and supervisor accounts")
 
     email = str(profile.get("email") or user.get("email") or "").strip().lower()
     if not email:
