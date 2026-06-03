@@ -66,6 +66,7 @@ uvicorn app.main:app --host 0.0.0.0 --port $PORT
 - `CFDP_PROVISION_API_KEY` (shared secret expected by CFDP in `X-BIS-Provision-Key`)
 - `CFDP_PROVISION_REQUIRED` (`true` to block BIS account creation when CFDP sync fails; default is `false`)
 - `CFDP_TO_BIS_PROVISION_API_KEY` (shared secret required by BIS internal endpoint `POST /api/internal/cfdp/provision-account`)
+- `CFDP_SURVEY_BASE_URL` (optional public CFDP base URL used for auto-login handoff; if omitted BIS derives it from `CFDP_PROVISION_URL`)
 
 ## 2) Frontend service (Static Site)
 

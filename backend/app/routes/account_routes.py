@@ -5,7 +5,7 @@ import hashlib
 import hmac
 import json
 import time
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit, urlunsplit
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
 
@@ -62,6 +62,30 @@ def _sign_handoff_payload(payload: dict) -> str:
         hashlib.sha256,
     ).digest()
     return f"{encoded_payload}.{_base64url_encode(signature)}"
+
+
+def _derive_survey_base_url() -> str:
+    explicit = os.environ.get("CFDP_SURVEY_BASE_URL", "").strip().rstrip("/")
+    if explicit:
+        return explicit
+
+    provision_url = os.environ.get("CFDP_PROVISION_URL", "").strip()
+    if not provision_url:
+        return ""
+
+    parsed = urlsplit(provision_url)
+    path = parsed.path.rstrip("/")
+
+    for suffix in (
+        "/api/internal/bis/provision-user",
+        "/internal/bis/provision-user",
+    ):
+        if path.endswith(suffix):
+            path = path[: -len(suffix)] or "/"
+            break
+
+    normalized_path = path.rstrip("/")
+    return urlunsplit((parsed.scheme, parsed.netloc, normalized_path, "", "")).rstrip("/")
 
 
 # ===============================
@@ -250,9 +274,12 @@ async def create_survey_handoff(user: dict = Depends(get_current_user)) -> Surve
     }
     token = _sign_handoff_payload(payload)
 
-    survey_base_url = os.environ.get("CFDP_SURVEY_BASE_URL", "http://localhost:3001").strip().rstrip("/")
+    survey_base_url = _derive_survey_base_url()
     if not survey_base_url:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="CFDP survey base URL is not configured")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="CFDP survey base URL is not configured. Set CFDP_SURVEY_BASE_URL or CFDP_PROVISION_URL.",
+        )
 
     redirect_url = f"{survey_base_url}/api/internal/auth/handoff?token={quote(token, safe='')}"
     return SurveyHandoffResponse(redirectUrl=redirect_url)
