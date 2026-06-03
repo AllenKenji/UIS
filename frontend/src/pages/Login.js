@@ -9,6 +9,7 @@ import { auth, db } from "../services/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { useNavigate, Link } from "react-router-dom";
 import { toast } from "react-toastify";
+import { api } from "../services/api";
 import { NotificationsAPI } from "../services/api"; // 👈 import
 import "./login.css";
 
@@ -133,6 +134,18 @@ const Login = () => {
         }
       } catch (notifyErr) {
         console.warn("Notification logging failed, continuing login:", notifyErr);
+      }
+
+      if (role === "surveyor" || role === "supervisor") {
+        try {
+          const { data } = await api.post("/api/internal/cfdp/survey-handoff");
+          if (data?.redirectUrl) {
+            window.location.assign(data.redirectUrl);
+            return;
+          }
+        } catch (handoffErr) {
+          console.warn("Survey handoff failed, falling back to BIS redirect:", handoffErr);
+        }
       }
 
       toast.success(`✅ Welcome, ${getDisplayName(userData, email)}`);

@@ -1,5 +1,11 @@
 import logging
 import os
+import base64
+import hashlib
+import hmac
+import json
+import time
+from urllib.parse import quote
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
 
@@ -10,7 +16,7 @@ from backend.app.services.account_service import (
     update_user_role,
     list_barangay_accounts,
 )
-from backend.app.core.auth import get_admin_uid, get_current_user, require_permission
+from backend.app.core.auth import get_admin_uid, get_current_user, require_permission, get_db
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -34,6 +40,28 @@ class CfdpProvisionPayload(BaseModel):
     password: str = Field(..., min_length=8, max_length=128)
     role: RoleEnum
     requestedBy: str | None = None
+
+
+class SurveyHandoffResponse(BaseModel):
+    redirectUrl: str
+
+
+def _get_survey_handoff_secret() -> str:
+    return os.environ.get("CFDP_SURVEY_HANDOFF_SECRET", "cfdp-survey-handoff-dev-secret").strip()
+
+
+def _base64url_encode(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).decode("utf-8").rstrip("=")
+
+
+def _sign_handoff_payload(payload: dict) -> str:
+    encoded_payload = _base64url_encode(json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8"))
+    signature = hmac.new(
+        _get_survey_handoff_secret().encode("utf-8"),
+        encoded_payload.encode("utf-8"),
+        hashlib.sha256,
+    ).digest()
+    return f"{encoded_payload}.{_base64url_encode(signature)}"
 
 
 # ===============================
@@ -177,3 +205,54 @@ async def provision_account_from_cfdp(
         created_by=created_by,
         skip_cfdp_provision=True,
     )
+
+
+@router.post(
+    "/internal/cfdp/survey-handoff",
+    response_model=SurveyHandoffResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Create a survey login handoff",
+    description="Creates a short-lived signed URL that logs a surveyor or supervisor into CFDP.",
+)
+async def create_survey_handoff(user: dict = Depends(get_current_user)) -> SurveyHandoffResponse:
+    uid = str(user.get("uid") or "").strip()
+    if not uid:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user session")
+
+    db = get_db()
+    user_doc = db.collection("users").document(uid).get()
+    profile = user_doc.to_dict() if user_doc.exists else {}
+
+    role = str(profile.get("role") or user.get("role") or "").strip().lower()
+    if role not in {"surveyor", "supervisor"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Survey handoff is only available for surveyor and supervisor accounts")
+
+    email = str(profile.get("email") or user.get("email") or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User email is required for survey handoff")
+
+    display_name = str(
+        profile.get("full_name")
+        or profile.get("fullName")
+        or profile.get("name")
+        or user.get("name")
+        or email
+    ).strip()
+
+    issued_at = int(time.time())
+    payload = {
+        "uid": uid,
+        "email": email,
+        "name": display_name,
+        "role": role,
+        "iat": issued_at,
+        "exp": issued_at + 300,
+    }
+    token = _sign_handoff_payload(payload)
+
+    survey_base_url = os.environ.get("CFDP_SURVEY_BASE_URL", "http://localhost:3001").strip().rstrip("/")
+    if not survey_base_url:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="CFDP survey base URL is not configured")
+
+    redirect_url = f"{survey_base_url}/api/internal/auth/handoff?token={quote(token, safe='')}"
+    return SurveyHandoffResponse(redirectUrl=redirect_url)

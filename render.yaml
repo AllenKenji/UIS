@@ -31,6 +31,10 @@ services:
         value: "false"
       - key: CFDP_TO_BIS_PROVISION_API_KEY
         sync: false
+      - key: CFDP_SURVEY_BASE_URL
+        sync: false
+      - key: CFDP_SURVEY_HANDOFF_SECRET
+        sync: false
 
   - type: static
     name: bis-frontend
