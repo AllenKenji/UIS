@@ -23,7 +23,9 @@ survey_presence_sessions: dict[str, dict] = {}
 
 
 class SurveyPresencePayload(BaseModel):
-    uid: str
+    uid: str | None = None
+    email: str | None = None
+    name: str | None = None
     role: str
     sessionId: str
     online: bool = True
@@ -98,6 +100,38 @@ def _upsert_survey_presence_session(session_id: str, uid: str, role: str):
 
 def _clear_survey_presence_session(session_id: str):
     survey_presence_sessions.pop(str(session_id or "").strip(), None)
+
+
+def _count_survey_presence_sessions_for_uid(uid: str) -> int:
+    normalized_uid = str(uid or "").strip()
+    if not normalized_uid:
+        return 0
+
+    _prune_survey_presence_sessions()
+    return sum(
+        1
+        for payload in survey_presence_sessions.values()
+        if str(payload.get("uid") or "").strip() == normalized_uid
+    )
+
+
+def _resolve_uid_from_email(email: str | None, role: str) -> str | None:
+    normalized_email = str(email or "").strip().lower()
+    normalized_role = _normalize_role(role)
+    if not normalized_email:
+        return None
+
+    try:
+        docs = get_db().collection("users").where("email", "==", normalized_email).stream()
+        for doc in docs:
+            data = doc.to_dict() or {}
+            doc_role = _normalize_role(data.get("role"))
+            if not doc_role or doc_role == normalized_role:
+                return str(doc.id)
+    except Exception as err:
+        logger.warning("⚠️ Failed resolving uid by email=%s role=%s: %s", normalized_email, normalized_role, err)
+
+    return None
 
 
 def _get_survey_presence_users() -> dict[str, dict]:
@@ -227,15 +261,50 @@ async def sync_cfdp_presence(
 
     session_id = str(payload.sessionId or "").strip()
     uid = str(payload.uid or "").strip()
+    if not uid:
+        uid = str(_resolve_uid_from_email(payload.email, normalized_role) or "").strip()
+
     if not session_id or not uid:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="uid and sessionId are required")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="sessionId and either uid or resolvable email are required")
 
     _prune_survey_presence_sessions()
+    before_count = _count_survey_presence_sessions_for_uid(uid)
 
     if payload.online:
         _upsert_survey_presence_session(session_id, uid, normalized_role)
     else:
         _clear_survey_presence_session(session_id)
+
+    after_count = _count_survey_presence_sessions_for_uid(uid)
+
+    actor_name = str(payload.name or "").strip() or _resolve_actor_name(uid)
+    officer_role = normalized_role.replace("_", " ").title()
+
+    if before_count == 0 and after_count > 0:
+        try:
+            await NotificationService.notify(
+                role="admin",
+                type="login",
+                message=f"{officer_role} {actor_name} logged in",
+                scope="officer",
+                user=actor_name,
+                user_id=uid,
+            )
+        except Exception as err:
+            logger.warning("⚠️ Failed CFDP login notify uid=%s: %s", uid, err)
+
+    if before_count > 0 and after_count == 0:
+        try:
+            await NotificationService.notify(
+                role="admin",
+                type="logout",
+                message=f"{officer_role} {actor_name} logged out",
+                scope="officer",
+                user=actor_name,
+                user_id=uid,
+            )
+        except Exception as err:
+            logger.warning("⚠️ Failed CFDP logout notify uid=%s: %s", uid, err)
 
     return {"success": True}
 
