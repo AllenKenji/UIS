@@ -1,20 +1,32 @@
 # backend/app/routes/ws_routes.py
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, Header, HTTPException, status
 from starlette.websockets import WebSocketState
 from backend.app.core.websocket_manager import manager
 from backend.app.core.auth import _verify_token, get_db, require_permission
 from backend.app.services.notification_service import NotificationService
 from fastapi import Depends
 from datetime import datetime, timedelta, timezone
+from pydantic import BaseModel
 import asyncio
 import logging
 import json
+import os
 
 router = APIRouter(tags=["websocket"])
 logger = logging.getLogger("uvicorn.error")
 OFFICER_ROLES = {"staff", "secretary", "treasurer", "sk", "dilg"}
 OFFLINE_LOGOUT_GRACE_SECONDS = 3
+SURVEY_SYNC_ROLES = {"surveyor", "supervisor"}
+SURVEY_PRESENCE_TTL_SECONDS = 90
+survey_presence_sessions: dict[str, dict] = {}
+
+
+class SurveyPresencePayload(BaseModel):
+    uid: str
+    role: str
+    sessionId: str
+    online: bool = True
 
 
 def _normalize_role(value: str | None) -> str:
@@ -58,6 +70,75 @@ def _resolve_actor_name(uid: str, fallback: str = "Officer") -> str:
         logger.warning("⚠️ Failed to resolve actor name uid=%s: %s", uid, err)
 
     return fallback
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _prune_survey_presence_sessions():
+    now = _utc_now()
+    expired_session_ids = [
+        session_id
+        for session_id, payload in survey_presence_sessions.items()
+        if payload.get("expires_at") is None or payload.get("expires_at") <= now
+    ]
+
+    for session_id in expired_session_ids:
+        survey_presence_sessions.pop(session_id, None)
+
+
+def _upsert_survey_presence_session(session_id: str, uid: str, role: str):
+    survey_presence_sessions[session_id] = {
+        "uid": str(uid or "").strip(),
+        "role": _normalize_role(role),
+        "expires_at": _utc_now() + timedelta(seconds=SURVEY_PRESENCE_TTL_SECONDS),
+    }
+
+
+def _clear_survey_presence_session(session_id: str):
+    survey_presence_sessions.pop(str(session_id or "").strip(), None)
+
+
+def _get_survey_presence_users() -> dict[str, dict]:
+    _prune_survey_presence_sessions()
+
+    users: dict[str, dict] = {}
+    for payload in survey_presence_sessions.values():
+        uid = str(payload.get("uid") or "").strip()
+        role = _normalize_role(payload.get("role"))
+        if not uid:
+            continue
+
+        existing = users.get(uid, {"online": False, "count": 0, "role": role, "source": "survey"})
+        existing["online"] = True
+        existing["count"] = int(existing.get("count", 0)) + 1
+        existing["role"] = role or existing.get("role")
+        existing["source"] = "survey"
+        users[uid] = existing
+
+    return users
+
+
+def _merge_presence_users(base_users: dict[str, dict], overlay_users: dict[str, dict]) -> dict[str, dict]:
+    merged = dict(base_users)
+
+    for uid, payload in overlay_users.items():
+        existing = merged.get(uid, {"online": False, "count": 0, "role": payload.get("role")})
+        existing["online"] = bool(existing.get("online")) or bool(payload.get("online"))
+        existing["count"] = int(existing.get("count", 0)) + int(payload.get("count", 0))
+        if payload.get("role"):
+            existing["role"] = payload.get("role")
+        if payload.get("source"):
+            existing["source"] = payload.get("source")
+        merged[uid] = existing
+
+    return merged
+
+
+def _is_valid_internal_presence_key(provided_key: str | None) -> bool:
+    expected_key = os.environ.get("CFDP_TO_BIS_PROVISION_API_KEY", "").strip()
+    return bool(expected_key) and (provided_key or "").strip() == expected_key
 
 
 def _recent_officer_logout_exists(uid: str, window_seconds: int = 30) -> bool:
@@ -132,6 +213,33 @@ async def _emit_disconnect_logout_if_still_offline(uid: str, role: str):
         logger.warning("⚠️ Failed websocket-disconnect logout notify uid=%s: %s", uid, err)
 
 
+@router.post("/api/internal/cfdp/presence")
+async def sync_cfdp_presence(
+    payload: SurveyPresencePayload,
+    x_cfdp_provision_key: str | None = Header(default=None),
+):
+    if not _is_valid_internal_presence_key(x_cfdp_provision_key):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+    normalized_role = _normalize_role(payload.role)
+    if normalized_role not in SURVEY_SYNC_ROLES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only surveyor or supervisor roles are allowed")
+
+    session_id = str(payload.sessionId or "").strip()
+    uid = str(payload.uid or "").strip()
+    if not session_id or not uid:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="uid and sessionId are required")
+
+    _prune_survey_presence_sessions()
+
+    if payload.online:
+        _upsert_survey_presence_session(session_id, uid, normalized_role)
+    else:
+        _clear_survey_presence_session(session_id)
+
+    return {"success": True}
+
+
 @router.get("/api/ws/presence/roles")
 async def get_role_presence(_uid: str = Depends(require_permission("manageUsers"))):
     role_counts = {}
@@ -139,7 +247,11 @@ async def get_role_presence(_uid: str = Depends(require_permission("manageUsers"
         role = str(info.get("role") or "resident").strip().lower()
         role_counts[role] = role_counts.get(role, 0) + 1
 
-    tracked_roles = ["admin", "secretary", "staff", "treasurer", "sk", "dilg", "resident"]
+    for payload in _get_survey_presence_users().values():
+        role = str(payload.get("role") or "resident").strip().lower()
+        role_counts[role] = role_counts.get(role, 0) + int(payload.get("count", 0) or 0)
+
+    tracked_roles = ["admin", "secretary", "staff", "treasurer", "sk", "dilg", "resident", "surveyor", "supervisor"]
     roles = {
         role: {
             "online": role_counts.get(role, 0) > 0,
@@ -154,7 +266,7 @@ async def get_role_presence(_uid: str = Depends(require_permission("manageUsers"
 
     return {
         "roles": roles,
-        "total_active_connections": len(manager.active_connections),
+        "total_active_connections": len(manager.active_connections) + len(survey_presence_sessions),
     }
 
 
@@ -174,9 +286,11 @@ async def get_user_presence(_uid: str = Depends(require_permission("manageUsers"
         existing["role"] = role
         users[uid] = existing
 
+    users = _merge_presence_users(users, _get_survey_presence_users())
+
     return {
         "users": users,
-        "total_active_connections": len(manager.active_connections),
+        "total_active_connections": len(manager.active_connections) + len(survey_presence_sessions),
     }
 
 @router.websocket("/ws/notifications")
