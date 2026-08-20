@@ -50,17 +50,21 @@ export const buildMiscPayload = (item, key, value) => ({
 
 export const buildUsageMiscPayload = (item, key, value, usage) => {
   const isDocument = usage === "document";
+  const currentType = item.miscFeeType || "fixed";
+  const currentValue = item.miscFeeRate ?? 0;
+  const selectedType = key === "miscFeeType" ? value : currentType;
+  const selectedValue = key === "miscFeeValue" ? value : currentValue;
   return {
     targetType: item.miscTargetType || usage,
     targetName: item.miscTargetName || (isDocument ? item.documentType : item.businessType),
     feeType: item.feeType || "fixed",
     fee: safeNumber(item.fee ?? 0),
     useForDocuments: isDocument ? true : !!item.useForDocuments,
-    documentFeeType: isDocument && key === "miscFeeType" ? value : item.documentFeeType || "fixed",
-    documentFee: safeNumber(isDocument && key === "miscFeeValue" ? value : item.documentFee ?? item.miscFeeRate ?? 0),
+    documentFeeType: isDocument ? selectedType : item.documentFeeType || currentType,
+    documentFee: safeNumber(isDocument ? selectedValue : item.documentFee ?? currentValue),
     useForBusinesses: !isDocument ? true : !!item.useForBusinesses,
-    businessFeeType: !isDocument && key === "miscFeeType" ? value : item.businessFeeType || "fixed",
-    businessFee: safeNumber(!isDocument && key === "miscFeeValue" ? value : item.businessFee ?? item.miscFeeRate ?? 0),
+    businessFeeType: !isDocument ? selectedType : item.businessFeeType || currentType,
+    businessFee: safeNumber(!isDocument ? selectedValue : item.businessFee ?? currentValue),
     enabled: item.enabled !== false,
     miscType: item.miscType,
   };

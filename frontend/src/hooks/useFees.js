@@ -78,6 +78,9 @@ export function useFees(delayMs = 500) {
     },
     updateMiscFee: async (id, item, key, value) => {
       try {
+        if (!id) {
+          throw new Error("No linked miscellaneous fee record was found");
+        }
         const payload = item.miscUsage
           ? buildUsageMiscPayload(item, key, value, item.miscUsage)
           : buildMiscPayload(item, key, value);
