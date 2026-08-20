@@ -49,13 +49,13 @@ export default function FeeDashboard() {
       { value: "fixed", label: "Fixed amount" },
       { value: "percentage", label: "Percentage" },
     ] },
-    { key: "documentFee", label: "Document Value", editable: true },
+    { key: "documentFee", label: "Document Value", editable: true, type: "number" },
     { key: "useForBusinesses", label: "Businesses", editable: true, type: "checkbox" },
     { key: "businessFeeType", label: "Business Calculation", editable: true, type: "select", options: [
       { value: "fixed", label: "Fixed amount" },
       { value: "percentage", label: "Percentage" },
     ] },
-    { key: "businessFee", label: "Business Value", editable: true },
+    { key: "businessFee", label: "Business Value", editable: true, type: "number" },
     { key: "feeType", label: "Fee Calculation", editable: true, type: "select", options: [
       { value: "fixed", label: "Fixed amount" },
       { value: "percentage", label: "Percentage" },

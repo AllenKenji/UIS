@@ -35,16 +35,6 @@ const modesConfig = {
         { value: "percentage", label: "Percentage" },
       ] },
       { name: "businessFee", label: "Business Value", type: "number" },
-      {
-        name: "feeType",
-        label: "Fee Calculation",
-        type: "select",
-        options: [
-          { value: "fixed", label: "Fixed amount" },
-          { value: "percentage", label: "Percentage" },
-        ],
-      },
-      { name: "fee", label: "Fee", type: "number" },
       { name: "enabled", label: "Enabled", type: "checkbox" },
     ],
   },

@@ -34,8 +34,8 @@ export const buildBusinessPayload = (item, key, value) => ({
 
 // 🆕 Misc payload builder
 export const buildMiscPayload = (item, key, value) => ({
-  feeType: key === "feeType" ? value : item.feeType || "fixed",
-  fee: safeNumber(key === "fee" ? value : item.fee),
+  feeType: item.feeType || "fixed",
+  fee: safeNumber(item.fee ?? 0),
   useForDocuments: key === "useForDocuments" ? !!value : !!item.useForDocuments,
   documentFeeType: key === "documentFeeType" ? value : item.documentFeeType || "fixed",
   documentFee: safeNumber(key === "documentFee" ? value : item.documentFee ?? 0),

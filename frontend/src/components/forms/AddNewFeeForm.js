@@ -7,7 +7,15 @@ import modesConfig from "../../config/modesConfig";
 
 export default function AddNewFeeForm({ onAdded, miscFees = [] }) {
   const [mode, setMode] = useState("document");
-  const [formData, setFormData] = useState({ fee: 0, feeType: "fixed", enabled: true });
+  const [formData, setFormData] = useState({
+    useForDocuments: false,
+    documentFeeType: "fixed",
+    documentFee: 0,
+    useForBusinesses: false,
+    businessFeeType: "fixed",
+    businessFee: 0,
+    enabled: true,
+  });
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -51,7 +59,15 @@ export default function AddNewFeeForm({ onAdded, miscFees = [] }) {
 
       alert("✅ Fee saved!");
       onAdded?.();
-      setFormData({ fee: 0, feeType: "fixed", enabled: true });
+      setFormData({
+        useForDocuments: false,
+        documentFeeType: "fixed",
+        documentFee: 0,
+        useForBusinesses: false,
+        businessFeeType: "fixed",
+        businessFee: 0,
+        enabled: true,
+      });
     } catch (err) {
       console.error("❌ Fee submission failed:", err);
       alert("❌ Failed to save fee");
@@ -83,6 +99,7 @@ export default function AddNewFeeForm({ onAdded, miscFees = [] }) {
             <input
               type="number"
               min="0"
+              step="any"
               value={value}
               onChange={e => handleChange(field.name, Number(e.target.value))}
             />

@@ -61,6 +61,8 @@ export default function FeeTable({ title, columns, data, onUpdate, onDelete }) {
                     ) : (
                       <input
                         type={col.type || "text"}
+                        step={col.type === "number" ? "any" : undefined}
+                        min={col.type === "number" ? "0" : undefined}
                         value={item[col.key] ?? ""}
                         onChange={e => handleChange(item, col, e)}
                       />

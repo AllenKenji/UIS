@@ -18,5 +18,14 @@ export function validateFeePayload(mode, payload) {
     return { valid: false, message: "Percentage miscellaneous fees must be between 0 and 100" };
   }
 
+  if (mode === "misc") {
+    if (payload.documentFeeType === "percentage" && payload.documentFee > 100) {
+      return { valid: false, message: "Document percentage fees must be between 0 and 100" };
+    }
+    if (payload.businessFeeType === "percentage" && payload.businessFee > 100) {
+      return { valid: false, message: "Business percentage fees must be between 0 and 100" };
+    }
+  }
+
   return { valid: true, message: "" };
 }
