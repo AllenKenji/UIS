@@ -6,9 +6,11 @@ export function calculateMiscFee(misc, baseAmount) {
     : Number(misc.fee) || 0;
 }
 
+const normalizeFeeKey = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
+
 export function resolveMiscFees(items, miscFees, shouldResolve = true, usage = "document") {
   const miscMap = miscFees.reduce((map, misc) => {
-    const key = misc.miscType.toLowerCase();
+    const key = normalizeFeeKey(misc.miscType || misc.id);
     map[key] = [...(map[key] || []), misc];
     return map;
   }, {});
@@ -16,12 +18,15 @@ export function resolveMiscFees(items, miscFees, shouldResolve = true, usage = "
   return items.map(item => {
     if (!shouldResolve) return { ...item, miscFeeResolved: null };
 
-    const candidates = item.miscType ? miscMap[item.miscType.toLowerCase()] || [] : [];
+    const candidates = item.miscType
+      ? miscMap[normalizeFeeKey(item.miscType)] || []
+      : miscFees.filter(entry => entry.id === item.miscFeeId);
     const targetType = usage === "document" ? "document" : "business";
     const targetName = usage === "document" ? item.documentType : item.businessType;
+    const normalizedTarget = normalizeFeeKey(targetName);
     const misc = candidates.find(entry =>
-      entry.targetType === targetType && entry.targetName?.toLowerCase() === targetName?.toLowerCase()
-    ) || candidates.find(entry => !entry.targetType);
+      entry.targetType === targetType && normalizeFeeKey(entry.targetName) === normalizedTarget
+    ) || candidates.find(entry => !entry.targetType) || candidates[0] || null;
 
     const useFee = usage === "document" ? misc?.useForDocuments : misc?.useForBusinesses;
     const feeType = usage === "document" ? misc?.documentFeeType : misc?.businessFeeType;
