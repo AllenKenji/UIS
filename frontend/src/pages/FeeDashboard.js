@@ -42,12 +42,17 @@ export default function FeeDashboard() {
     { key: "annualTotal", label: "Annual Total (₱)", editable: false },
   ];
 
+  const targetOptions = [
+    ...documentFees.map(item => ({ value: item.documentType, label: `Document: ${item.documentType}` })),
+    ...businessFees.map(item => ({ value: item.businessType, label: `Business: ${item.businessType}` })),
+  ];
+
   const miscColumns = [
-    { key: "targetType", label: "Applies To", editable: true, type: "select", options: [
+    { key: "targetType", label: "Target Category", editable: true, type: "select", options: [
       { value: "document", label: "Document type" },
       { value: "business", label: "Business type" },
     ] },
-    { key: "targetName", label: "Target Type", editable: true },
+    { key: "targetName", label: "Target Type", editable: true, type: "select", options: targetOptions },
     { key: "useForDocuments", label: "Documents", editable: true, type: "checkbox" },
     { key: "documentFeeType", label: "Document Calculation", editable: true, type: "select", options: [
       { value: "fixed", label: "Fixed amount" },

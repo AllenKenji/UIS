@@ -23,7 +23,7 @@ const modesConfig = {
     endpoint: "/api/fees/misc",
     fields: [
       { name: "miscType", label: "Misc Type", type: "text" },
-      { name: "targetType", label: "Applies To", type: "select", options: [
+      { name: "targetType", label: "Target Category", type: "select", options: [
         { value: "document", label: "Document type" },
         { value: "business", label: "Business type" },
       ] },
