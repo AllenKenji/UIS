@@ -30,6 +30,9 @@ export function resolveMiscFees(items, miscFees, shouldResolve = true, usage = "
 
     return {
       ...item,
+      miscFeeId: misc?.id || item.miscFeeId,
+      miscTargetType: misc?.targetType || item.miscTargetType,
+      miscTargetName: misc?.targetName || item.miscTargetName,
       miscFeeResolved:
         misc && misc.enabled && item.enabled && (!configured || useFee)
           ? calculateMiscFee(configured ? { fee: feeValue, feeType } : misc, item.fee)
