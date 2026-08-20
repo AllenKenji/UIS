@@ -15,7 +15,6 @@ export default function FeeDashboard() {
     updateMiscFee,
     deleteDocumentFee,
     deleteBusinessFee,
-    deleteMiscFee,
     getRegistrationTotal,
     getAnnualTotal,
     getDocumentTotal,
@@ -26,7 +25,11 @@ export default function FeeDashboard() {
     { key: "fee", label: "Fee (₱)", editable: true },
     { key: "enabled", label: "Enabled", editable: true, type: "checkbox" },
     { key: "miscType", label: "Misc Type", editable: false },
-    { key: "miscFeeResolved", label: "Misc Fee (₱)", editable: false },
+    { key: "miscFeeType", label: "Fee Calculation", editable: true, type: "select", options: [
+      { value: "fixed", label: "Fixed amount" },
+      { value: "percentage", label: "Percentage" },
+    ] },
+    { key: "miscFeeValue", label: "Misc Fee Value", editable: true, type: "number" },
     { key: "totalFee", label: "Total Fee (₱)", editable: false }, 
   ];
 
@@ -37,36 +40,13 @@ export default function FeeDashboard() {
     { key: "annualFee", label: "Annual Fee (₱)", editable: true },
     { key: "enabled", label: "Enabled", editable: true, type: "checkbox" },
     { key: "miscType", label: "Misc Type", editable: false },
-    { key: "miscFeeResolved", label: "Misc Fee (₱)", editable: false },
+    { key: "miscFeeType", label: "Fee Calculation", editable: true, type: "select", options: [
+      { value: "fixed", label: "Fixed amount" },
+      { value: "percentage", label: "Percentage" },
+    ] },
+    { key: "miscFeeValue", label: "Misc Fee Value", editable: true, type: "number" },
     { key: "registrationTotal", label: "Registration Total (₱)", editable: false },
     { key: "annualTotal", label: "Annual Total (₱)", editable: false },
-  ];
-
-  const targetOptions = [
-    ...documentFees.map(item => ({ value: item.documentType, label: `Document: ${item.documentType}` })),
-    ...businessFees.map(item => ({ value: item.businessType, label: `Business: ${item.businessType}` })),
-  ];
-
-  const miscColumns = [
-    { key: "targetType", label: "Target Category", editable: true, type: "select", options: [
-      { value: "document", label: "Document type" },
-      { value: "business", label: "Business type" },
-    ] },
-    { key: "targetName", label: "Target Type", editable: true, type: "select", options: targetOptions },
-    { key: "useForDocuments", label: "Documents", editable: true, type: "checkbox" },
-    { key: "documentFeeType", label: "Document Calculation", editable: true, type: "select", options: [
-      { value: "fixed", label: "Fixed amount" },
-      { value: "percentage", label: "Percentage" },
-    ] },
-    { key: "documentFee", label: "Document Value", editable: true, type: "number" },
-    { key: "useForBusinesses", label: "Businesses", editable: true, type: "checkbox" },
-    { key: "businessFeeType", label: "Business Calculation", editable: true, type: "select", options: [
-      { value: "fixed", label: "Fixed amount" },
-      { value: "percentage", label: "Percentage" },
-    ] },
-    { key: "businessFee", label: "Business Value", editable: true, type: "number" },
-    { key: "fee", label: "Legacy Value", editable: false },
-    { key: "enabled", label: "Enabled", editable: true, type: "checkbox" },
   ];
 
   const renderFeeTable = (title, columns, data, onUpdate, onDelete) => (
@@ -99,9 +79,16 @@ export default function FeeDashboard() {
         documentColumns,
         documentFees.map(doc => ({
           ...doc,
+          miscUsage: "document",
+          miscFeeValue: doc.miscFeeRate ?? 0,
           totalFee: getDocumentTotal(doc, "document"),
         })),
-        (id, key, value, item) => updateDocumentFee(id, item, key, value),
+        (id, key, value, item) => {
+          if (key === "miscFeeType" || key === "miscFeeValue") {
+            return updateMiscFee(item.miscFeeId, item, key, value).then(refreshData);
+          }
+          return updateDocumentFee(id, item, key, value);
+        },
         deleteDocumentFee
       )}
 
@@ -111,20 +98,18 @@ export default function FeeDashboard() {
         businessColumns,
         businessFees.map(biz => ({
           ...biz,
+          miscUsage: "business",
+          miscFeeValue: biz.miscFeeRate ?? 0,
           registrationTotal: getRegistrationTotal(biz, "business"),
           annualTotal: getAnnualTotal(biz, "business"),
         })),
-        (id, key, value, item) => updateBusinessFee(id, item, key, value),
+        (id, key, value, item) => {
+          if (key === "miscFeeType" || key === "miscFeeValue") {
+            return updateMiscFee(item.miscFeeId, item, key, value).then(refreshData);
+          }
+          return updateBusinessFee(id, item, key, value);
+        },
         deleteBusinessFee
-      )}
-
-      {/* 🆕 Miscellaneous Fees */}
-      {renderFeeTable(
-        "🆕 Miscellaneous Fees",
-        miscColumns,
-        miscFees,
-        (id, key, value, item) => updateMiscFee(id, item, key, value),
-        deleteMiscFee
       )}
     </div>
   );

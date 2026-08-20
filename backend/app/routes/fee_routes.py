@@ -80,8 +80,9 @@ def list_with_misc(collection: str) -> List[Dict]:
     docs = get_db().collection(collection).get()
     misc_map = {}
     for misc_doc in get_db().collection("misc_fees").get():
-        misc_map.setdefault(normalize_id(misc_doc.to_dict().get("miscType", misc_doc.id)), []).append(
-            misc_doc.to_dict()
+        misc_data = misc_doc.to_dict() | {"id": misc_doc.id}
+        misc_map.setdefault(normalize_id(misc_data.get("miscType", misc_doc.id)), []).append(
+            misc_data
         )
     result = []
     for doc in docs:
@@ -93,6 +94,9 @@ def list_with_misc(collection: str) -> List[Dict]:
             target_name = data.get("businessType") if usage == "business" else data.get("documentType")
             misc_entry = find_misc_entry(misc_map.get(misc_type_key, []), usage, target_name or "")
             if misc_entry and misc_entry.get("enabled") and data.get("enabled"):
+                data["miscFeeId"] = misc_entry.get("id")
+                data["miscTargetType"] = misc_entry.get("targetType")
+                data["miscTargetName"] = misc_entry.get("targetName")
                 use_fee, fee_type, fee_value = get_misc_configuration(misc_entry, usage)
                 data["miscFeeType"] = fee_type
                 data["miscFeeRate"] = fee_value

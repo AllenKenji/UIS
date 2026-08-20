@@ -4,6 +4,7 @@ import {
   buildDocumentPayload,
   buildBusinessPayload,
   buildMiscPayload,
+  buildUsageMiscPayload,
 } from "../utils/payloadBuilders";
 
 export function useFees(delayMs = 500) { 
@@ -77,7 +78,9 @@ export function useFees(delayMs = 500) {
     },
     updateMiscFee: async (id, item, key, value) => {
       try {
-        const payload = buildMiscPayload(item, key, value);
+        const payload = item.miscUsage
+          ? buildUsageMiscPayload(item, key, value, item.miscUsage)
+          : buildMiscPayload(item, key, value);
         await FeesAPI.updateMisc(id, payload);
         setMiscFees(prev =>
           prev.map(m => (m.id === id ? { ...m, ...payload } : m))

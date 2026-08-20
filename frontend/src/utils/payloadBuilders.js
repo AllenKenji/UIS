@@ -47,3 +47,21 @@ export const buildMiscPayload = (item, key, value) => ({
   enabled: key === "enabled" ? !!value : !!item.enabled,
   miscType: item.miscType || item.id || null, // ✅ always include
 });
+
+export const buildUsageMiscPayload = (item, key, value, usage) => {
+  const isDocument = usage === "document";
+  return {
+    targetType: item.miscTargetType || usage,
+    targetName: item.miscTargetName || (isDocument ? item.documentType : item.businessType),
+    feeType: item.feeType || "fixed",
+    fee: safeNumber(item.fee ?? 0),
+    useForDocuments: isDocument ? true : !!item.useForDocuments,
+    documentFeeType: isDocument && key === "miscFeeType" ? value : item.documentFeeType || "fixed",
+    documentFee: safeNumber(isDocument && key === "miscFeeValue" ? value : item.documentFee ?? item.miscFeeRate ?? 0),
+    useForBusinesses: !isDocument ? true : !!item.useForBusinesses,
+    businessFeeType: !isDocument && key === "miscFeeType" ? value : item.businessFeeType || "fixed",
+    businessFee: safeNumber(!isDocument && key === "miscFeeValue" ? value : item.businessFee ?? item.miscFeeRate ?? 0),
+    enabled: item.enabled !== false,
+    miscType: item.miscType,
+  };
+};
