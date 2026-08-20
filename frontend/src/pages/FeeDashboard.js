@@ -43,7 +43,11 @@ export default function FeeDashboard() {
   ];
 
   const miscColumns = [
-    { key: "miscType", label: "Misc Type", editable: false },
+    { key: "targetType", label: "Applies To", editable: true, type: "select", options: [
+      { value: "document", label: "Document type" },
+      { value: "business", label: "Business type" },
+    ] },
+    { key: "targetName", label: "Target Type", editable: true },
     { key: "useForDocuments", label: "Documents", editable: true, type: "checkbox" },
     { key: "documentFeeType", label: "Document Calculation", editable: true, type: "select", options: [
       { value: "fixed", label: "Fixed amount" },
@@ -56,11 +60,7 @@ export default function FeeDashboard() {
       { value: "percentage", label: "Percentage" },
     ] },
     { key: "businessFee", label: "Business Value", editable: true, type: "number" },
-    { key: "feeType", label: "Fee Calculation", editable: true, type: "select", options: [
-      { value: "fixed", label: "Fixed amount" },
-      { value: "percentage", label: "Percentage" },
-    ] },
-    { key: "fee", label: "Value", editable: true },
+    { key: "fee", label: "Legacy Value", editable: false },
     { key: "enabled", label: "Enabled", editable: true, type: "checkbox" },
   ];
 
@@ -81,7 +81,12 @@ export default function FeeDashboard() {
       {loading && <p className="loading">Loading fees...</p>}
       {error && <p className="error">{error}</p>}
 
-      <AddNewFeeForm onAdded={refreshData} miscFees={miscFees} />
+      <AddNewFeeForm
+        onAdded={refreshData}
+        miscFees={miscFees}
+        documentFees={documentFees}
+        businessFees={businessFees}
+      />
 
       {/* 📄 Document Fees */}
       {renderFeeTable(

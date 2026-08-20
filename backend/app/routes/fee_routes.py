@@ -54,6 +54,21 @@ def get_misc_configuration(misc: dict, usage: str) -> tuple[bool, str, float]:
         )
     return True, misc.get("feeType", "fixed"), misc.get("fee", 0)
 
+def find_misc_entry(entries: list[dict], usage: str, target_name: str) -> dict | None:
+    target_type = "business" if usage == "business" else "document"
+    normalized_target = normalize_id(target_name)
+    exact = next(
+        (
+            entry for entry in entries
+            if entry.get("targetType") == target_type
+            and normalize_id(entry.get("targetName", "")) == normalized_target
+        ),
+        None,
+    )
+    if exact:
+        return exact
+    return next((entry for entry in entries if not entry.get("targetType")), None)
+
 # -----------------------------
 # 🔧 Shared Firestore Helpers
 # -----------------------------
@@ -63,18 +78,20 @@ def list_collection(collection: str) -> List[Dict]:
 
 def list_with_misc(collection: str) -> List[Dict]:
     docs = get_db().collection(collection).get()
-    misc_map = {
-        normalize_id(m.id): m.to_dict()
-        for m in get_db().collection("misc_fees").get()
-    }
+    misc_map = {}
+    for misc_doc in get_db().collection("misc_fees").get():
+        misc_map.setdefault(normalize_id(misc_doc.to_dict().get("miscType", misc_doc.id)), []).append(
+            misc_doc.to_dict()
+        )
     result = []
     for doc in docs:
         data = doc.to_dict()
         misc_type_raw = data.get("miscType")
         if misc_type_raw:
             misc_type_key = normalize_id(misc_type_raw)
-            misc_entry = misc_map.get(misc_type_key)
             usage = "business" if collection == "business_types" else "document"
+            target_name = data.get("businessType") if usage == "business" else data.get("documentType")
+            misc_entry = find_misc_entry(misc_map.get(misc_type_key, []), usage, target_name or "")
             if misc_entry and misc_entry.get("enabled") and data.get("enabled"):
                 use_fee, fee_type, fee_value = get_misc_configuration(misc_entry, usage)
                 data["miscFeeType"] = fee_type
@@ -145,6 +162,10 @@ def make_fee_routes(
         logger.info("Creating fee with payload=%s", payload.dict())
 
         fee_id = normalize_id(getattr(payload, id_field))
+        if collection == "misc_fees" and getattr(payload, "targetType", None) and getattr(payload, "targetName", None):
+            fee_id = normalize_id(
+                f"{getattr(payload, id_field)}_{payload.targetType}_{payload.targetName}"
+            )
         data = {id_field: getattr(payload, id_field).strip(), "fee": payload.fee}
         for field in extra_fields:
             data[field] = getattr(payload, field, None)
@@ -206,7 +227,7 @@ make_fee_routes(
     update_model=MiscFee,
     id_field="miscType",
     extra_fields=[
-        "enabled", "feeType", "useForDocuments", "documentFeeType", "documentFee",
+        "enabled", "feeType", "targetType", "targetName", "useForDocuments", "documentFeeType", "documentFee",
         "useForBusinesses", "businessFeeType", "businessFee",
     ],
 )

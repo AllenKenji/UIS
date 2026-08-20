@@ -23,6 +23,11 @@ const modesConfig = {
     endpoint: "/api/fees/misc",
     fields: [
       { name: "miscType", label: "Misc Type", type: "text" },
+      { name: "targetType", label: "Applies To", type: "select", options: [
+        { value: "document", label: "Document type" },
+        { value: "business", label: "Business type" },
+      ] },
+      { name: "targetName", label: "Target Type", type: "select" },
       { name: "useForDocuments", label: "Use for Documents", type: "checkbox" },
       { name: "documentFeeType", label: "Document Fee Calculation", type: "select", options: [
         { value: "fixed", label: "Fixed amount" },

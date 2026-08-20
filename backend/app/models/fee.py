@@ -46,6 +46,10 @@ class NewBusinessFee(BusinessFee):
 # -----------------------------
 class MiscFee(BaseModel):
     """Update model for miscellaneous fees."""
+    targetType: Optional[Literal["document", "business"]] = Field(
+        default=None, description="Specific fee target category; omitted means legacy global configuration"
+    )
+    targetName: Optional[str] = Field(default=None, min_length=1, description="Specific document or business type")
     useForDocuments: bool = Field(default=False, description="Apply this fee to documents")
     documentFeeType: Literal["fixed", "percentage"] = Field(default="fixed")
     documentFee: float = Field(default=0, ge=0, description="Document fixed amount or percentage")
@@ -55,7 +59,7 @@ class MiscFee(BaseModel):
     feeType: Literal["fixed", "percentage"] = Field(
         default="fixed", description="Whether fee is a fixed amount or a percentage"
     )
-    fee: float = Field(..., ge=0, description="Miscellaneous fee amount or percentage rate")
+    fee: float = Field(default=0, ge=0, description="Legacy miscellaneous fee amount or percentage rate")
     enabled: bool = Field(default=True, description="Enable/disable this fee")
 
     def model_post_init(self, __context):

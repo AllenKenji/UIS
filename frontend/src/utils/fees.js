@@ -7,16 +7,21 @@ export function calculateMiscFee(misc, baseAmount) {
 }
 
 export function resolveMiscFees(items, miscFees, shouldResolve = true, usage = "document") {
-  const miscMap = Object.fromEntries(
-    miscFees.map(m => [m.miscType.toLowerCase(), m])
-  );
+  const miscMap = miscFees.reduce((map, misc) => {
+    const key = misc.miscType.toLowerCase();
+    map[key] = [...(map[key] || []), misc];
+    return map;
+  }, {});
 
   return items.map(item => {
     if (!shouldResolve) return { ...item, miscFeeResolved: null };
 
-    const misc = item.miscType
-      ? miscMap[item.miscType.toLowerCase()]
-      : null;
+    const candidates = item.miscType ? miscMap[item.miscType.toLowerCase()] || [] : [];
+    const targetType = usage === "document" ? "document" : "business";
+    const targetName = usage === "document" ? item.documentType : item.businessType;
+    const misc = candidates.find(entry =>
+      entry.targetType === targetType && entry.targetName?.toLowerCase() === targetName?.toLowerCase()
+    ) || candidates.find(entry => !entry.targetType);
 
     const useFee = usage === "document" ? misc?.useForDocuments : misc?.useForBusinesses;
     const feeType = usage === "document" ? misc?.documentFeeType : misc?.businessFeeType;

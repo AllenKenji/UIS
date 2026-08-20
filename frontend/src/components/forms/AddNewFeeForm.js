@@ -5,7 +5,7 @@ import "./add-new-fee-form.css";
 import { validateFeePayload } from "../../utils/validation";
 import modesConfig from "../../config/modesConfig"; 
 
-export default function AddNewFeeForm({ onAdded, miscFees = [] }) {
+export default function AddNewFeeForm({ onAdded, miscFees = [], documentFees = [], businessFees = [] }) {
   const [mode, setMode] = useState("document");
   const [formData, setFormData] = useState({
     useForDocuments: false,
@@ -107,6 +107,22 @@ export default function AddNewFeeForm({ onAdded, miscFees = [] }) {
         );
 
       case "select":
+                if (field.name === "targetName") {
+                  const targets = formData.targetType === "document" ? documentFees : businessFees;
+                  return (
+                    <label key={field.name}>
+                      {field.label}:
+                      <select value={value} onChange={e => handleChange(field.name, e.target.value)}>
+                        <option value="">-- choose --</option>
+                        {targets.map(target => {
+                          const name = formData.targetType === "document" ? target.documentType : target.businessType;
+                          return <option key={target.id} value={name}>{name}</option>;
+                        })}
+                      </select>
+                    </label>
+                  );
+                }
+
         // Special handling for miscType dropdown
         if (field.name === "miscType") {
           // ✅ Only show miscType if enabled and mode is document/business
