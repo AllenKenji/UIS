@@ -51,7 +51,7 @@ export function useResolvedFees() {
 
   const getDocumentTotal = (item) => {
     let total = item.fee || 0;
-    if (item.enabled && item.miscFeeResolved) {
+    if (item.enabled && item.miscFeeResolved !== null) {
       total += item.miscFeeResolved;
     }
     return total;

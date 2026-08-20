@@ -42,7 +42,7 @@ export function resolveMiscFees(items, miscFees, shouldResolve = true, usage = "
       miscTargetType: misc?.targetType || item.miscTargetType,
       miscTargetName: misc?.targetName || item.miscTargetName,
       miscFeeResolved:
-        misc && misc.enabled && item.enabled && (!configured || useFee)
+        misc && misc.enabled && item.enabled && (hasRowOverride || !configured || useFee)
             ? calculateMiscFee({ fee: resolvedValue, feeType: resolvedType }, item.fee)
           : null,
           miscFeeType: resolvedType,
