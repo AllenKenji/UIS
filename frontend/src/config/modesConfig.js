@@ -23,6 +23,15 @@ const modesConfig = {
     endpoint: "/api/fees/misc",
     fields: [
       { name: "miscType", label: "Misc Type", type: "text" },
+      {
+        name: "feeType",
+        label: "Fee Calculation",
+        type: "select",
+        options: [
+          { value: "fixed", label: "Fixed amount" },
+          { value: "percentage", label: "Percentage" },
+        ],
+      },
       { name: "fee", label: "Fee", type: "number" },
       { name: "enabled", label: "Enabled", type: "checkbox" },
     ],

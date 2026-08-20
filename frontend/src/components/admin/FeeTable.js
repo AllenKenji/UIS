@@ -47,6 +47,17 @@ export default function FeeTable({ title, columns, data, onUpdate, onDelete }) {
                         checked={!!item[col.key]}
                         onChange={e => handleChange(item, col, e)}
                       />
+                    ) : col.type === "select" ? (
+                      <select
+                        value={item[col.key] ?? "fixed"}
+                        onChange={e => handleChange(item, col, e)}
+                      >
+                        {(col.options || []).map(option => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
                     ) : (
                       <input
                         type={col.type || "text"}

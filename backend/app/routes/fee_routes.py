@@ -33,6 +33,12 @@ FRONTEND_BASE_URL = os.environ.get("FRONTEND_BASE_URL", "https://uis.lits.com.ph
 def normalize_id(value: str) -> str:
     return re.sub(r"[^a-z0-9_]", "_", value.strip().lower())
 
+def calculate_misc_fee(misc: dict, base_amount: int | float) -> int:
+    value = misc.get("fee", 0) or 0
+    if misc.get("feeType", "fixed") == "percentage":
+        return round(float(base_amount or 0) * float(value) / 100)
+    return round(float(value))
+
 # -----------------------------
 # 🔧 Shared Firestore Helpers
 # -----------------------------
@@ -54,7 +60,9 @@ def list_with_misc(collection: str) -> List[Dict]:
             misc_type_key = normalize_id(misc_type_raw)
             misc_entry = misc_map.get(misc_type_key)
             if misc_entry and misc_entry.get("enabled") and data.get("enabled"):
-                data["miscFeeResolved"] = misc_entry["fee"]
+                data["miscFeeResolved"] = calculate_misc_fee(misc_entry, data.get("fee", 0))
+                data["miscFeeType"] = misc_entry.get("feeType", "fixed")
+                data["miscFeeRate"] = misc_entry.get("fee", 0)
             else:
                 data["miscFeeResolved"] = None
         else:
@@ -170,7 +178,7 @@ make_fee_routes(
     new_model=NewMiscFee,
     update_model=MiscFee,
     id_field="miscType",
-    extra_fields=["enabled"],
+    extra_fields=["enabled", "feeType"],
 )
 
 # -----------------------------
@@ -181,9 +189,15 @@ def list_public_business_types():
     all_types = list_with_misc("business_types")
     result = []
     for bt in all_types:
-            total = (bt.get("fee", 0) +
-                     bt.get("registrationFee", 0) +
-                     (bt.get("miscFeeResolved") or 0))
+            subtotal = bt.get("fee", 0) + bt.get("registrationFee", 0)
+            misc = calculate_misc_fee(
+                {
+                    "fee": bt.get("miscFeeRate", bt.get("miscFeeResolved", 0)),
+                    "feeType": bt.get("miscFeeType", "fixed"),
+                },
+                subtotal,
+            )
+            total = subtotal + misc
             bt["totalFee"] = total
             result.append(bt)
     return result
@@ -204,7 +218,7 @@ def list_public_document_types():
 # -----------------------------
 # 💰 Fee Computation Helpers
 # -----------------------------
-def resolve_misc_fee(bt: dict) -> int:
+def resolve_misc_fee(bt: dict, base_amount: int | float | None = None) -> int:
     misc_type_raw = bt.get("miscType") 
     if misc_type_raw: 
         misc_type_key = normalize_id(misc_type_raw) 
@@ -212,7 +226,7 @@ def resolve_misc_fee(bt: dict) -> int:
         if misc_entry.exists: 
             misc = misc_entry.to_dict() 
             if misc.get("enabled") and bt.get("enabled"): 
-                return misc.get("fee", 0) 
+                return calculate_misc_fee(misc, bt.get("fee", 0) if base_amount is None else base_amount)
     return 0
 
 def compute_document_fee(document_type: str) -> int:
@@ -235,7 +249,7 @@ def compute_business_registration_fee(business_type: str) -> int:
 
     # ✅ Align with frontend: base + registration + misc if enabled
     total = (bt.get("fee", 0) + bt.get("registrationFee", 0))
-    total += resolve_misc_fee(bt)
+    total += resolve_misc_fee(bt, total)
     return total
 
 
@@ -247,7 +261,7 @@ def compute_business_annual_fee(business_type: str) -> int:
 
     # ✅ Align with frontend: base + annual + misc if enabled
     total = (bt.get("fee", 0) + bt.get("annualFee", 0))
-    total += resolve_misc_fee(bt)
+    total += resolve_misc_fee(bt, total)
     return total
 
 

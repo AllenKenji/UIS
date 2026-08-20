@@ -34,6 +34,7 @@ export const buildBusinessPayload = (item, key, value) => ({
 
 // 🆕 Misc payload builder
 export const buildMiscPayload = (item, key, value) => ({
+  feeType: key === "feeType" ? value : item.feeType || "fixed",
   fee: safeNumber(key === "fee" ? value : item.fee),
   enabled: key === "enabled" ? !!value : !!item.enabled,
   miscType: item.miscType || item.id || null, // ✅ always include

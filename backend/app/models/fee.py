@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Literal, Optional
 
 # -----------------------------
 # 🔑 Base Models
@@ -42,8 +42,15 @@ class NewBusinessFee(BusinessFee):
 # -----------------------------
 class MiscFee(BaseModel):
     """Update model for miscellaneous fees."""
-    fee: int = Field(..., ge=0, description="Miscellaneous fee amount")
+    feeType: Literal["fixed", "percentage"] = Field(
+        default="fixed", description="Whether fee is a fixed amount or a percentage"
+    )
+    fee: float = Field(..., ge=0, description="Miscellaneous fee amount or percentage rate")
     enabled: bool = Field(default=True, description="Enable/disable this fee")
+
+    def model_post_init(self, __context):
+        if self.feeType == "percentage" and self.fee > 100:
+            raise ValueError("Percentage miscellaneous fees must be between 0 and 100")
 
 class NewMiscFee(MiscFee):
     """Creation model for new miscellaneous fees."""

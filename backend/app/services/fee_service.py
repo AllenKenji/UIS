@@ -1,4 +1,4 @@
-from backend.app.routes.fee_routes import list_with_misc, list_collection
+from backend.app.routes.fee_routes import calculate_misc_fee, list_with_misc, list_collection
 from datetime import datetime, timezone
 from dateutil.relativedelta import relativedelta
 
@@ -30,8 +30,6 @@ def resolve_fee(collection: str, id_field: str, type_value: str, fee_type: str |
     if not fee_record:
         raise ValueError(f"Fee not found for {type_value} in {collection}")
 
-    misc = fee_record.get("miscFeeResolved") or 0
-
     if collection == "business_types":
         if not fee_type:
             raise ValueError("fee_type required for business_types (registrationFee or annualFee)")
@@ -43,6 +41,17 @@ def resolve_fee(collection: str, id_field: str, type_value: str, fee_type: str |
     else:  # misc_fees
         base = 0
         main = fee_record.get("fee", 0)
+
+    if collection in ["business_types", "document_types"]:
+        misc = calculate_misc_fee(
+            {
+                "fee": fee_record.get("miscFeeRate", fee_record.get("miscFeeResolved", 0)),
+                "feeType": fee_record.get("miscFeeType", "fixed"),
+            },
+            base + main,
+        )
+    else:
+        misc = fee_record.get("fee", 0)
 
     total = base + main + misc
 

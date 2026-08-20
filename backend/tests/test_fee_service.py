@@ -1,6 +1,7 @@
 import pytest
 from datetime import datetime, timezone
 from dateutil.relativedelta import relativedelta
+from backend.app.routes.fee_routes import calculate_misc_fee
 from backend.app.services.fee_service import determine_business_fee_type
 
 def make_business_doc(status="active", reg_date=None, payments=None):
@@ -37,3 +38,9 @@ def test_leap_year_anniversary():
     # Monkeypatch datetime.now if needed, or just check relativedelta logic
     next_anniversary = reg_date + relativedelta(years=1)
     assert next_anniversary == datetime(2025, 2, 28, tzinfo=timezone.utc)
+
+def test_percentage_misc_fee_uses_base_amount():
+    assert calculate_misc_fee({"fee": 2.5, "feeType": "percentage"}, 750) == 19
+
+def test_missing_fee_type_remains_fixed():
+    assert calculate_misc_fee({"fee": 75}, 750) == 75

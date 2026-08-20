@@ -2,13 +2,6 @@ import "../styles/fee-dashboard.css";
 import AddNewFeeForm from "../components/forms/AddNewFeeForm";
 import FeeTable from "../components/admin/FeeTable";
 import { useResolvedFees } from "../hooks/useResolvedFees";
-import {
-  buildDocumentPayload,
-  buildBusinessPayload,
-  buildMiscPayload,
-} from "../utils/payloadBuilders";
-
-
 export default function FeeDashboard() {
   const {
     documentFees,
@@ -51,7 +44,11 @@ export default function FeeDashboard() {
 
   const miscColumns = [
     { key: "miscType", label: "Misc Type", editable: false },
-    { key: "fee", label: "Fee (₱)", editable: true },
+    { key: "feeType", label: "Fee Calculation", editable: true, type: "select", options: [
+      { value: "fixed", label: "Fixed amount" },
+      { value: "percentage", label: "Percentage" },
+    ] },
+    { key: "fee", label: "Value", editable: true },
     { key: "enabled", label: "Enabled", editable: true, type: "checkbox" },
   ];
 
@@ -82,7 +79,7 @@ export default function FeeDashboard() {
           ...doc,
           totalFee: getDocumentTotal(doc, "document"),
         })),
-        (id, key, value, item) => updateDocumentFee(id, buildDocumentPayload(item, key, value)),
+        (id, key, value, item) => updateDocumentFee(id, item, key, value),
         deleteDocumentFee
       )}
 
@@ -95,7 +92,7 @@ export default function FeeDashboard() {
           registrationTotal: getRegistrationTotal(biz, "business"),
           annualTotal: getAnnualTotal(biz, "business"),
         })),
-        (id, key, value, item) => updateBusinessFee(id, buildBusinessPayload(item, key, value)),
+        (id, key, value, item) => updateBusinessFee(id, item, key, value),
         deleteBusinessFee
       )}
 
@@ -104,7 +101,7 @@ export default function FeeDashboard() {
         "🆕 Miscellaneous Fees",
         miscColumns,
         miscFees,
-        (id, key, value, item) => updateMiscFee(id, buildMiscPayload(item, key, value)),
+        (id, key, value, item) => updateMiscFee(id, item, key, value),
         deleteMiscFee
       )}
     </div>

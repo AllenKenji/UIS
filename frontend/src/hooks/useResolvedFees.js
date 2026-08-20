@@ -1,5 +1,5 @@
 import { useFees } from "./useFees";
-import { resolveMiscFees } from "../utils/fees";
+import { calculateMiscFee, resolveMiscFees } from "../utils/fees";
 
 /**
  * Wraps useFees and resolves misc fees for documents and businesses.
@@ -31,16 +31,20 @@ export function useResolvedFees() {
    */
   const getRegistrationTotal = (item) => {
     let total = (item.fee || 0) + (item.registrationFee || 0);
-    if (item.enabled && item.miscFeeResolved) {
-      total += item.miscFeeResolved;
+    if (item.enabled && item.miscFeeResolved !== null) {
+      total += item.miscFeeType === "percentage"
+        ? calculateMiscFee({ fee: item.miscFeeRate, feeType: item.miscFeeType }, total)
+        : item.miscFeeResolved;
     }
     return total;
   };
 
   const getAnnualTotal = (item) => {
     let total = (item.fee || 0) + (item.annualFee || 0);
-    if (item.enabled && item.miscFeeResolved) {
-      total += item.miscFeeResolved;
+    if (item.enabled && item.miscFeeResolved !== null) {
+      total += item.miscFeeType === "percentage"
+        ? calculateMiscFee({ fee: item.miscFeeRate, feeType: item.miscFeeType }, total)
+        : item.miscFeeResolved;
     }
     return total;
   };

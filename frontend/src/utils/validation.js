@@ -14,5 +14,9 @@ export function validateFeePayload(mode, payload) {
     }
   }
 
+  if (mode === "misc" && payload.feeType === "percentage" && payload.fee > 100) {
+    return { valid: false, message: "Percentage miscellaneous fees must be between 0 and 100" };
+  }
+
   return { valid: true, message: "" };
 }
