@@ -79,10 +79,17 @@ def list_with_misc(collection: str) -> List[Dict]:
                 use_fee, fee_type, fee_value = get_misc_configuration(misc_entry, usage)
                 data["miscFeeType"] = fee_type
                 data["miscFeeRate"] = fee_value
-                data["miscFeeResolved"] = calculate_misc_fee(
-                    {"fee": fee_value, "feeType": fee_type},
-                    data.get("fee", 0),
-                ) if use_fee else None
+                misc_config = {"fee": fee_value, "feeType": fee_type}
+                if use_fee and collection == "business_types":
+                    registration_base = data.get("fee", 0) + data.get("registrationFee", 0)
+                    annual_base = data.get("fee", 0) + data.get("annualFee", 0)
+                    data["registrationMiscFeeResolved"] = calculate_misc_fee(misc_config, registration_base)
+                    data["annualMiscFeeResolved"] = calculate_misc_fee(misc_config, annual_base)
+                    data["miscFeeResolved"] = data["registrationMiscFeeResolved"]
+                else:
+                    data["miscFeeResolved"] = calculate_misc_fee(
+                        misc_config, data.get("fee", 0)
+                    ) if use_fee else None
             else:
                 data["miscFeeResolved"] = None
         else:

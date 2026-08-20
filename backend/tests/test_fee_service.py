@@ -42,5 +42,13 @@ def test_leap_year_anniversary():
 def test_percentage_misc_fee_uses_base_amount():
     assert calculate_misc_fee({"fee": 2.5, "feeType": "percentage"}, 750) == 19
 
+def test_business_registration_percentage_uses_registration_subtotal():
+    subtotal = 1000 + 500
+    assert subtotal + calculate_misc_fee({"fee": 10, "feeType": "percentage"}, subtotal) == 1650
+
+def test_business_annual_percentage_uses_annual_subtotal():
+    subtotal = 1000 + 300
+    assert subtotal + calculate_misc_fee({"fee": 10, "feeType": "percentage"}, subtotal) == 1430
+
 def test_missing_fee_type_remains_fixed():
     assert calculate_misc_fee({"fee": 75}, 750) == 75
