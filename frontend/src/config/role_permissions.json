@@ -44,7 +44,7 @@
     "viewBusinesses",
     "viewIncidents",
     "viewAllComplaints",
-    "fileComplaintsForResidents"   
+    "fileComplaintsForResidents"
   ],
   "resident": [
     "viewDashboard",
@@ -58,13 +58,13 @@
     "viewOwnIncidents",
     "submitFeedback"
   ],
-  "secretary": [ 
+  "secretary": [
     "viewDashboard",
     "documentRequest",
-    "viewDocuments", 
-    "pendingRequests", 
-    "paidRequests", 
-    "issuedDocuments", 
+    "viewDocuments",
+    "pendingRequests",
+    "paidRequests",
+    "issuedDocuments",
     "rejectedRequests",
     "manageDocuments"
   ],
