@@ -93,10 +93,11 @@ def list_with_misc(collection: str) -> List[Dict]:
             usage = "business" if collection == "business_types" else "document"
             target_name = data.get("businessType") if usage == "business" else data.get("documentType")
             misc_entry = find_misc_entry(misc_map.get(misc_type_key, []), usage, target_name or "")
-            if misc_entry and misc_entry.get("enabled") and data.get("enabled"):
+            if misc_entry:
                 data["miscFeeId"] = misc_entry.get("id")
                 data["miscTargetType"] = misc_entry.get("targetType")
                 data["miscTargetName"] = misc_entry.get("targetName")
+            if misc_entry and misc_entry.get("enabled") and data.get("enabled"):
                 use_fee, fee_type, fee_value = get_misc_configuration(misc_entry, usage)
                 data["miscFeeType"] = fee_type
                 data["miscFeeRate"] = fee_value

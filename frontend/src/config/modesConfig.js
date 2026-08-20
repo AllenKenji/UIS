@@ -5,7 +5,6 @@ const modesConfig = {
       { name: "documentType", label: "Document Type", type: "text" },
       { name: "fee", label: "Fee", type: "number" },
       { name: "enabled", label: "Enabled", type: "checkbox" },
-      { name: "miscType", label: "Misc Fee Type", type: "select" }, // ✅ new
     ],
   },
   business: {
@@ -16,7 +15,6 @@ const modesConfig = {
       { name: "registrationFee", label: "Registration Fee", type: "number" },
       { name: "annualFee", label: "Annual Fee", type: "number" },
       { name: "enabled", label: "Enabled", type: "checkbox" },
-      { name: "miscType", label: "Misc Fee Type", type: "select" }, // ✅ new
     ],
   },
   misc: {
