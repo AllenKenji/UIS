@@ -60,9 +60,12 @@ def list_with_misc(collection: str) -> List[Dict]:
             misc_type_key = normalize_id(misc_type_raw)
             misc_entry = misc_map.get(misc_type_key)
             if misc_entry and misc_entry.get("enabled") and data.get("enabled"):
-                data["miscFeeResolved"] = calculate_misc_fee(misc_entry, data.get("fee", 0))
-                data["miscFeeType"] = misc_entry.get("feeType", "fixed")
+                data["miscFeeType"] = data.get("miscFeeType") or misc_entry.get("feeType", "fixed")
                 data["miscFeeRate"] = misc_entry.get("fee", 0)
+                data["miscFeeResolved"] = calculate_misc_fee(
+                    {"fee": data["miscFeeRate"], "feeType": data["miscFeeType"]},
+                    data.get("fee", 0),
+                )
             else:
                 data["miscFeeResolved"] = None
         else:
@@ -152,7 +155,7 @@ make_fee_routes(
     new_model=NewDocumentFee,
     update_model=DocumentFee,
     id_field="documentType",
-    extra_fields=["miscType", "enabled"],
+    extra_fields=["miscType", "miscFeeType", "enabled"],
     resolve_misc=True,
 )
 
@@ -165,7 +168,7 @@ make_fee_routes(
     new_model=NewBusinessFee,
     update_model=BusinessFee,
     id_field="businessType",
-    extra_fields=["registrationFee", "annualFee", "miscType", "enabled"],
+    extra_fields=["registrationFee", "annualFee", "miscType", "miscFeeType", "enabled"],
     resolve_misc=True,
 )
 
@@ -226,6 +229,7 @@ def resolve_misc_fee(bt: dict, base_amount: int | float | None = None) -> int:
         if misc_entry.exists: 
             misc = misc_entry.to_dict() 
             if misc.get("enabled") and bt.get("enabled"): 
+                misc["feeType"] = bt.get("miscFeeType") or misc.get("feeType", "fixed")
                 return calculate_misc_fee(misc, bt.get("fee", 0) if base_amount is None else base_amount)
     return 0
 

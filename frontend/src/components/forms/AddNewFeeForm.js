@@ -19,8 +19,10 @@ export default function AddNewFeeForm({ onAdded, miscFees = [] }) {
     // Attach miscType reference only if enabled
     if ((mode === "document" || mode === "business") && payload.enabled) {
       payload.miscType = payload.miscType ?? null;
+      payload.miscFeeType = payload.miscType ? payload.miscFeeType || null : null;
     } else {
       delete payload.miscType; // ensure it's not sent when disabled
+      delete payload.miscFeeType;
     }
 
     return payload;
@@ -110,6 +112,27 @@ export default function AddNewFeeForm({ onAdded, miscFees = [] }) {
             );
           }
           return null; // hide miscType when not enabled
+        }
+
+        if (field.name === "miscFeeType") {
+          if ((mode === "document" || mode === "business") && formData.enabled && formData.miscType) {
+            return (
+              <label key={field.name}>
+                {field.label}:
+                <select
+                  value={value || "fixed"}
+                  onChange={e => handleChange(field.name, e.target.value)}
+                >
+                  {(field.options || []).map(opt => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            );
+          }
+          return null;
         }
 
         // Fallback for other select fields

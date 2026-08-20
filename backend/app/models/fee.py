@@ -12,6 +12,10 @@ class BaseFee(BaseModel):
         default=None,
         description="Reference to a miscellaneous fee type (from misc_fees)"
     )
+    miscFeeType: Optional[Literal["fixed", "percentage"]] = Field(
+        default=None,
+        description="Optional per-document or per-business override for the miscellaneous fee calculation"
+    )
 
 # -----------------------------
 # 📄 Document Fee Models

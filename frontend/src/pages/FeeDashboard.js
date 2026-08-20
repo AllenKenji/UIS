@@ -26,6 +26,10 @@ export default function FeeDashboard() {
     { key: "fee", label: "Fee (₱)", editable: true },
     { key: "enabled", label: "Enabled", editable: true, type: "checkbox" },
     { key: "miscType", label: "Misc Type", editable: false },
+    { key: "miscFeeType", label: "Misc Calculation", editable: true, type: "select", options: [
+      { value: "fixed", label: "Fixed amount" },
+      { value: "percentage", label: "Percentage" },
+    ] },
     { key: "miscFeeResolved", label: "Misc Fee (₱)", editable: false },
     { key: "totalFee", label: "Total Fee (₱)", editable: false }, 
   ];
@@ -37,6 +41,10 @@ export default function FeeDashboard() {
     { key: "annualFee", label: "Annual Fee (₱)", editable: true },
     { key: "enabled", label: "Enabled", editable: true, type: "checkbox" },
     { key: "miscType", label: "Misc Type", editable: false },
+    { key: "miscFeeType", label: "Misc Calculation", editable: true, type: "select", options: [
+      { value: "fixed", label: "Fixed amount" },
+      { value: "percentage", label: "Percentage" },
+    ] },
     { key: "miscFeeResolved", label: "Misc Fee (₱)", editable: false },
     { key: "registrationTotal", label: "Registration Total (₱)", editable: false },
     { key: "annualTotal", label: "Annual Total (₱)", editable: false },

@@ -6,6 +6,15 @@ const modesConfig = {
       { name: "fee", label: "Fee", type: "number" },
       { name: "enabled", label: "Enabled", type: "checkbox" },
       { name: "miscType", label: "Misc Fee Type", type: "select" }, // ✅ new
+      {
+        name: "miscFeeType",
+        label: "Misc Calculation",
+        type: "select",
+        options: [
+          { value: "fixed", label: "Fixed amount" },
+          { value: "percentage", label: "Percentage" },
+        ],
+      },
     ],
   },
   business: {
@@ -17,6 +26,15 @@ const modesConfig = {
       { name: "annualFee", label: "Annual Fee", type: "number" },
       { name: "enabled", label: "Enabled", type: "checkbox" },
       { name: "miscType", label: "Misc Fee Type", type: "select" }, // ✅ new
+      {
+        name: "miscFeeType",
+        label: "Misc Calculation",
+        type: "select",
+        options: [
+          { value: "fixed", label: "Fixed amount" },
+          { value: "percentage", label: "Percentage" },
+        ],
+      },
     ],
   },
   misc: {
