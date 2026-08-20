@@ -21,8 +21,8 @@ export function useResolvedFees() {
     deleteMiscFee,
   } = useFees();
 
-  const resolvedDocuments = resolveMiscFees(documentFees, miscFees, true);
-  const resolvedBusinesses = resolveMiscFees(businessFees, miscFees, true);
+  const resolvedDocuments = resolveMiscFees(documentFees, miscFees, true, "document");
+  const resolvedBusinesses = resolveMiscFees(businessFees, miscFees, true, "business");
 
   /**
    * Compute totals for a given item.

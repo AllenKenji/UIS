@@ -14,7 +14,6 @@ const safeNumber = (val) => {
 export const buildDocumentPayload = (item, key, value) => ({
   fee: safeNumber(key === "fee" ? value : item.fee),
   miscType: item.miscType || null,
-  miscFeeType: key === "miscFeeType" ? value : item.miscFeeType || null,
   enabled: key === "enabled" ? !!value : !!item.enabled,
   documentType: item.documentType || item.id || null, // ✅ always include
 });
@@ -29,7 +28,6 @@ export const buildBusinessPayload = (item, key, value) => ({
     key === "annualFee" ? value : item.annualFee
   ),
   miscType: item.miscType || null,
-  miscFeeType: key === "miscFeeType" ? value : item.miscFeeType || null,
   enabled: key === "enabled" ? !!value : !!item.enabled,
   businessType: item.businessType || item.id || null, // ✅ always include
 });
@@ -38,6 +36,12 @@ export const buildBusinessPayload = (item, key, value) => ({
 export const buildMiscPayload = (item, key, value) => ({
   feeType: key === "feeType" ? value : item.feeType || "fixed",
   fee: safeNumber(key === "fee" ? value : item.fee),
+  useForDocuments: key === "useForDocuments" ? !!value : !!item.useForDocuments,
+  documentFeeType: key === "documentFeeType" ? value : item.documentFeeType || "fixed",
+  documentFee: safeNumber(key === "documentFee" ? value : item.documentFee ?? 0),
+  useForBusinesses: key === "useForBusinesses" ? !!value : !!item.useForBusinesses,
+  businessFeeType: key === "businessFeeType" ? value : item.businessFeeType || "fixed",
+  businessFee: safeNumber(key === "businessFee" ? value : item.businessFee ?? 0),
   enabled: key === "enabled" ? !!value : !!item.enabled,
   miscType: item.miscType || item.id || null, // ✅ always include
 });

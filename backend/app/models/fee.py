@@ -46,6 +46,12 @@ class NewBusinessFee(BusinessFee):
 # -----------------------------
 class MiscFee(BaseModel):
     """Update model for miscellaneous fees."""
+    useForDocuments: bool = Field(default=False, description="Apply this fee to documents")
+    documentFeeType: Literal["fixed", "percentage"] = Field(default="fixed")
+    documentFee: float = Field(default=0, ge=0, description="Document fixed amount or percentage")
+    useForBusinesses: bool = Field(default=False, description="Apply this fee to businesses")
+    businessFeeType: Literal["fixed", "percentage"] = Field(default="fixed")
+    businessFee: float = Field(default=0, ge=0, description="Business fixed amount or percentage")
     feeType: Literal["fixed", "percentage"] = Field(
         default="fixed", description="Whether fee is a fixed amount or a percentage"
     )
@@ -55,6 +61,10 @@ class MiscFee(BaseModel):
     def model_post_init(self, __context):
         if self.feeType == "percentage" and self.fee > 100:
             raise ValueError("Percentage miscellaneous fees must be between 0 and 100")
+        if self.documentFeeType == "percentage" and self.documentFee > 100:
+            raise ValueError("Document percentage fees must be between 0 and 100")
+        if self.businessFeeType == "percentage" and self.businessFee > 100:
+            raise ValueError("Business percentage fees must be between 0 and 100")
 
 class NewMiscFee(MiscFee):
     """Creation model for new miscellaneous fees."""
