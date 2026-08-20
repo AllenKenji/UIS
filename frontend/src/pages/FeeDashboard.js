@@ -12,7 +12,6 @@ export default function FeeDashboard() {
     refreshData,
     updateDocumentFee,
     updateBusinessFee,
-    updateMiscFee,
     deleteDocumentFee,
     deleteBusinessFee,
     getRegistrationTotal,
@@ -85,7 +84,7 @@ export default function FeeDashboard() {
         })),
         (id, key, value, item) => {
           if (key === "miscFeeType" || key === "miscFeeValue") {
-            return updateMiscFee(item.miscFeeId, item, key, value).then(refreshData);
+            return updateDocumentFee(id, item, key, value).then(refreshData);
           }
           return updateDocumentFee(id, item, key, value);
         },
@@ -105,7 +104,7 @@ export default function FeeDashboard() {
         })),
         (id, key, value, item) => {
           if (key === "miscFeeType" || key === "miscFeeValue") {
-            return updateMiscFee(item.miscFeeId, item, key, value).then(refreshData);
+            return updateBusinessFee(id, item, key, value).then(refreshData);
           }
           return updateBusinessFee(id, item, key, value);
         },

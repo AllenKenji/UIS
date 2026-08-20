@@ -14,6 +14,8 @@ const safeNumber = (val) => {
 export const buildDocumentPayload = (item, key, value) => ({
   fee: safeNumber(key === "fee" ? value : item.fee),
   miscType: item.miscType || null,
+  miscFeeType: key === "miscFeeType" ? value : item.miscFeeType || null,
+  miscFeeRate: safeNumber(key === "miscFeeValue" ? value : item.miscFeeRate),
   enabled: key === "enabled" ? !!value : !!item.enabled,
   documentType: item.documentType || item.id || null, // ✅ always include
 });
@@ -28,6 +30,8 @@ export const buildBusinessPayload = (item, key, value) => ({
     key === "annualFee" ? value : item.annualFee
   ),
   miscType: item.miscType || null,
+  miscFeeType: key === "miscFeeType" ? value : item.miscFeeType || null,
+  miscFeeRate: safeNumber(key === "miscFeeValue" ? value : item.miscFeeRate),
   enabled: key === "enabled" ? !!value : !!item.enabled,
   businessType: item.businessType || item.id || null, // ✅ always include
 });

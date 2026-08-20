@@ -32,6 +32,9 @@ export function resolveMiscFees(items, miscFees, shouldResolve = true, usage = "
     const feeType = usage === "document" ? misc?.documentFeeType : misc?.businessFeeType;
     const feeValue = usage === "document" ? misc?.documentFee : misc?.businessFee;
     const configured = usage === "document" ? "useForDocuments" in (misc || {}) : "useForBusinesses" in (misc || {});
+    const hasRowOverride = item.miscFeeType != null || item.miscFeeRate != null;
+    const resolvedType = hasRowOverride ? item.miscFeeType : (configured ? feeType : misc?.feeType || "fixed");
+    const resolvedValue = hasRowOverride ? item.miscFeeRate : (configured ? feeValue : misc?.fee ?? 0);
 
     return {
       ...item,
@@ -40,10 +43,10 @@ export function resolveMiscFees(items, miscFees, shouldResolve = true, usage = "
       miscTargetName: misc?.targetName || item.miscTargetName,
       miscFeeResolved:
         misc && misc.enabled && item.enabled && (!configured || useFee)
-          ? calculateMiscFee(configured ? { fee: feeValue, feeType } : misc, item.fee)
+            ? calculateMiscFee({ fee: resolvedValue, feeType: resolvedType }, item.fee)
           : null,
-      miscFeeType: configured ? feeType : misc?.feeType || "fixed",
-      miscFeeRate: configured ? feeValue : misc?.fee ?? 0,
+          miscFeeType: resolvedType,
+          miscFeeRate: resolvedValue,
     };
   });
 }

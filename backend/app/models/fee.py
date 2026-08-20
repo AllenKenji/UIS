@@ -16,6 +16,11 @@ class BaseFee(BaseModel):
         default=None,
         description="Optional per-document or per-business override for the miscellaneous fee calculation"
     )
+    miscFeeRate: Optional[float] = Field(
+        default=None,
+        ge=0,
+        description="Per-document or per-business miscellaneous fee amount or percentage"
+    )
 
 # -----------------------------
 # 📄 Document Fee Models

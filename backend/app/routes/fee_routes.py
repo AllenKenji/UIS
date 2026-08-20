@@ -98,7 +98,13 @@ def list_with_misc(collection: str) -> List[Dict]:
                 data["miscTargetType"] = misc_entry.get("targetType")
                 data["miscTargetName"] = misc_entry.get("targetName")
             if misc_entry and misc_entry.get("enabled") and data.get("enabled"):
-                use_fee, fee_type, fee_value = get_misc_configuration(misc_entry, usage)
+                has_row_override = data.get("miscFeeType") is not None or data.get("miscFeeRate") is not None
+                if has_row_override:
+                    use_fee = True
+                    fee_type = data.get("miscFeeType") or misc_entry.get("feeType", "fixed")
+                    fee_value = data.get("miscFeeRate") if data.get("miscFeeRate") is not None else misc_entry.get("fee", 0)
+                else:
+                    use_fee, fee_type, fee_value = get_misc_configuration(misc_entry, usage)
                 data["miscFeeType"] = fee_type
                 data["miscFeeRate"] = fee_value
                 misc_config = {"fee": fee_value, "feeType": fee_type}
@@ -205,7 +211,7 @@ make_fee_routes(
     new_model=NewDocumentFee,
     update_model=DocumentFee,
     id_field="documentType",
-    extra_fields=["miscType", "enabled"],
+    extra_fields=["miscType", "miscFeeType", "miscFeeRate", "enabled"],
     resolve_misc=True,
 )
 
@@ -218,7 +224,7 @@ make_fee_routes(
     new_model=NewBusinessFee,
     update_model=BusinessFee,
     id_field="businessType",
-    extra_fields=["registrationFee", "annualFee", "miscType", "enabled"],
+    extra_fields=["registrationFee", "annualFee", "miscType", "miscFeeType", "miscFeeRate", "enabled"],
     resolve_misc=True,
 )
 
