@@ -38,6 +38,7 @@ const PaymentStatusChart = ({ documents = [] }) => {
 
   const options = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       legend: { position: "bottom" },
       title: { display: true, text: "Payment Status" },

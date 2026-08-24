@@ -49,6 +49,7 @@ const DocumentTypeChart = ({ documents = [], counters = [] }) => {
 
   const options = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       legend: { position: "top" },
       title: { display: true, text: "Document Types Requested" },

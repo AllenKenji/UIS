@@ -46,6 +46,7 @@ const MonthlyTrendChart = ({ documents = [] }) => {
 
   const options = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       legend: { position: "top" },
       title: { display: true, text: "Monthly Request Trends" },
