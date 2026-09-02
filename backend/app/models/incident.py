@@ -26,6 +26,7 @@ class IncidentBase(BaseModel):
     residentId: Optional[str] = Field(
         None, description="Resident UID who is the subject of the incident"
     )
+    barangayId: Optional[str] = Field(None, description="Tenant this incident belongs to")
 
 # 🆕 Incident creation schema
 class IncidentCreate(IncidentBase):
@@ -41,6 +42,7 @@ class Incident(BaseModel):
     location: str
     authUid: Optional[str] = None
     residentId: Optional[str] = None
+    barangayId: Optional[str] = None
     assigned_to_uid: Optional[str] = None
     timestamp: datetime
     updated_at: Optional[datetime] = None

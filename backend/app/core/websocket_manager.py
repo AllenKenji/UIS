@@ -60,7 +60,12 @@ class ConnectionManager:
         )
         for connection, info in list(self.active_connections.items()):
             try:
-                if role and info.get("role") != role:
+                # Match against every role on the connection (a multi-role account
+                # keeps receiving notifications for roles it isn't currently
+                # "active as"), falling back to the single active role for
+                # connections registered before this field existed.
+                connection_roles = info.get("roles") or [info.get("role")]
+                if role and role not in connection_roles:
                     continue
                 if user_id and info.get("user_id") != user_id:
                     continue

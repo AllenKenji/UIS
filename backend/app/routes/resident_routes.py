@@ -1,14 +1,23 @@
 import logging
-from fastapi import APIRouter, Query, Body, HTTPException, status, Request
+from fastapi import APIRouter, Depends, Query, Body, HTTPException, status, Request
 from typing import Optional, List
 from starlette.concurrency import run_in_threadpool
 from backend.app.models import ResidentCreate, ResidentUpdate, ResidentOut
 from backend.app.services import resident_service
 from backend.app.services.resident_service import ResidentError
+from backend.app.services.email_service import send_email
+from backend.app.core.auth import get_current_user, require_permission, resolve_tenant_scope
 from pydantic import BaseModel, ValidationError
 
 logger = logging.getLogger("uvicorn.error")
 router = APIRouter(tags=["Residents"])
+
+
+def _ensure_in_scope(resident: ResidentOut, scope: Optional[str]) -> ResidentOut:
+    """A barangay admin/staff may only touch residents in their own tenant."""
+    if scope is not None and resident.barangay_id != scope:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resident not found")
+    return resident
 
 # 📦 Response models
 class BulkResidentResponse(BaseModel):
@@ -53,13 +62,23 @@ async def list_residents(
     start_after_id: Optional[str] = Query(None),
     email: Optional[str] = Query(None),
     full_name: Optional[str] = Query(None, alias="fullName"),
-    birth_date: Optional[str] = Query(None, alias="birthDate")
+    birth_date: Optional[str] = Query(None, alias="birthDate"),
+    barangayId: Optional[str] = Query(None),
+    verificationStatus: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user),
+    # Secretaries don't manage resident records, but they do need to look up
+    # their own barangay's registered residents to attach to a walk-in
+    # document request — allow listing on either permission, tenant-scoped
+    # below by resolve_tenant_scope either way.
+    _: None = Depends(require_permission(["manageResidents", "manageDocuments"])),
 ):
+    scope = resolve_tenant_scope(current_user, barangayId)
     if email:
         resident = await safe_service_call(
             "find resident by email",
             resident_service.find_by_email,
             email,
+            scope,
         )
         return [resident] if resident else []
     if full_name and birth_date:
@@ -67,34 +86,66 @@ async def list_residents(
             "find duplicates",
             resident_service.find_duplicates,
             full_name,
-            birth_date
+            birth_date,
+            None,
+            None,
+            scope,
         )
     return await safe_service_call(
         "list residents",
         resident_service.get_all_residents,
         limit,
-        start_after_id
+        start_after_id,
+        scope,
+        verificationStatus,
     )
 
 @router.get("/residents/{id}", response_model=ResidentOut)
-async def get_resident(id: str):
+async def get_resident(
+    id: str,
+    current_user: dict = Depends(get_current_user),
+    _: None = Depends(require_permission("manageResidents")),
+):
     logger.info("📤 Fetching resident with ID: %s", id)
-    return await safe_service_call("get resident", resident_service.get_resident_by_id, id)
+    resident = await safe_service_call("get resident", resident_service.get_resident_by_id, id)
+    return _ensure_in_scope(resident, resolve_tenant_scope(current_user))
 
 
 # 🚀 POST /residents
 @router.post("/residents", response_model=ResidentOut, status_code=status.HTTP_201_CREATED)
-async def add_resident(data: ResidentCreate = Body(...)) -> ResidentOut:
+async def add_resident(
+    data: ResidentCreate = Body(...),
+    barangayId: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user),
+    _: None = Depends(require_permission("manageResidents")),
+) -> ResidentOut:
+    scope = resolve_tenant_scope(current_user, barangayId)
     logger.debug("📥 Incoming resident payload: %s", data.model_dump(by_alias=True))
-    return await safe_service_call(
+    resident = await safe_service_call(
         "create resident",
         resident_service.add_resident,
-        data.model_dump(by_alias=True)
+        data.model_dump(by_alias=True),
+        None,
+        True,
+        scope,
     )
+    if resident.email:
+        try:
+            send_email("welcome", resident.email, resident.full_name)
+        except Exception as error:
+            logger.warning("Welcome email could not be sent to resident %s: %s", resident.email, error)
+    return resident
 
 # 🚀 PUT /residents/{id}
 @router.put("/residents/{id}", response_model=ResidentOut)
-async def update_resident(id: str, data: ResidentUpdate = Body(...)) -> ResidentOut:
+async def update_resident(
+    id: str,
+    data: ResidentUpdate = Body(...),
+    current_user: dict = Depends(get_current_user),
+    _: None = Depends(require_permission("manageResidents")),
+) -> ResidentOut:
+    existing = await safe_service_call("get resident", resident_service.get_resident_by_id, id)
+    _ensure_in_scope(existing, resolve_tenant_scope(current_user))
     logger.debug("📥 Update resident %s payload: %s", id, data.model_dump(by_alias=True))
     return await safe_service_call(
         "update resident",
@@ -105,7 +156,14 @@ async def update_resident(id: str, data: ResidentUpdate = Body(...)) -> Resident
 
 # 🚀 PATCH /residents/{id}
 @router.patch("/residents/{id}", response_model=ResidentOut)
-async def patch_resident(id: str, data: ResidentUpdate = Body(...)) -> ResidentOut:
+async def patch_resident(
+    id: str,
+    data: ResidentUpdate = Body(...),
+    current_user: dict = Depends(get_current_user),
+    _: None = Depends(require_permission("manageResidents")),
+) -> ResidentOut:
+    existing = await safe_service_call("get resident", resident_service.get_resident_by_id, id)
+    _ensure_in_scope(existing, resolve_tenant_scope(current_user))
     logger.debug("📥 Patch resident %s payload: %s", id, data.model_dump(exclude_unset=True, by_alias=True))
     return await safe_service_call(
         "patch resident",
@@ -116,19 +174,60 @@ async def patch_resident(id: str, data: ResidentUpdate = Body(...)) -> ResidentO
 
 # 🚀 DELETE /residents/{id}
 @router.delete("/residents/{id}", response_model=DeleteResponse)
-async def delete_resident(id: str):
+async def delete_resident(
+    id: str,
+    current_user: dict = Depends(get_current_user),
+    _: None = Depends(require_permission("manageResidents")),
+):
+    existing = await safe_service_call("get resident", resident_service.get_resident_by_id, id)
+    _ensure_in_scope(existing, resolve_tenant_scope(current_user))
     logger.info("🗑️ Deleting resident with ID: %s", id)
     return await safe_service_call("delete resident", resident_service.delete_resident, id)
 
+
+# 🚀 PATCH /residents/{id}/verification
+class VerificationPayload(BaseModel):
+    verificationStatus: str  # "verified" | "rejected" | "pending"
+    notes: Optional[str] = None
+
+
+@router.patch("/residents/{id}/verification", response_model=ResidentOut)
+async def verify_resident(
+    id: str,
+    payload: VerificationPayload = Body(...),
+    current_user: dict = Depends(get_current_user),
+    _: None = Depends(require_permission("manageResidents")),
+):
+    existing = await safe_service_call("get resident", resident_service.get_resident_by_id, id)
+    _ensure_in_scope(existing, resolve_tenant_scope(current_user))
+    logger.info("🔎 Resident %s verification set to %s by %s", id, payload.verificationStatus, current_user.get("uid"))
+    return await safe_service_call(
+        "verify resident",
+        resident_service.verify_resident,
+        id,
+        payload.verificationStatus,
+        current_user.get("uid"),
+        payload.notes,
+    )
+
 # 🚀 GET /households/{householdId}
 @router.get("/households/{householdId}", response_model=List[ResidentOut])
-async def get_household_residents(householdId: str):
+async def get_household_residents(
+    householdId: str,
+    current_user: dict = Depends(get_current_user),
+    _: None = Depends(require_permission("manageResidents")),
+):
+    scope = resolve_tenant_scope(current_user)
     logger.info("📤 Fetching residents for household %s", householdId)
-    return await safe_service_call("fetch household residents", resident_service.get_residents_by_household, householdId)
+    return await safe_service_call("fetch household residents", resident_service.get_residents_by_household, householdId, scope)
 
 # 🚀 DELETE /households/{householdId}
 @router.delete("/households/{householdId}", response_model=DeleteResponse)
-async def delete_household_residents(householdId: str):
+async def delete_household_residents(
+    householdId: str,
+    current_user: dict = Depends(get_current_user),
+    _: None = Depends(require_permission("manageResidents")),
+):
     logger.info("🗑️ Deleting residents in household %s", householdId)
     return await safe_service_call("delete household residents", resident_service.delete_by_household, householdId)
 
@@ -136,17 +235,29 @@ async def delete_household_residents(householdId: str):
 @router.post("/residents/bulk", response_model=BulkResidentResponse)
 async def add_residents_bulk(
     data: List[ResidentCreate] = Body(...),
-    household_id: Optional[str] = Query(None, alias="householdId")
+    household_id: Optional[str] = Query(None, alias="householdId"),
+    barangayId: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user),
+    _: None = Depends(require_permission("manageResidents")),
 ):
+    scope = resolve_tenant_scope(current_user, barangayId)
     logger.debug("📥 Bulk resident payload count: %d", len(data))
     result = await safe_service_call(
         "bulk create residents",
         resident_service.add_residents_bulk,
         [d.model_dump(by_alias=True) for d in data],
-        household_id
+        household_id,
+        scope,
     )
     if "message" not in result:
         result["message"] = "Bulk residents created successfully"
+    for resident in result["items"]:
+        if not resident.email:
+            continue
+        try:
+            send_email("welcome", resident.email, resident.full_name)
+        except Exception as error:
+            logger.warning("Welcome email could not be sent to resident %s: %s", resident.email, error)
     return result
 
 # 🚀 DEBUG /residents/debug

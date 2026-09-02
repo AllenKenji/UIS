@@ -36,17 +36,23 @@ export function resolveMiscFees(items, miscFees, shouldResolve = true, usage = "
     const resolvedType = hasRowOverride ? item.miscFeeType : (configured ? feeType : misc?.feeType || "fixed");
     const resolvedValue = hasRowOverride ? item.miscFeeRate : (configured ? feeValue : misc?.fee ?? 0);
 
+    // A row can carry its own miscFeeType/miscFeeRate override even when it isn't
+    // linked to (or matched by) any misc_fees entry — that override should still
+    // apply on its own, rather than requiring a resolved `misc` record to exist.
+    const applies = item.enabled && (
+      hasRowOverride || (misc && misc.enabled && (!configured || useFee))
+    );
+
     return {
       ...item,
       miscFeeId: misc?.id || item.miscFeeId,
       miscTargetType: misc?.targetType || item.miscTargetType,
       miscTargetName: misc?.targetName || item.miscTargetName,
-      miscFeeResolved:
-        misc && misc.enabled && item.enabled && (hasRowOverride || !configured || useFee)
-            ? calculateMiscFee({ fee: resolvedValue, feeType: resolvedType }, item.fee)
-          : null,
-          miscFeeType: resolvedType,
-          miscFeeRate: resolvedValue,
+      miscFeeResolved: applies
+        ? calculateMiscFee({ fee: resolvedValue, feeType: resolvedType }, item.fee)
+        : null,
+      miscFeeType: resolvedType,
+      miscFeeRate: resolvedValue,
     };
   });
 }

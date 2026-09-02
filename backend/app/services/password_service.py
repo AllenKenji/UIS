@@ -2,9 +2,9 @@ import uuid
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException
-from firebase_admin import auth
 from backend.app.utils.firestore_utils import get_db
 from backend.app.models.password import UserOut
+from backend.app.core.local_auth import hash_password
 
 RESET_EXPIRY_MINUTES = 30
 
@@ -49,9 +49,12 @@ def apply_password_reset(token: str, new_password: str) -> None:
     """Apply a new password if the token is valid."""
     token_data = verify_reset_token(token)
 
-    # Update password in Firebase Auth
-    user = auth.get_user_by_email(token_data["email"])
-    auth.update_user(user.uid, password=new_password)
+    matches = get_db().collection("users").where("email", "==", token_data["email"].strip().lower()).limit(1).get()
+    if not matches:
+        matches = get_db().collection("residents").where("email", "==", token_data["email"].strip().lower()).limit(1).get()
+    if not matches:
+        raise HTTPException(status_code=404, detail="User not found")
+    matches[0].reference.update({"passwordHash": hash_password(new_password)})
 
     # Delete token after successful reset
     delete_reset_token(token)

@@ -2,11 +2,10 @@ import logging
 import hmac
 import hashlib
 import os
-from backend.app.services.payment_service import log_payment_record, _next_receipt_number, _get_business_doc
+from datetime import datetime, timezone
 from backend.app.services.notification_service import NotificationService
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from google.cloud import firestore
 from fastapi.concurrency import run_in_threadpool
 from backend.app.utils.firestore_utils import get_db
 
@@ -87,7 +86,6 @@ def _next_transaction_id():
     counter_ref = get_db().collection("counters").document("transactions")
     transaction = get_db().transaction()
 
-    @firestore.transactional
     def increment_counter(transaction):
         snapshot = counter_ref.get(transaction=transaction)
         current = snapshot.get("value") if snapshot.exists else 0
@@ -95,7 +93,7 @@ def _next_transaction_id():
         transaction.set(counter_ref, {"value": new_value})
         return new_value
 
-    new_number = increment_counter(transaction)
+    new_number = transaction.run(increment_counter)
     return f"TXN-{new_number:05d}"
 
 @router.post("/webhook")
@@ -199,7 +197,7 @@ async def paymongo_webhook(request: Request):
             "status": workflow_status,
             "transactionId": transaction_id,
             "paymentIntentId": intent_id,
-            "paymentDate": paid_at or firestore.SERVER_TIMESTAMP,
+            "paymentDate": paid_at or datetime.now(timezone.utc),
             "eventType": event_type
         }
 
@@ -221,9 +219,10 @@ async def paymongo_webhook(request: Request):
                     owner_name=business_data.get("ownerName"),
                     business_name=business_data.get("businessName"),
                     business_type=business_data.get("businessType"),
-                    event_type=event_type, 
+                    event_type=event_type,
                     paid_at=paid_at,
-                    method="paymongo"
+                    method="paymongo",
+                    barangay_id=business_data.get("barangayId"),
                 )
 
                 await _notify_payment_roles(
@@ -256,9 +255,10 @@ async def paymongo_webhook(request: Request):
                     owner_name=doc_data.get("ownerName"),
                     business_name=doc_data.get("businessName"),
                     document_type=doc_data.get("documentType"),
-                    event_type=event_type, 
+                    event_type=event_type,
                     paid_at=paid_at,
-                    method="paymongo"
+                    method="paymongo",
+                    barangay_id=doc_data.get("barangayId"),
                 )
                 await _notify_payment_roles(
                     _build_payment_message(
@@ -292,9 +292,10 @@ async def paymongo_webhook(request: Request):
                     owner_name=business_data.get("ownerName"), 
                     business_name=business_data.get("businessName"), 
                     business_type=business_data.get("businessType"),
-                    event_type=event_type, 
+                    event_type=event_type,
                     paid_at=paid_at,
-                    method="paymongo" 
+                    method="paymongo",
+                    barangay_id=business_data.get("barangayId"),
                 )
                 await _notify_payment_roles(
                     _build_payment_message(
@@ -324,9 +325,10 @@ async def paymongo_webhook(request: Request):
                         owner_name=doc_data.get("ownerName"), 
                         business_name=doc_data.get("businessName"), 
                         document_type=doc_data.get("documentType"),
-                        event_type=event_type, 
+                        event_type=event_type,
                         paid_at=paid_at,
-                        method="paymongo"
+                        method="paymongo",
+                        barangay_id=doc_data.get("barangayId"),
                     )
                     await _notify_payment_roles(
                         _build_payment_message(
@@ -369,7 +371,8 @@ async def paymongo_webhook(request: Request):
                     business_type=business_data.get("businessType"),
                     event_type=event_type,
                     paid_at=paid_at,
-                    method="paymongo"
+                    method="paymongo",
+                    barangay_id=business_data.get("barangayId"),
                 )
 
                 await _notify_payment_roles(
@@ -423,9 +426,10 @@ async def record_business_payment(payload: dict):
         owner_name=business_data.get("ownerName"),
         business_type=business_data.get("businessType"),
         event_type="staff.payment",
-        paid_at=firestore.SERVER_TIMESTAMP,
+        paid_at=datetime.now(timezone.utc),
         method=method,
-        receipt_number=receipt_number   # pass explicitly
+        receipt_number=receipt_number,   # pass explicitly
+        barangay_id=business_data.get("barangayId"),
     )
 
     response = { 
@@ -487,7 +491,7 @@ async def record_document_payment(payload: dict):
             "paymentStatus": "paid", 
             "status": "paid", # secretary payments can be final 
             "transactionId": transaction_id, 
-            "paymentDate": firestore.SERVER_TIMESTAMP, 
+            "paymentDate": datetime.now(timezone.utc),
             "method": method, 
             "eventType": "staff.payment" 
         } 
@@ -505,9 +509,10 @@ async def record_document_payment(payload: dict):
             business_name=doc_data.get("businessName"),
             document_type=doc_data.get("documentType"),
             event_type="staff.payment",
-            paid_at=firestore.SERVER_TIMESTAMP,
+            paid_at=datetime.now(timezone.utc),
             method=method,
-            receipt_number=receipt_number
+            receipt_number=receipt_number,
+            barangay_id=doc_data.get("barangayId"),
         )
 
         response = {

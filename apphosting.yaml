@@ -9,12 +9,6 @@ runConfig:
   entrypoint: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
 
 env:
-  # Firebase bucket
-  - variable: FIREBASE_STORAGE_BUCKET
-    value: barangay-1721d.appspot.com
-    availability:
-      - RUNTIME
-
   # PayMongo secrets
   - variable: PAYMONGO_SECRET_KEY
     secret: paymongoSecretKeyRef

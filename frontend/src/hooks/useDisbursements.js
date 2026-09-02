@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { db } from "../services/firebase";
-import { collection, onSnapshot, getDocs } from "firebase/firestore";
+import { DisbursementsAPI } from "../services/api";
 
 
 export function useDisbursements() {
@@ -17,32 +16,19 @@ export function useDisbursements() {
     setDailySummary(calculateDailySummary(data));
   }, []);
 
-  // 📡 Real-time subscription
-  useEffect(() => {
-    const disbursementsRef = collection(db, "disbursements");
-    const unsubscribe = onSnapshot(disbursementsRef, snapshot => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      recalc(data);
-    });
-    return unsubscribe;
-  }, [recalc]);
-
-  // 🔄 Manual refresh (e.g. after API mutation)
+  // Manual refresh (e.g. after API mutation)
   const refresh = useCallback(async () => {
     try {
-      const snapshot = await getDocs(collection(db, "disbursements"));
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      recalc(data);
+      const data = await DisbursementsAPI.list();
+      recalc(Array.isArray(data) ? data : data?.items || []);
     } catch (err) {
       console.error("Failed to refresh disbursements", err);
     }
   }, [recalc]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   return { disbursements, totals, byCategory, dailySummary, refresh };
 }

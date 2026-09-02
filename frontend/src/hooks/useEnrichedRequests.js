@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { DocumentsAPI } from "../services/api";   
-import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { getDoc, doc } from "firebase/firestore";
-import { db } from "../services/firebase";
+import { useUser } from "../context/UserContext";
 
 const normalizeStatus = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
 
@@ -40,17 +38,6 @@ const normalizeDoc = (doc) => ({
   attachments: doc.attachments ?? {},
 });
 
-const getResidentName = async (uid) => {
-  if (!uid) return null;
-  try {
-    const snap = await getDoc(doc(db, "residents", uid));
-    return snap.exists() ? snap.data().fullName : null;
-  } catch (err) {
-    console.error(`❌ Failed to fetch resident name for ${uid}:`, err.message);
-    return null;
-  }
-};
-
 export const useEnrichedRequests = () => {
   const [pending, setPending] = useState([]);
   const [toVerify, setToVerify] = useState([]);
@@ -58,7 +45,7 @@ export const useEnrichedRequests = () => {
   const [approved, setApproved] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [authReady, setAuthReady] = useState(false);
+  const { isAuthenticated } = useUser();
 
   const fetchRequests = async () => {
     setLoading(true);
@@ -75,8 +62,7 @@ export const useEnrichedRequests = () => {
         Promise.all(
           docs.map(async (doc) => {
             const existingName = doc.residentName || doc.resident_name;
-            const name = existingName || await getResidentName(doc.resident_id || doc.residentId);
-            return { ...doc, resident_name: name, residentName: name };
+            return { ...doc, resident_name: existingName, residentName: existingName };
           })
         );
 
@@ -95,29 +81,10 @@ export const useEnrichedRequests = () => {
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(getAuth(), async (user) => {
-      if (!user) {
-        setAuthReady(false);
-        return;
-      }
-
-      try {
-        await user.getIdToken(true);
-      } catch (err) {
-        console.warn("⚠️ Failed to refresh auth token for document requests:", err?.message || err);
-      } finally {
-        // Continue loading requests even if token refresh fails; axios interceptor can still attach cached token.
-        setAuthReady(true);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (authReady) {
+    if (isAuthenticated) {
       fetchRequests();
     }
-  }, [authReady]);
+  }, [isAuthenticated]);
 
 
   return {

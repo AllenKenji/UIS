@@ -1,6 +1,1 @@
-{
-  "dependencies": {
-    "firebase-functions": "^7.0.5",
-    "nodemailer": "^8.0.1"
-  }
-}
+{}

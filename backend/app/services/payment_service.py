@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timezone
-from google.cloud import firestore
 from backend.app.utils.firestore_utils import get_db
+from backend.app.core.postgres_store import SERVER_TIMESTAMP
 
 
 logger = logging.getLogger("uvicorn.error")
@@ -15,7 +15,6 @@ def _next_receipt_number():
     counter_ref = get_db().collection("counters").document(f"receipts_{current_year}")
     transaction = get_db().transaction()
 
-    @firestore.transactional
     def increment_counter(transaction):
         snapshot = counter_ref.get(transaction=transaction)
 
@@ -25,7 +24,7 @@ def _next_receipt_number():
         transaction.set(counter_ref, {"value": new_value})
         return new_value
 
-    new_number = increment_counter(transaction)
+    new_number = transaction.run(increment_counter)
     return f"RCPT-{current_year}-{new_number:05d}"
 
 
@@ -54,7 +53,7 @@ def update_payment_status(business_id: str, event_type: str, status: str,
         "status": new_status,
         "transactionId": transaction_id,
         "eventType": event_type,
-        "paymentDate": paid_at or firestore.SERVER_TIMESTAMP
+        "paymentDate": paid_at or SERVER_TIMESTAMP()
     }
     if payment_intent_id:
         update_data["paymentIntentId"] = payment_intent_id
@@ -78,9 +77,10 @@ def update_payment_status(business_id: str, event_type: str, status: str,
         business_name=business_name, 
         owner_name=owner_name, 
         business_type=business_data.get("businessType"),
-        event_type=event_type, 
+        event_type=event_type,
         paid_at=paid_at,
-        method="paymongo"
+        method="paymongo",
+        barangay_id=business_data.get("barangayId"),
     )
 
     logger.info("✅ Updated business %s with status=%s event=%s intent=%s",
@@ -131,7 +131,7 @@ def update_document_payment_status(event_type: str,
         "status": new_status,
         "transactionId": transaction_id,
         "eventType": event_type,
-        "paymentDate": paid_at or firestore.SERVER_TIMESTAMP
+        "paymentDate": paid_at or SERVER_TIMESTAMP()
     }
     if payment_intent_id:
         update_data["paymentIntentId"] = payment_intent_id
@@ -158,7 +158,8 @@ def update_document_payment_status(event_type: str,
             document_type=doc_data.get("documentType"),
             event_type=event_type,
             paid_at=paid_at,
-            method="paymongo"
+            method="paymongo",
+            barangay_id=doc_data.get("barangayId"),
         )
 
         logger.info("✅ Updated document %s with status=%s event=%s intent=%s source=%s",
@@ -169,7 +170,7 @@ def update_document_payment_status(event_type: str,
 def log_payment_record(reference_number, transaction_id, amount, status, fee_type,
                        business_id=None, document_id=None, owner_name=None, business_name=None,
                        business_type=None, document_type=None, receipt_number=None,
-                       event_type=None, paid_at=None, method=None):
+                       event_type=None, paid_at=None, method=None, barangay_id=None):
     """Log payment into payments and receipts collections."""
     # Decide entity type
     entity_type = "business" if business_id else "document"
@@ -187,9 +188,10 @@ def log_payment_record(reference_number, transaction_id, amount, status, fee_typ
         "businessName": business_name,
         "entityType": entity_type,
         "entityCategory": entity_category,
-        "datePaid": paid_at or firestore.SERVER_TIMESTAMP,
+        "datePaid": paid_at or SERVER_TIMESTAMP(),
         "eventType": event_type,
-        "method": method
+        "method": method,
+        "barangayId": barangay_id,
     }
     get_db().collection("payments").add(payment_data)
 
@@ -202,3 +204,29 @@ def log_payment_record(reference_number, transaction_id, amount, status, fee_typ
 
     logger.info("✅ Logged payment and receipt for reference=%s type=%s", reference_number, entity_category)
     return receipt_data["receiptNumber"]
+
+
+def list_payments(barangay_id: str = None, status: str = None, limit: int = 200, offset: int = 0):
+    """List payment records, most recent first, optionally scoped to a barangay/status."""
+    query = get_db().collection("payments").order_by("datePaid", direction="DESCENDING")
+    if barangay_id:
+        query = query.where("barangayId", "==", barangay_id)
+    if status:
+        query = query.where("status", "==", status)
+    docs = query.limit(limit).offset(offset).get()
+    return [doc.to_dict() | {"id": doc.id} for doc in docs]
+
+
+def payments_summary(barangay_ids: list[str] = None):
+    """Aggregate paid-collections totals grouped by barangayId."""
+    docs = get_db().collection("payments").where("status", "==", "paid").get()
+    totals: dict = {}
+    for doc in docs:
+        data = doc.to_dict()
+        bid = data.get("barangayId")
+        if barangay_ids is not None and bid not in barangay_ids:
+            continue
+        entry = totals.setdefault(bid, {"barangayId": bid, "totalCollected": 0, "count": 0})
+        entry["totalCollected"] += float(data.get("amount") or 0)
+        entry["count"] += 1
+    return list(totals.values())

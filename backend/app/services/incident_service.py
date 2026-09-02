@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 from typing import Optional, List
-from google.cloud import firestore
+from backend.app.core.postgres_store import SERVER_TIMESTAMP
 from backend.app.utils.firestore_utils import get_db
 from backend.app.models.incident import (
     IncidentCreate,
@@ -9,6 +9,8 @@ from backend.app.models.incident import (
     IncidentWithResident,
     IncidentStatus,
 )
+from backend.app.services.resident_service import require_verified_resident
+from fastapi import HTTPException
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -44,12 +46,21 @@ def _normalize_incident(doc) -> dict:
 def create_incident(data: IncidentCreate) -> Incident:
     doc_ref = get_db().collection(INCIDENT_COLLECTION).document()
 
+    # Incidents belong to the subject resident's barangay, not a client-supplied value.
+    resident_doc = get_db().collection("residents").document(data.residentId).get()
+    if not resident_doc.exists:
+        raise HTTPException(status_code=404, detail="Resident not found")
+    resident_data = resident_doc.to_dict() or {}
+    require_verified_resident(resident_data)
+    barangay_id = resident_data.get("barangayId")
+
     payload = data.dict()
     payload.update({
         "id": doc_ref.id,
+        "barangayId": barangay_id,
         "status": IncidentStatus.pending.value,
-        "createdAt": firestore.SERVER_TIMESTAMP,
-        "updatedAt": firestore.SERVER_TIMESTAMP,
+        "createdAt": SERVER_TIMESTAMP(),
+        "updatedAt": SERVER_TIMESTAMP(),
     })
 
     doc_ref.set(payload)
@@ -119,10 +130,13 @@ def _enrich_with_resident(data: dict) -> IncidentWithResident:
 
 # 📋 List all incidents with resident info (admin view)
 def list_incidents_with_residents(
-    status: Optional[str] = None, limit: int = 50, start_after_id: Optional[str] = None
+    status: Optional[str] = None, limit: int = 50, start_after_id: Optional[str] = None, barangay_id: Optional[str] = None
 ) -> List[IncidentWithResident]:
 
     query = get_db().collection(INCIDENT_COLLECTION)
+
+    if barangay_id:
+        query = query.where("barangayId", "==", barangay_id)
 
     if status:
         # Avoid composite-index requirement by NOT using order_by when filtering by status.
@@ -182,7 +196,7 @@ def update_incident_status(
 
         update_data = {
             "status": status,
-            "updatedAt": firestore.SERVER_TIMESTAMP,
+            "updatedAt": SERVER_TIMESTAMP(),
         }
         if assigned_to:
             update_data["assigned_to_name"] = assigned_to

@@ -1,10 +1,12 @@
 import uuid
 from datetime import datetime, timezone
 import logging
-from backend.app.core.firebase import delete_file
+from backend.app.core.local_storage import delete_file
 from backend.app.services.paymongo_service import create_payment_link
 from backend.app.services.fee_service import resolve_business_fee, determine_business_fee_type
+from backend.app.services.resident_service import require_verified_resident
 from backend.app.utils.firestore_utils import get_db
+from fastapi import HTTPException
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -12,9 +14,17 @@ def create_business_application(data):
     business = data.business
     documents = data.documents
 
+    # Businesses belong to their owning resident's barangay, not a client-supplied value.
+    owner_doc = get_db().collection("residents").document(data.owner_uid).get()
+    if not owner_doc.exists:
+        raise HTTPException(status_code=404, detail="Resident not found")
+    owner_data = owner_doc.to_dict() or {}
+    require_verified_resident(owner_data)
+    barangay_id = owner_data.get("barangayId")
+
     # Decide fee type (registration vs annual)
     fee_type = determine_business_fee_type(business.dict())
-    fee_breakdown = resolve_business_fee(business.type, fee_type)
+    fee_breakdown = resolve_business_fee(business.type, fee_type, barangay_id)
     amount = fee_breakdown["totalFee"]
 
     doc_ref = get_db().collection("businesses").document()
@@ -43,6 +53,7 @@ def create_business_application(data):
     doc_ref.set({
         "ownerUid": data.owner_uid,
         "ownerName": data.owner_name,
+        "barangayId": barangay_id,
         "contactNumber": data.contact_number,
         "email": data.email,
         "businessId": business_id,
@@ -81,7 +92,7 @@ def update_businesses_for_annual_renewal():
 
         # If the fee type is annual, update status and amount
         if fee_type == "annualFee":
-            fee_breakdown = resolve_business_fee(data["businessType"], fee_type)
+            fee_breakdown = resolve_business_fee(data["businessType"], fee_type, data.get("barangayId"))
             amount = fee_breakdown["totalFee"]
 
             biz.reference.update({

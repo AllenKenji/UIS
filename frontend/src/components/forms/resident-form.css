@@ -1,32 +1,58 @@
 /* resident-form.css */
 
 .resident-form {
-  max-width: 600px;
-  margin: 2rem auto;
-  padding: 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  column-gap: 1.25rem;
+  row-gap: 0.75rem;
+  max-width: 880px;
+  margin: 1.5rem auto;
+  padding: 1.25rem 1.5rem;
   background: #f9f9f9;
   border-radius: 8px;
   border: 1px solid #ddd;
   font-family: system-ui, sans-serif;
 }
 
+/* One label+control (+error/preview) group per grid cell. Two per row by default,
+   full width for anything that needs the whole row (address block, photo, signature). */
+.field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.field-full {
+  grid-column: 1 / -1;
+}
+
 .resident-form label {
-  display: block;
-  margin-top: 1rem;
+  margin-bottom: 0.25rem;
   font-weight: 600;
   color: #333;
+  font-size: 0.9rem;
+}
+
+.resident-form label span {
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: #777;
 }
 
 .resident-form input,
 .resident-form select,
 .resident-form textarea {
   width: 100%;
-  padding: 0.5rem;
-  margin-top: 0.25rem;
+  padding: 0.4rem 0.5rem;
   border: 1px solid #ccc;
   border-radius: 4px;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   box-sizing: border-box;
+}
+
+.resident-form textarea {
+  min-height: 2.2rem;
 }
 
 .resident-form input:focus,
@@ -38,13 +64,18 @@
 }
 
 .resident-form fieldset {
-  margin-top: 1.5rem;
-  padding: 1rem;
+  margin: 0;
+  padding: 0.75rem 1rem 1rem;
   border: 1px solid #ccc;
   border-radius: 6px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 1.25rem;
+  row-gap: 0.75rem;
 }
 
-.resident-form legend {
+.resident-form fieldset legend {
+  grid-column: 1 / -1;
   font-weight: 600;
   color: #444;
   padding: 0 0.5rem;
@@ -57,7 +88,7 @@
 
 .error {
   color: var(--color-danger);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   margin-top: 4px;
   display: block;
 }
@@ -79,15 +110,20 @@
 
 .photo-preview,
 .fingerprint-preview {
-  max-width: 120px;
-  max-height: 120px;
+  max-width: 96px;
+  max-height: 96px;
   border: 1px solid #ccc;
   border-radius: 6px;
   object-fit: cover;
 }
 
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
 .resident-form button {
-  margin-top: 1.5rem;
   padding: 0.6rem 1.2rem;
   font-size: 0.95rem;
   font-weight: 600;
@@ -124,4 +160,12 @@
   height: 60px;
   object-fit: contain;
   border-bottom: 1px solid #000;
+}
+
+/* Narrow viewports collapse back to a single comfortably-tappable column. */
+@media (max-width: 720px) {
+  .resident-form,
+  .resident-form fieldset {
+    grid-template-columns: 1fr;
+  }
 }

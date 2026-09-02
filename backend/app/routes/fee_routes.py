@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 import os
-from backend.app.core.auth import get_admin_uid
-from backend.app.services.paymongo_service import ( 
+from backend.app.core.auth import get_admin_uid, get_current_user, resolve_tenant_scope
+from backend.app.services.tenant_service import require_tenant_exists
+from backend.app.services.paymongo_service import (
     create_payment_link, 
     create_payment_intent # ✅ new helper for e-wallets 
 )
@@ -161,46 +162,69 @@ def make_fee_routes(
         extra_fields = []
 
     @router.get(f"/{prefix}")
-    def list_fees(admin=Depends(get_admin_uid)):
-        return list_with_misc(collection) if resolve_misc else list_collection(collection)
+    def list_fees(barangayId: str | None = None, admin=Depends(get_admin_uid), current_user: dict = Depends(get_current_user)):
+        scope = resolve_tenant_scope(current_user, barangayId)
+        items = list_with_misc(collection) if resolve_misc else list_collection(collection)
+        return [item for item in items if scope is None or item.get("barangayId") == scope]
 
     @router.post(f"/{prefix}")
-    def create_fee(payload: new_model = Body(...), admin=Depends(get_admin_uid)):  # type: ignore
+    def create_fee(payload: new_model = Body(...), admin=Depends(get_admin_uid), current_user: dict = Depends(get_current_user)):  # type: ignore
         """
         Create a new fee entry in Firestore.
         FastAPI will validate `payload` against the `new_model` schema.
         """
         logger.info("Creating fee with payload=%s", payload.dict())
 
-        fee_id = normalize_id(getattr(payload, id_field))
+        if current_user.get("role") == "super_admin":
+            barangay_id = payload.barangayId
+            if not barangay_id:
+                raise HTTPException(status_code=400, detail="barangayId is required")
+        else:
+            barangay_id = current_user.get("barangayId")
+        require_tenant_exists(barangay_id)
+
+        fee_id = normalize_id(f"{barangay_id}_{getattr(payload, id_field)}")
         if collection == "misc_fees" and getattr(payload, "targetType", None) and getattr(payload, "targetName", None):
             fee_id = normalize_id(
-                f"{getattr(payload, id_field)}_{payload.targetType}_{payload.targetName}"
+                f"{barangay_id}_{getattr(payload, id_field)}_{payload.targetType}_{payload.targetName}"
             )
-        data = {id_field: getattr(payload, id_field).strip(), "fee": payload.fee}
+        data = {id_field: getattr(payload, id_field).strip(), "fee": payload.fee, "barangayId": barangay_id}
         for field in extra_fields:
             data[field] = getattr(payload, field, None)
         return create_document(collection, fee_id, data)
 
+    def _get_fee_or_404(fee_id: str) -> dict:
+        snapshot = get_db().collection(collection).document(fee_id).get()
+        if not snapshot.exists:
+            raise HTTPException(status_code=404, detail="Fee entry not found")
+        return snapshot.to_dict() or {}
+
     @router.put(f"/{prefix}/{{fee_id}}")
-    def update_fee(fee_id: str, payload: update_model = Body(...), admin=Depends(get_admin_uid)):  # type: ignore
+    def update_fee(fee_id: str, payload: update_model = Body(...), admin=Depends(get_admin_uid), current_user: dict = Depends(get_current_user)):  # type: ignore
         """
         Update an existing fee entry in Firestore.
         FastAPI will validate `payload` against the `update_model` schema.
         """
+        existing = _get_fee_or_404(fee_id)
+        if current_user.get("role") != "super_admin" and existing.get("barangayId") != current_user.get("barangayId"):
+            raise HTTPException(status_code=403, detail="Fee entry belongs to a different barangay")
+
         update_data = {"fee": payload.fee}
         for field in extra_fields:
             value = getattr(payload, field, None)
             if value is not None:
                 update_data[field] = value
-        return update_document(collection, normalize_id(fee_id), update_data)
+        return update_document(collection, fee_id, update_data)
 
     @router.delete(f"/{prefix}/{{fee_id}}")
-    def delete_fee(fee_id: str, admin=Depends(get_admin_uid)):
+    def delete_fee(fee_id: str, admin=Depends(get_admin_uid), current_user: dict = Depends(get_current_user)):
         """
         Delete a fee entry from Firestore.
         """
-        return delete_document(collection, normalize_id(fee_id))
+        existing = _get_fee_or_404(fee_id)
+        if current_user.get("role") != "super_admin" and existing.get("barangayId") != current_user.get("barangayId"):
+            raise HTTPException(status_code=403, detail="Fee entry belongs to a different barangay")
+        return delete_document(collection, fee_id)
 
 # -----------------------------
 # 📄 Document Fee Routes
@@ -211,7 +235,7 @@ make_fee_routes(
     new_model=NewDocumentFee,
     update_model=DocumentFee,
     id_field="documentType",
-    extra_fields=["miscType", "miscFeeType", "miscFeeRate", "enabled"],
+    extra_fields=["miscType", "miscFeeType", "miscFeeRate", "enabled", "validityDays"],
     resolve_misc=True,
 )
 
@@ -247,10 +271,12 @@ make_fee_routes(
 # 🌐 Public Business Fee View
 # -----------------------------
 @router.get("/public/businesses")
-def list_public_business_types():
+def list_public_business_types(barangayId: str):
     all_types = list_with_misc("business_types")
     result = []
     for bt in all_types:
+            if bt.get("barangayId") != barangayId:
+                continue
             subtotal = bt.get("fee", 0) + bt.get("registrationFee", 0)
             misc = bt.get("miscFeeResolved") or 0
             total = subtotal + misc
@@ -260,10 +286,12 @@ def list_public_business_types():
 
 # 🌐 Public Document Fee View
 @router.get("/public/documents")
-def list_public_document_types():
+def list_public_document_types(barangayId: str):
     all_docs = list_with_misc("document_types")
     result = []
     for doc in all_docs:
+            if doc.get("barangayId") != barangayId:
+                continue
             total = (doc.get("fee", 0) +
                      (doc.get("miscFeeResolved") or 0))
             doc["totalFee"] = total
@@ -294,8 +322,11 @@ def resolve_misc_fee(
                 ) if use_fee else 0
     return 0
 
-def compute_document_fee(document_type: str) -> int:
-    docs = get_db().collection("document_types").where("documentType", "==", document_type).limit(1).get()
+def compute_document_fee(document_type: str, barangay_id: str | None = None) -> int:
+    query = get_db().collection("document_types").where("documentType", "==", document_type)
+    if barangay_id:
+        query = query.where("barangayId", "==", barangay_id)
+    docs = query.limit(1).get()
     if not docs:
         raise HTTPException(status_code=404, detail=f"No fee configured for document type: {document_type}")
     doc = docs[0].to_dict()
@@ -306,8 +337,11 @@ def compute_document_fee(document_type: str) -> int:
     return total
 
 
-def compute_business_registration_fee(business_type: str) -> int:
-    docs = get_db().collection("business_types").where("businessType", "==", business_type).limit(1).get()
+def compute_business_registration_fee(business_type: str, barangay_id: str | None = None) -> int:
+    query = get_db().collection("business_types").where("businessType", "==", business_type)
+    if barangay_id:
+        query = query.where("barangayId", "==", barangay_id)
+    docs = query.limit(1).get()
     if not docs:
         raise HTTPException(status_code=404, detail=f"No fee configured for business type: {business_type}")
     bt = docs[0].to_dict()
@@ -318,8 +352,11 @@ def compute_business_registration_fee(business_type: str) -> int:
     return total
 
 
-def compute_business_annual_fee(business_type: str) -> int:
-    docs = get_db().collection("business_types").where("businessType", "==", business_type).limit(1).get()
+def compute_business_annual_fee(business_type: str, barangay_id: str | None = None) -> int:
+    query = get_db().collection("business_types").where("businessType", "==", business_type)
+    if barangay_id:
+        query = query.where("barangayId", "==", barangay_id)
+    docs = query.limit(1).get()
     if not docs:
         raise HTTPException(status_code=404, detail=f"No fee configured for business type: {business_type}")
     bt = docs[0].to_dict()
@@ -342,11 +379,12 @@ def create_business_payment(business_id: str, payload: dict = Body(...)):
     business = ref.get().to_dict()
 
     # ✅ Decide which fee to compute
+    barangay_id = business.get("barangayId")
     if payment_type == "annual":
-        fee = compute_business_annual_fee(business.get("businessType"))
+        fee = compute_business_annual_fee(business.get("businessType"), barangay_id)
         description = f"Annual Business Fee for {business_id}"
     else:
-        fee = compute_business_registration_fee(business.get("businessType"))
+        fee = compute_business_registration_fee(business.get("businessType"), barangay_id)
         description = f"Registration Business Fee for {business_id}"
 
     if fee <= 0:
@@ -400,7 +438,7 @@ def create_document_payment(document_id: str, payload: dict = Body(...)):
     document = ref.get().to_dict()
 
     doc_type = document.get("documentType")
-    fee = compute_document_fee(doc_type)
+    fee = compute_document_fee(doc_type, document.get("barangayId"))
     if fee < 0:
         raise HTTPException(status_code=400, detail="Invalid fee amount")
     

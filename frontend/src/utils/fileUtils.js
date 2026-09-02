@@ -1,12 +1,11 @@
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "../services/firebase";
+import { api, API_BASE_URL } from "../services/api";
 
 /**
  * ✅ Generate safe file reference
  */
 export const generateSafeFileRef = (uid, path, fileName) => {
   const safeFileName = encodeURIComponent(fileName);
-  return ref(storage, `residents/${uid}/${path}/${safeFileName}`);
+  return `residents/${uid}/${path}/${safeFileName}`;
 };
 
 /**
@@ -42,15 +41,33 @@ export const resizeImage = (file, size = 192) =>
  * ✅ Upload blob with type-safe extension
  */
 export const uploadBlobToStorage = async (uid, blob, path, fileName) => {
-  const fileRef = generateSafeFileRef(uid, path, fileName);
   const contentType = blob.type || "image/png";
 
-  console.log("📂 Uploading to:", fileRef.fullPath);
+  console.log("📂 Uploading to:", path);
   console.log("📦 Blob type:", contentType);
   console.log("📦 Blob size:", blob.size);
 
-  await uploadBytes(fileRef, blob, { contentType });
-  return await getDownloadURL(fileRef);
+  const formData = new FormData();
+  formData.append("uid", uid);
+  formData.append("path", path);
+  formData.append("file", blob, fileName);
+  const response = await api.post("/api/storage/upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  const url = response.data?.url;
+  return url?.startsWith("/") ? `${API_BASE_URL}${url}` : url;
+};
+
+export const uploadLocalFile = async (uid, file, path, fileName = file.name) => {
+  const response = await api.post("/api/storage/upload", (() => {
+    const formData = new FormData();
+    formData.append("uid", uid);
+    formData.append("path", path);
+    formData.append("file", file, fileName);
+    return formData;
+  })(), { headers: { "Content-Type": "multipart/form-data" } });
+  const url = response.data?.url;
+  return { url: url?.startsWith("/") ? `${API_BASE_URL}${url}` : url, path: response.data?.path };
 };
 
 /**

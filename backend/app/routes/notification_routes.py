@@ -98,6 +98,29 @@ def _normalize_role(value: str | None) -> str:
     return str(value or "").strip().lower()
 
 
+def _effective_roles(user: dict) -> List[str]:
+    """
+    All roles a multi-role account should see notifications for — not just
+    whichever one is currently active in the session. Switching the active
+    role (POST /auth/switch-role) only changes what the UI acts as; it
+    shouldn't hide notifications addressed to the account's other roles.
+    """
+    roles = user.get("roles") or [user.get("role")]
+    normalized = [_normalize_role(r) for r in roles if r]
+    return normalized or [_normalize_role(user.get("role")) or "resident"]
+
+
+def _notification_docs_for_roles(roles: List[str]):
+    """Merge per-role notification queries (the query layer has no "in" operator)."""
+    seen_ids = set()
+    for role in roles:
+        for doc in get_db().collection("notifications").where("role", "==", role).stream():
+            if doc.id in seen_ids:
+                continue
+            seen_ids.add(doc.id)
+            yield doc
+
+
 def _resolve_actor_identity(user: dict, fallback_name: str = "Officer", fallback_role: str = "officer") -> tuple[str, str]:
     uid = user.get("uid")
     if not uid:
@@ -167,22 +190,21 @@ def _resolve_audience_user_ids(data: dict) -> Set[str]:
     return audience
 
 
-def _is_notification_visible_to_user(data: dict, role: str, uid: str) -> bool:
+def _is_notification_visible_to_user(data: dict, roles: List[str], uid: str) -> bool:
     target_role = _normalize_role(data.get("role"))
-    if role == "admin":
+    if "admin" in roles:
         return target_role == "admin"
-    if role == "resident":
+    if "resident" in roles:
         return str(data.get("user_id") or "") == str(uid)
-    return target_role == _normalize_role(role)
+    return target_role in roles
 
 
-def _iter_scoped_notification_docs(role: str, uid: str):
-    query = get_db().collection("notifications")
-    if role == "admin":
-        return query.where("role", "==", "admin").stream()
-    if role == "resident":
-        return query.where("user_id", "==", uid).stream()
-    return query.where("role", "==", role).stream()
+def _iter_scoped_notification_docs(roles: List[str], uid: str):
+    if "admin" in roles:
+        return get_db().collection("notifications").where("role", "==", "admin").stream()
+    if "resident" in roles:
+        return get_db().collection("notifications").where("user_id", "==", uid).stream()
+    return _notification_docs_for_roles(roles)
 
 
 def _resolve_business_owner_uid(payload: BusinessStatusUpdatePayload) -> Optional[str]:
@@ -352,20 +374,21 @@ async def get_notifications(user: dict = Depends(get_current_user)):
     Fetch notifications for the current user.
     - Admin: see all notifications.
     - Resident: only own notifications (user_id filter).
-    - Other roles: only notifications addressed to their role.
+    - Other roles: notifications addressed to any of the account's roles, not
+      just whichever one is currently active in the session.
     """
-    role = user.get("role")
+    roles = _effective_roles(user)
     uid = user.get("uid")
 
     try:
         query = get_db().collection("notifications")
 
-        if role == "admin":
+        if "admin" in roles:
             docs = query.where("role", "==", "admin").stream()
-        elif role == "resident":
+        elif "resident" in roles:
             docs = query.where("user_id", "==", uid).stream()
         else:
-            docs = query.where("role", "==", role).stream()
+            docs = _notification_docs_for_roles(roles)
 
         notifications = []
         for doc in docs:
@@ -658,11 +681,11 @@ async def bulk_delete_notifications_actions(
     - Permanently deletes only when all intended recipients have deleted.
     - Optionally restrict to only read notifications.
     """
-    role = user.get("role")
+    roles = _effective_roles(user)
     uid = user.get("uid")
 
     try:
-        docs = _iter_scoped_notification_docs(role, uid)
+        docs = _iter_scoped_notification_docs(roles, uid)
         deleted_ids = []
         globally_deleted_ids = []
         for doc in docs:
@@ -694,11 +717,11 @@ async def delete_all_notifications_actions(
     - Applies per-user hide (`deleted_by`) for this account.
     - Permanently deletes only when all intended recipients have deleted.
     """
-    role = user.get("role")
+    roles = _effective_roles(user)
     uid = user.get("uid")
 
     try:
-        docs = _iter_scoped_notification_docs(role, uid)
+        docs = _iter_scoped_notification_docs(roles, uid)
         deleted_ids = []
         globally_deleted_ids = []
         for doc in docs:
@@ -726,22 +749,19 @@ async def mark_all_notifications_read_actions(
     Mark all unread notifications as read for the caller scope.
     - Admin: mark admin-targeted notifications.
     - Resident: mark only own notifications.
-    - Other roles: mark notifications addressed to their role.
+    - Other roles: mark notifications addressed to any of the account's roles.
     """
-    role = user.get("role")
+    roles = _effective_roles(user)
     uid = user.get("uid")
 
     try:
-        query = get_db().collection("notifications").where("read", "==", False)
-
-        if role == "admin":
-            query = query.where("role", "==", "admin")
-        elif role == "resident":
-            query = query.where("user_id", "==", uid)
+        if "admin" in roles:
+            docs = get_db().collection("notifications").where("read", "==", False).where("role", "==", "admin").stream()
+        elif "resident" in roles:
+            docs = get_db().collection("notifications").where("read", "==", False).where("user_id", "==", uid).stream()
         else:
-            query = query.where("role", "==", role)
+            docs = (doc for doc in _notification_docs_for_roles(roles) if not (doc.to_dict() or {}).get("read"))
 
-        docs = query.stream()
         updated_ids = []
         now = datetime.now(timezone.utc)
         for doc in docs:
@@ -764,7 +784,7 @@ async def delete_notification(
     - Marks notification hidden for this user using `deleted_by`.
     - Permanently deletes from Firestore only when all intended recipients deleted it.
     """
-    role = user.get("role")
+    roles = _effective_roles(user)
     uid = user.get("uid")
 
     try:
@@ -777,7 +797,7 @@ async def delete_notification(
         data = doc.to_dict()
 
         # Role scoping guard
-        if not _is_notification_visible_to_user(data, role, uid):
+        if not _is_notification_visible_to_user(data, roles, uid):
             raise HTTPException(status_code=403, detail="Not authorized to delete this notification")
 
         return _delete_for_user_or_globally(doc, str(uid))
@@ -798,11 +818,11 @@ async def bulk_delete_notifications(
     Legacy bulk delete endpoint.
     Uses same per-user delete semantics as /actions/bulk-delete.
     """
-    role = user.get("role")
+    roles = _effective_roles(user)
     uid = user.get("uid")
 
     try:
-        docs = _iter_scoped_notification_docs(role, uid)
+        docs = _iter_scoped_notification_docs(roles, uid)
         deleted_ids = []
         globally_deleted_ids = []
         for doc in docs:

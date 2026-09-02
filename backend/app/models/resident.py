@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, EmailStr, HttpUrl, StringConstraints, ConfigDict
+from pydantic import BaseModel, Field, EmailStr, HttpUrl, StringConstraints, ConfigDict, model_validator
 from typing import Optional, Annotated
 from datetime import date, datetime
 from enum import Enum
@@ -47,7 +47,7 @@ class ResidentCreate(BaseModel):
     birth_date: date = Field(..., alias="birthDate")
     gender: Gender
     civil_status: CivilStatus = Field(..., alias="civilStatus")
-    contact_number: Annotated[str, StringConstraints(pattern=r"^09\d{9}$")] = Field(..., alias="contactNumber", example="09171234567")
+    contact_number: Optional[Annotated[str, StringConstraints(pattern=r"^09\d{9}$")]] = Field(None, alias="contactNumber", example="09171234567")
     email: Optional[EmailStr]
     address: Address
     household_id: Optional[str] = Field(None, alias="householdId")
@@ -58,6 +58,12 @@ class ResidentCreate(BaseModel):
     fingerprints: Optional[Fingerprints] = Field(None, alias="fingerprints")  # ✅ nested object
     signature_url: Optional[str] = Field(None, alias="signatureUrl")
     remarks: Optional[str] = None
+
+    @model_validator(mode="after")
+    def require_login_identifier(self):
+        if not self.email and not self.contact_number:
+            raise ValueError("Provide either an email address or a valid Philippine mobile number")
+        return self
 
 # 📤 Resident output model
 class ResidentOut(BaseModel):
@@ -72,19 +78,28 @@ class ResidentOut(BaseModel):
     id: str
     full_name: str = Field(..., alias="fullName")
     birth_date: Optional[date] = Field(None, alias="birthDate")
-    gender: Optional[Gender]
+    gender: Optional[Gender] = None
     civil_status: Optional[CivilStatus] = Field(None, alias="civilStatus")
     contact_number: Optional[str] = Field(None, alias="contactNumber")
-    email: Optional[EmailStr]
-    address: Optional[Address]
+    email: Optional[EmailStr] = None
+    address: Optional[Address] = None
     household_id: Optional[str] = Field(None, alias="householdId")
     is_head_of_family: Optional[bool] = Field(False, alias="isHeadOfFamily")
     voter_status: Optional[VoterStatus] = Field(None, alias="voterStatus")
-    occupation: Optional[str]
+    occupation: Optional[str] = None
     photo_url: Optional[str] = Field(None, alias="photoUrl")
     fingerprints: Optional[Fingerprints] = Field(None, alias="fingerprints")
     signature_url: Optional[str] = Field(None, alias="signatureUrl")
-    remarks: Optional[str]
+    remarks: Optional[str] = None
+    barangay_id: Optional[str] = Field(None, alias="barangayId")
+    id_document_url: Optional[str] = Field(None, alias="idDocumentUrl")
+    verification_status: Optional[str] = Field("verified", alias="verificationStatus")
+    verified_by: Optional[str] = Field(None, alias="verifiedBy")
+    verified_at: Optional[datetime] = Field(None, alias="verifiedAt")
+    verification_notes: Optional[str] = Field(None, alias="verificationNotes")
+    update_request_remarks: Optional[str] = Field(None, alias="updateRequestRemarks")
+    update_request_document_url: Optional[str] = Field(None, alias="updateRequestDocumentUrl")
+    update_requested_at: Optional[datetime] = Field(None, alias="updateRequestedAt")
     created_at: Optional[datetime] = Field(None, alias="createdAt")
     updated_at: Optional[datetime] = Field(None, alias="updatedAt")
 

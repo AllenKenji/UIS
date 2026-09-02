@@ -1,8 +1,7 @@
 import axios from "axios";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
 
-const isDevelopment = process.env.NODE_ENV !== "production";
-const rawEnvApiBaseUrl = process.env.REACT_APP_API_BASE_URL || "";
+const isDevelopment = !import.meta.env.PROD;
+const rawEnvApiBaseUrl = import.meta.env.VITE_API_BASE_URL || "";
 
 const normalizeDevBaseUrl = (url) => {
   if (!url) return "";
@@ -15,11 +14,11 @@ const normalizeDevBaseUrl = (url) => {
 // - In production without env var, use deployed API
 export const API_BASE_URL =
   (isDevelopment ? normalizeDevBaseUrl(rawEnvApiBaseUrl) : rawEnvApiBaseUrl) ||
-  (isDevelopment ? "http://127.0.0.1:8000" : "https://asia-southeast1-barangay-1721d.cloudfunctions.net/sendEmailAsia");
+  (isDevelopment ? "http://127.0.0.1:8000" : "https://bis-backend-eg5y.onrender.com");
 
 console.log("🌐 API Base URL:", API_BASE_URL);
 
-  if (process.env.NODE_ENV === "production" && API_BASE_URL.startsWith("http://")) { 
+  if (import.meta.env.PROD && API_BASE_URL.startsWith("http://")) {
     throw new Error("❌ Production API_BASE_URL must use HTTPS"); 
   }
 
@@ -35,14 +34,32 @@ export const endpoints = {
   },
   documents: "/api/documents",
   businesses: "/api/businesses",
+  youth: {
+    programs: "/api/youth/programs",
+    events: "/api/youth/events",
+    feedback: "/api/youth/feedback",
+  },
   audit: "/api/document_audit",
+  reporting: {
+    counters: "/api/reporting/counters",
+    documentStatuses: "/api/reporting/documents/statuses",
+    treasurer: {
+      payments: "/api/reporting/treasurer/payments",
+      receipts: "/api/reporting/treasurer/receipts",
+      businesses: "/api/reporting/treasurer/businesses",
+      documents: "/api/reporting/treasurer/documents",
+    },
+  },
   dashboard: "/dashboard-summary",
   disbursements: "/api/disbursements",
   accounts: {
     create: "/api/admin/create-account",
     updateRole: (uid) => `/api/admin/update-role/${uid}`,
+    updateProfile: (uid) => `/api/admin/accounts/${uid}/profile`,
+    updatePhoto: (uid) => `/api/admin/accounts/${uid}/photo`,
     delete: (uid) => `/api/admin/delete-account/${uid}`,
     list: "/api/admin/accounts",
+    mySignature: "/api/account/my-signature",
   },
   settings: {
     permissions: "/api/settings/permissions",
@@ -56,6 +73,28 @@ export const endpoints = {
     request: "/api/password/request", 
     verify: (token) => `/api/password/verify/${token}`, 
     apply: "/api/password/apply", },
+  messages: "/api/messages",
+  public: {
+    registrations: "/api/public/registrations",
+    resolve: "/api/public/access/resolve",
+    requestUpdate: "/api/public/access/request-update",
+    complaints: "/api/public/complaints",
+    announcements: "/api/public/announcements",
+    tenants: "/api/public/tenants",
+    tenant: (id) => `/api/public/tenants/${id}`,
+  },
+  auth: { switchRole: "/api/auth/switch-role" },
+  superAdmin: {
+    tenants: "/api/super-admin/tenants",
+    tenant: (id) => `/api/super-admin/tenants/${id}`,
+    tenantLogo: (id) => `/api/super-admin/tenants/${id}/logo`,
+    cities: "/api/super-admin/cities",
+    city: (id) => `/api/super-admin/cities/${id}`,
+    cityLogo: (id) => `/api/super-admin/cities/${id}/logo`,
+    accounts: "/api/super-admin/accounts",
+    payments: "/api/super-admin/payments",
+    paymentsSummary: "/api/super-admin/payments/summary",
+  },
 };
 
 // 🛡️ Axios instance
@@ -65,53 +104,14 @@ export const api = axios.create({
   timeout: 30000,
 });
 
-const waitForAuthUser = (auth, timeoutMs = 1200) =>
-  new Promise((resolve) => {
-    if (auth.currentUser) {
-      resolve(auth.currentUser);
-      return;
-    }
-
-    let settled = false;
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (settled) return;
-      settled = true;
-      unsubscribe();
-      resolve(user || null);
-    });
-
-    setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      unsubscribe();
-      resolve(auth.currentUser || null);
-    }, timeoutMs);
-  });
-
-// 🔐 Always inject a fresh token 
+// Inject the PostgreSQL JWT saved by the local login flow.
 api.interceptors.request.use(async (config) => {
-  const auth = getAuth();
   const cachedToken = sessionStorage.getItem("authToken");
 
   if (config.url?.includes("/api/password/")) { return config; }
 
-  let tokenToUse = cachedToken;
-  const user = auth.currentUser || await waitForAuthUser(auth);
-
-  if (user) {
-    try {
-      const freshToken = await user.getIdToken(false);
-      tokenToUse = freshToken || tokenToUse;
-      if (freshToken) {
-        sessionStorage.setItem("authToken", freshToken);
-      }
-    } catch (err) {
-      console.warn("⚠️ Failed to refresh Firebase token", err);
-    }
-  }
-
-  if (tokenToUse) {
-    config.headers.Authorization = `Bearer ${tokenToUse}`;
+  if (cachedToken) {
+    config.headers.Authorization = `Bearer ${cachedToken}`;
   }
 
   return config;
@@ -146,7 +146,7 @@ const extractErrorDetail = (data) => {
 const handleError = (error, context) => {
   const status = error.response?.status;
   const detail = extractErrorDetail(error.response?.data) || error.message;
-  if (process.env.NODE_ENV !== "production") {
+  if (!import.meta.env.PROD) {
     console.error(`❌ ${context} failed [${status ?? "no status"}]:`, detail);
   }
   throw new APIError(detail, status, context);
@@ -201,6 +201,10 @@ ResidentsAPI.findByNameAndBirthDate = (fullName, birthDate) =>
   api.get(endpoints.residents, { params: { fullName, birthDate } })
     .then((res) => res.data)
     .catch((err) => handleError(err, "Resident duplicate check"));
+ResidentsAPI.verify = (id, verificationStatus, notes) =>
+  api.patch(`${endpoints.residents}/${id}/verification`, { verificationStatus, notes })
+    .then((res) => res.data)
+    .catch((err) => handleError(err, "Resident verification"));
 
 // 🚨 Incident APIs
 export const IncidentsAPI = new BaseAPI(endpoints.incidents);
@@ -235,6 +239,14 @@ export const ComplaintsAPI = {
 
 // 📄 Document APIs
 export const DocumentsAPI = new BaseAPI(endpoints.documents);
+
+export const MessagesAPI = {
+  recipients: (q = "") => api.get(`${endpoints.messages}/recipients`, { params: { q } }).then((res) => res.data),
+  conversations: () => api.get(`${endpoints.messages}/conversations`).then((res) => res.data),
+  createConversation: (recipientUid) => api.post(`${endpoints.messages}/conversations/${recipientUid}`).then((res) => res.data),
+  items: (conversationId) => api.get(`${endpoints.messages}/conversations/${conversationId}/items`).then((res) => res.data),
+  send: (conversationId, body) => api.post(`${endpoints.messages}/conversations/${conversationId}/items`, { body }).then((res) => res.data),
+};
 
 // 🔄 Update document status
 DocumentsAPI.patchStatus = (id, payload) =>
@@ -282,6 +294,19 @@ BusinessesAPI.listByOwner = (ownerName) =>
     .then(res => res.data)
     .catch(err => handleError(err, "List resident businesses"));
 
+BusinessesAPI.createApplication = (data) =>
+  api.post(`${endpoints.businesses}/applications`, data)
+    .then((res) => res.data)
+    .catch((err) => handleError(err, "Create business application"));
+
+export const YouthProgramsAPI = new BaseAPI(endpoints.youth.programs);
+export const YouthEventsAPI = new BaseAPI(endpoints.youth.events);
+export const YouthFeedbackAPI = new BaseAPI(endpoints.youth.feedback);
+
+export const notifyYouthDataChanged = () => {
+  window.dispatchEvent(new Event("youth-data-changed"));
+};
+
 // 📝 Audit APIs
 export const AuditAPI = {
   list: () =>
@@ -312,10 +337,80 @@ export const AccountsAPI = {
     api.put(endpoints.accounts.updateRole(uid), { role })
       .then((res) => res.data)
       .catch((err) => handleError(err, "Account role update")),
+  updateProfile: (uid, data) =>
+    api.patch(endpoints.accounts.updateProfile(uid), data)
+      .then((res) => res.data)
+      .catch((err) => handleError(err, "Account profile update")),
+  updateMySignature: (signatureUrl) =>
+    api.patch(endpoints.accounts.mySignature, { signatureUrl })
+      .then((res) => res.data)
+      .catch((err) => handleError(err, "Signature update")),
+  updatePhoto: (uid, photoUrl) =>
+    api.patch(endpoints.accounts.updatePhoto(uid), { photoUrl })
+      .then((res) => res.data)
+      .catch((err) => handleError(err, "Account photo update")),
+  updateRoles: (uid, roles) =>
+    api.patch(`/api/admin/accounts/${uid}/roles`, { roles })
+      .then((res) => res.data)
+      .catch((err) => handleError(err, "Account roles update")),
   list: (params = {}) => 
     api.get("/api/admin/accounts", { params }) 
       .then((res) => res.data) 
       .catch((err) => handleError(err, "List accounts")),
+};
+
+export const AuthAPI = {
+  switchRole: (role) => api.post(endpoints.auth.switchRole, { role }).then((res) => res.data).catch((err) => handleError(err, "Role switch")),
+};
+
+export const PublicServicesAPI = {
+  listTenants: () => api.get(endpoints.public.tenants).then((res) => res.data),
+  getTenant: (barangayId) => api.get(endpoints.public.tenant(barangayId)).then((res) => res.data),
+  register: (formData) =>
+    api
+      .post(endpoints.public.registrations, formData, { headers: { "Content-Type": "multipart/form-data" } })
+      .then((res) => res.data),
+  resolve: (identifier, birthDate, barangayId) => api.post(endpoints.public.resolve, { identifier, birthDate, barangayId }).then((res) => res.data),
+  requestUpdate: (residentId, barangayId, remarks, document) => {
+    const formData = new FormData();
+    formData.append("residentId", residentId);
+    formData.append("barangayId", barangayId);
+    formData.append("remarks", remarks);
+    if (document) formData.append("document", document);
+    return api
+      .post(endpoints.public.requestUpdate, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((res) => res.data);
+  },
+  submitComplaint: (payload) => api.post(endpoints.public.complaints, payload).then((res) => res.data),
+  announcements: (barangayId) => api.get(endpoints.public.announcements, { params: { barangayId } }).then((res) => res.data),
+};
+
+export const SuperAdminAPI = {
+  listTenants: (params = {}) => api.get(endpoints.superAdmin.tenants, { params }).then((res) => res.data),
+  createTenant: (payload) => api.post(endpoints.superAdmin.tenants, payload).then((res) => res.data),
+  updateTenant: (id, payload) => api.patch(endpoints.superAdmin.tenant(id), payload).then((res) => res.data),
+  uploadTenantLogo: (id, file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api
+      .post(endpoints.superAdmin.tenantLogo(id), formData, { headers: { "Content-Type": "multipart/form-data" } })
+      .then((res) => res.data);
+  },
+  deleteTenant: (id) => api.delete(endpoints.superAdmin.tenant(id)).then((res) => res.data),
+  listCities: () => api.get(endpoints.superAdmin.cities).then((res) => res.data),
+  uploadCityLogo: (id, file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api
+      .post(endpoints.superAdmin.cityLogo(id), formData, { headers: { "Content-Type": "multipart/form-data" } })
+      .then((res) => res.data);
+  },
+  deleteCity: (id) => api.delete(endpoints.superAdmin.city(id)).then((res) => res.data),
+  listAccounts: (params = {}) => api.get(endpoints.superAdmin.accounts, { params }).then((res) => res.data),
+  listPayments: (params = {}) => api.get(endpoints.superAdmin.payments, { params }).then((res) => res.data),
+  paymentsSummary: (params = {}) => api.get(endpoints.superAdmin.paymentsSummary, { params }).then((res) => res.data),
 };
 
 // 📊 Dashboard APIs
@@ -329,6 +424,33 @@ export const DashboardAPI = {
     api.get("/api/documents/count/issued", { params: { documentType } }) 
       .then((res) => res.data) 
       .catch((err) => handleError(err, "Issued count fetch")),
+};
+
+export const ReportingAPI = {
+  listCounters: () =>
+    api.get(endpoints.reporting.counters)
+      .then((res) => res.data)
+      .catch((err) => handleError(err, "List reporting counters")),
+  documentStatuses: () =>
+    api.get(endpoints.reporting.documentStatuses)
+      .then((res) => res.data)
+      .catch((err) => handleError(err, "Get document status totals")),
+  listTreasurerPayments: () =>
+    api.get(endpoints.reporting.treasurer.payments)
+      .then((res) => res.data)
+      .catch((err) => handleError(err, "List treasurer payments")),
+  listTreasurerReceipts: () =>
+    api.get(endpoints.reporting.treasurer.receipts)
+      .then((res) => res.data)
+      .catch((err) => handleError(err, "List treasurer receipts")),
+  listTreasurerBusinesses: () =>
+    api.get(endpoints.reporting.treasurer.businesses)
+      .then((res) => res.data)
+      .catch((err) => handleError(err, "List treasurer businesses")),
+  listTreasurerDocuments: () =>
+    api.get(endpoints.reporting.treasurer.documents)
+      .then((res) => res.data)
+      .catch((err) => handleError(err, "List treasurer documents")),
 };
 
 // ⚙️ Settings APIs
@@ -346,8 +468,8 @@ export const SettingsAPI = {
 // 💰 Fees APIs (patched)
 export const FeesAPI = {
   // 📄 Document Fees
-  listDocuments: () =>
-    api.get(endpoints.fees.documents)
+  listDocuments: (params = {}) =>
+    api.get(endpoints.fees.documents, { params })
       .then((res) => res.data)
       .catch((err) => handleError(err, "List document fees")),
 
@@ -362,8 +484,8 @@ export const FeesAPI = {
       .catch((err) => handleError(err, "Delete document fee")),
 
   // 🏢 Business Fees
-  listBusinesses: () =>
-    api.get(endpoints.fees.businesses)
+  listBusinesses: (params = {}) =>
+    api.get(endpoints.fees.businesses, { params })
       .then((res) => res.data)
       .catch((err) => handleError(err, "List business fees")),
 
@@ -378,8 +500,8 @@ export const FeesAPI = {
       .catch((err) => handleError(err, "Delete business fee")),
 
   // 🆕 Miscellaneous Fees
-  listMisc: () =>
-    api.get(endpoints.fees.misc)
+  listMisc: (params = {}) =>
+    api.get(endpoints.fees.misc, { params })
       .then((res) => res.data)
       .catch((err) => handleError(err, "List miscellaneous fees")),
 

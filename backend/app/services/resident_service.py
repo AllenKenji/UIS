@@ -1,14 +1,20 @@
 import logging, random
+import os
 from datetime import date, datetime
 from typing import List, Dict, Optional, Any
-from google.cloud import firestore
+from uuid import uuid4
+from fastapi import HTTPException, status
 from fastapi.encoders import jsonable_encoder
-from firebase_admin import auth
 from backend.app.utils.firestore_utils import get_db
 from backend.app.models import ResidentOut
 from backend.app.core.roles import ROLE_PERMISSIONS   # ✅ import role permissions
+from backend.app.core.local_auth import create_user, delete_user
+from backend.app.core.postgres_store import SERVER_TIMESTAMP
+
+VERIFICATION_STATUSES = ("pending", "verified", "rejected")
 
 logger = logging.getLogger("uvicorn.error")
+RESIDENT_INITIAL_PASSWORD = os.environ.get("RESIDENT_INITIAL_PASSWORD", "12345678")
 
 # 🔑 Household ID generator
 def generate_household_id(barangay: str = "GEN") -> str:
@@ -31,11 +37,11 @@ def sanitize_resident_payload(data: dict, is_update: bool = False) -> dict:
             data[key] = val or None
 
     if not is_update:
-        data["createdAt"] = firestore.SERVER_TIMESTAMP
+        data["createdAt"] = SERVER_TIMESTAMP()
     else:
         data.pop("createdAt", None)
 
-    data["updatedAt"] = firestore.SERVER_TIMESTAMP
+    data["updatedAt"] = SERVER_TIMESTAMP()
 
     if not is_update and not data.get("householdId"):
         barangay = data.get("address", {}).get("barangay", "GEN")
@@ -46,7 +52,7 @@ def sanitize_resident_payload(data: dict, is_update: bool = False) -> dict:
 def encode_for_firestore(data: dict) -> dict:
     encoded = {}
     for k, v in data.items():
-        if v is firestore.SERVER_TIMESTAMP:
+        if isinstance(v, datetime):
             encoded[k] = v
         else:
             encoded[k] = jsonable_encoder(v)
@@ -65,7 +71,7 @@ def to_resident_out(doc: Dict[str, Any], id: Optional[str] = None) -> ResidentOu
     data = {**doc}
     if id:
         data["id"] = id
-    for key in ["createdAt", "updatedAt"]:
+    for key in ["createdAt", "updatedAt", "verifiedAt", "updateRequestedAt"]:
         if key in data and not isinstance(data[key], datetime):
             data.pop(key)
     for key in ["email", "remarks", "occupation"]:
@@ -73,36 +79,57 @@ def to_resident_out(doc: Dict[str, Any], id: Optional[str] = None) -> ResidentOu
             data[key] = None
     return ResidentOut(**data)
 
-# ➕ Create (with Firebase Auth integration + claims)
-def add_resident(data: dict) -> ResidentOut:
+
+def require_verified_resident(resident_data: dict) -> None:
+    """
+    Block a resident from availing barangay services (documents, business
+    registration, complaints, incidents) until admin/staff have verified their
+    self-registration. Residents with no verificationStatus at all (registered
+    before this feature, or created directly by staff) are treated as verified.
+    """
+    verification_status = resident_data.get("verificationStatus")
+    if verification_status == "pending":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your registration is still pending verification by barangay staff. Please visit or contact the barangay office to complete verification.",
+        )
+    if verification_status == "rejected":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your registration was not verified. Please contact the barangay office.",
+        )
+
+# ➕ Create (optionally with a login-capable account)
+def add_resident(data: dict, initial_password: str | None = None, create_login_account: bool = True, barangay_id: str | None = None, resident_id: str | None = None) -> ResidentOut:
     payload = sanitize_resident_payload(data)
     payload = encode_for_firestore(payload)
+    payload["barangayId"] = barangay_id
 
-    if not data.get("email"):
-        raise ResidentError("Resident must have an email to create an Auth account")
+    # Staff/admin-entered residents are vetted in person and considered verified
+    # immediately; residents who self-register through the public, no-login flow
+    # start "pending" until barangay staff verify their submitted photo/ID.
+    payload.setdefault("verificationStatus", "verified" if create_login_account else "pending")
 
-    clean_email = data["email"].strip().lower()
+    login_identifier = (data.get("email") or data.get("contactNumber") or "").strip()
+    if not login_identifier:
+        raise ResidentError("Resident must provide either an email address or contact number")
 
-    try:
-        user = auth.create_user(
-            email=clean_email,
-            password="123456",
-            display_name=data.get("fullName")
-        )
-        payload["authUid"] = user.uid
-        payload["id"] = user.uid
-        payload["passwordResetRequired"] = True
-        logger.info("✅ Firebase Auth user created for %s", clean_email)
+    if create_login_account:
+        try:
+            uid = create_user(login_identifier, initial_password or RESIDENT_INITIAL_PASSWORD, {"full_name": data.get("fullName"), "role": "resident", "contactNumber": data.get("contactNumber")})
+            payload["authUid"] = uid
+            payload["id"] = uid
+            payload["passwordResetRequired"] = True
+            logger.info("Local auth user created for %s", login_identifier)
 
-        # 🔑 Assign resident claims immediately
-        auth.set_custom_user_claims(user.uid, {"role": "resident"})
-        logger.info("🔑 Claims set for resident UID %s", user.uid)
+        except Exception as e:
+            logger.error("❌ Failed to create login account for %s: %s", login_identifier, str(e))
+            raise ResidentError("Failed to create login account")
+    else:
+        uid = resident_id or uuid4().hex
+        payload["id"] = uid
 
-    except Exception as e:
-        logger.error("❌ Failed to create Firebase Auth user for %s: %s", clean_email, str(e))
-        raise ResidentError("Failed to create Firebase Auth user")
-
-    doc_ref = get_db().collection("residents").document(user.uid)
+    doc_ref = get_db().collection("residents").document(uid)
     doc_ref.set({
         **payload,
         "role": "resident",
@@ -114,7 +141,7 @@ def add_resident(data: dict) -> ResidentOut:
     return to_resident_out(snapshot.to_dict(), id=doc_ref.id)
 
 # ➕ Bulk Create (with Firebase Auth integration + claims)
-def add_residents_bulk(residents: List[dict], householdId: Optional[str] = None) -> Dict[str, Any]:
+def add_residents_bulk(residents: List[dict], householdId: Optional[str] = None, barangay_id: str | None = None) -> Dict[str, Any]:
     if not residents:
         raise ResidentError("No residents provided for bulk add")
 
@@ -126,44 +153,36 @@ def add_residents_bulk(residents: List[dict], householdId: Optional[str] = None)
     created = []
 
     for data in residents:
-        if not data.get("email"):
-            logger.warning("⚠️ Skipping resident without email: %s", data.get("fullName"))
+        login_identifier = (data.get("email") or data.get("contactNumber") or "").strip()
+        if not login_identifier:
+            logger.warning("Skipping resident without email or contact number: %s", data.get("fullName"))
             continue
 
         data["householdId"] = householdId
         payload = sanitize_resident_payload(data)
         payload = encode_for_firestore(payload)
-
-        clean_email = data["email"].strip().lower()
+        payload["barangayId"] = barangay_id
 
         try:
             # ✅ Create Firebase Auth user
-            user = auth.create_user(
-                email=clean_email,
-                password="123456",
-                display_name=data.get("fullName")
-            )
-            payload["authUid"] = user.uid
-            payload["id"] = user.uid
+            uid = create_user(login_identifier, RESIDENT_INITIAL_PASSWORD, {"full_name": data.get("fullName"), "role": "resident", "contactNumber": data.get("contactNumber")})
+            payload["authUid"] = uid
+            payload["id"] = uid
             payload["passwordResetRequired"] = True
-            logger.info("✅ Firebase Auth user created for %s", clean_email)
-
-            # ✅ Assign only minimal claim
-            auth.set_custom_user_claims(user.uid, {"role": "resident"})
-            logger.info("🔑 Role claim set for resident UID %s", user.uid)
+            logger.info("Local auth user created for %s", login_identifier)
 
         except Exception as e:
-            logger.error("❌ Failed to create Firebase Auth user for %s: %s", clean_email, str(e))
+            logger.error("❌ Failed to create login account for %s: %s", login_identifier, str(e))
             continue
 
         # ✅ Store full profile + permissions in Firestore
-        doc_ref = get_db().collection("residents").document(user.uid)
+        doc_ref = get_db().collection("residents").document(uid)
         batch.set(doc_ref, {
             **payload,
             "role": "resident",
             "permissions": ROLE_PERMISSIONS["resident"]  # safe in Firestore
         })
-        created.append(to_resident_out(payload, id=user.uid))
+        created.append(to_resident_out(payload, id=uid))
 
     if not created:
         raise ResidentError("No residents were successfully created")
@@ -178,8 +197,13 @@ def get_resident_by_id(id: str) -> ResidentOut:
     return to_resident_out(snapshot.to_dict(), id=id)
 
 # 📤 Read all residents
-def get_all_residents(limit: int = 50, start_after_id: Optional[str] = None) -> List[ResidentOut]:
-    query = get_db().collection("residents").order_by("createdAt").limit(limit)
+def get_all_residents(limit: int = 50, start_after_id: Optional[str] = None, barangay_id: str | None = None, verification_status: str | None = None) -> List[ResidentOut]:
+    query = get_db().collection("residents")
+    if barangay_id:
+        query = query.where("barangayId", "==", barangay_id)
+    if verification_status:
+        query = query.where("verificationStatus", "==", verification_status)
+    query = query.order_by("createdAt").limit(limit)
     if start_after_id:
         last_doc = get_db().collection("residents").document(start_after_id).get()
         if last_doc.exists:
@@ -229,7 +253,7 @@ def delete_resident(id: str) -> Dict[str, str]:
 
     # Delete Firebase Auth user
     try:
-        auth.delete_user(id)
+        delete_user(id)
         logger.info("✅ Deleted Firebase Auth user with UID: %s", id)
     except Exception as e:
         logger.warning("⚠️ Failed to delete Firebase Auth user %s: %s", id, str(e))
@@ -237,12 +261,14 @@ def delete_resident(id: str) -> Dict[str, str]:
     return {"id": id, "message": "Resident deleted successfully"}
 
 # 🔎 Duplicate check
-def find_duplicates(fullName: str, birthDate: str, middleName: Optional[str] = None, suffix: Optional[str] = None) -> List[ResidentOut]:
+def find_duplicates(fullName: str, birthDate: str, middleName: Optional[str] = None, suffix: Optional[str] = None, barangay_id: str | None = None) -> List[ResidentOut]:
     query = get_db().collection("residents").where("fullName", "==", fullName.strip()).where("birthDate", "==", birthDate)
     if middleName:
         query = query.where("middleName", "==", middleName.strip())
     if suffix:
         query = query.where("suffix", "==", suffix.strip())
+    if barangay_id:
+        query = query.where("barangayId", "==", barangay_id)
 
     docs = query.stream()
     return [to_resident_out(doc.to_dict(), id=doc.id) for doc in docs]
@@ -262,8 +288,11 @@ def delete_by_household(householdId: str) -> Dict[str, Any]:
     return {"householdId": householdId, "deletedCount": deleted_count, "message": f"Deleted {deleted_count} resident(s)"}
 
 # 📤 Bulk Fetch by household
-def get_residents_by_household(householdId: str) -> List[ResidentOut]:
-    docs = get_db().collection("residents").where("householdId", "==", householdId).stream()
+def get_residents_by_household(householdId: str, barangay_id: str | None = None) -> List[ResidentOut]:
+    query = get_db().collection("residents").where("householdId", "==", householdId)
+    if barangay_id:
+        query = query.where("barangayId", "==", barangay_id)
+    docs = query.stream()
     residents = [to_resident_out(doc.to_dict(), id=doc.id) for doc in docs]
 
     if not residents:
@@ -271,9 +300,37 @@ def get_residents_by_household(householdId: str) -> List[ResidentOut]:
 
     return residents
 
-def find_by_email(email: str) -> Optional[ResidentOut]:
+# ✅ Admin/staff verification of a self-registered resident
+def verify_resident(id: str, verification_status: str, verified_by: str, notes: Optional[str] = None) -> ResidentOut:
+    if verification_status not in VERIFICATION_STATUSES:
+        raise ResidentError(f"Invalid verification status: {verification_status}")
+
+    doc_ref = get_db().collection("residents").document(id)
+    _get_resident_doc(id)
+
+    doc_ref.update({
+        "verificationStatus": verification_status,
+        "verifiedBy": verified_by,
+        "verifiedAt": SERVER_TIMESTAMP(),
+        "verificationNotes": notes,
+        "updatedAt": SERVER_TIMESTAMP(),
+        # Clear a resolved info-update request so it doesn't linger as stale
+        # context on the next lookup (covers both new-registration approvals,
+        # where these were never set, and update-request reviews).
+        "updateRequestRemarks": None,
+        "updateRequestDocumentUrl": None,
+        "updateRequestedAt": None,
+    })
+    snapshot = doc_ref.get()
+    return to_resident_out(snapshot.to_dict(), id=id)
+
+
+def find_by_email(email: str, barangay_id: str | None = None) -> Optional[ResidentOut]:
     clean_email = email.strip().lower()
-    docs = get_db().collection("residents").where("email", "==", clean_email).stream()
+    query = get_db().collection("residents").where("email", "==", clean_email)
+    if barangay_id:
+        query = query.where("barangayId", "==", barangay_id)
+    docs = query.stream()
 
     for doc in docs:
         return to_resident_out(doc.to_dict(), id=doc.id)

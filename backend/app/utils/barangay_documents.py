@@ -19,6 +19,31 @@ logger = logging.getLogger("uvicorn.error")
 def safe_text(value):
     return str(value) if value is not None else ""
 
+# Already-abbreviated or already-typed street/barangay names shouldn't get a
+# second prefix/suffix stacked on (e.g. "Rizal Avenue" -> "Rizal Ave." is fine,
+# but "Rizal St." shouldn't become "Rizal St. St.").
+_STREET_SUFFIXES = ("st", "st.", "street", "ave", "ave.", "avenue", "blvd", "blvd.", "boulevard", "rd", "rd.", "road", "highway", "hwy", "hwy.")
+
+
+def with_street_abbreviation(street: str) -> str:
+    street = street.strip()
+    if not street:
+        return street
+    last_word = street.rstrip(".").split(" ")[-1].lower()
+    if last_word in _STREET_SUFFIXES:
+        return street
+    return f"{street} St."
+
+
+def with_barangay_abbreviation(barangay: str) -> str:
+    barangay = barangay.strip()
+    if not barangay:
+        return barangay
+    if barangay.lower().startswith(("brgy", "barangay")):
+        return barangay
+    return f"Brgy. {barangay}"
+
+
 def format_address(address):
     if isinstance(address, str):
         try:
@@ -44,13 +69,11 @@ def format_address(address):
     if house_number:
         parts.append(house_number)
     if street:
-        parts.append(street)
+        parts.append(with_street_abbreviation(street))
     if purok:
         parts.append(f"Purok {purok}")
-    if barangay and not barangay.lower().startswith("barangay"):
-        parts.append(f"Barangay {barangay}")
-    elif barangay:
-        parts.append(barangay)
+    if barangay:
+        parts.append(with_barangay_abbreviation(barangay))
     if city:
         parts.append(city)
     if province:
@@ -70,7 +93,57 @@ def draw_qr_code(c, doc_id, margin, width):
         c.setFont("Helvetica-Oblique", 8)
         c.drawString(width - margin - 60, margin + 10, "(QR error)")
 
-def render_document(title, body_text, issued_by, issued_at, doc_id, barangay):
+def _draw_signature_image(c, signature_url, x, y, width, height):
+    """Best-effort draw of a staff e-signature image; silently skips on any failure."""
+    try:
+        if signature_url.startswith("http"):
+            img_data = urlopen(signature_url, timeout=10).read()
+            img = ImageReader(BytesIO(img_data))
+        elif signature_url.startswith("data:image"):
+            encoded = signature_url.split(",", 1)[1]
+            img_data = base64.b64decode(encoded)
+            img = ImageReader(BytesIO(img_data))
+        else:
+            img = ImageReader(signature_url)
+        c.drawImage(img, x, y, width=width, height=height, preserveAspectRatio=True, mask='auto')
+    except Exception as e:
+        logger.warning("Signature render failed: %s", e)
+
+
+def _draw_seal(c, image_url, fallback_path, x, y, width, height, alpha=None):
+    """
+    Draw the barangay's own uploaded seal/logo (image_url) if set; falls back
+    to the generic placeholder seal otherwise, or if the fetch fails for any
+    reason (missing file, network hiccup, bad image data).
+    """
+    try:
+        if image_url and image_url.startswith("http"):
+            img_data = urlopen(image_url, timeout=10).read()
+            source = ImageReader(BytesIO(img_data))
+        elif image_url and image_url.startswith("data:image"):
+            encoded = image_url.split(",", 1)[1]
+            source = ImageReader(BytesIO(base64.b64decode(encoded)))
+        elif image_url:
+            source = image_url
+        else:
+            source = fallback_path
+    except Exception as e:
+        logger.warning("Barangay seal fetch failed, using placeholder: %s", e)
+        source = fallback_path
+
+    if alpha is not None:
+        c.saveState()
+        c.setFillAlpha(alpha)
+    try:
+        c.drawImage(source, x, y, width=width, height=height, preserveAspectRatio=True, mask='auto')
+    except Exception as e:
+        logger.warning("Barangay seal render failed: %s", e)
+    finally:
+        if alpha is not None:
+            c.restoreState()
+
+
+def render_document(title, body_text, issued_by, issued_at, doc_id, barangay, signature_url=None, barangay_logo_url=None, valid_until=None, city_logo_url=None):
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=LETTER)
     width, height = LETTER
@@ -80,7 +153,16 @@ def render_document(title, body_text, issued_by, issued_at, doc_id, barangay):
     c.setLineWidth(2)
     c.rect(margin/2, margin/2, width - margin, height - margin)
 
-    # Seals (left: Republic, right: Barangay)
+    # Watermark: the city's own seal, centered and faded, behind everything else
+    if city_logo_url:
+        watermark_size = 4.2 * inch
+        _draw_seal(
+            c, city_logo_url, "backend/app/assets/seals/barangay_seal.png",
+            width/2 - watermark_size/2, height/2 - watermark_size/2, watermark_size, watermark_size,
+            alpha=0.12,
+        )
+
+    # Seals (left: Republic — always the PH seal; right: this barangay's own seal)
     try:
         c.drawImage("backend/app/assets/seals/ph_seal.png",
                     margin, height - margin - 50,
@@ -89,13 +171,10 @@ def render_document(title, body_text, issued_by, issued_at, doc_id, barangay):
         c.setFont("Helvetica-Oblique", 8)
         c.drawString(margin, height - margin - 10, "(PH seal missing)")
 
-    try:
-        c.drawImage("backend/app/assets/seals/barangay_seal.png",
-                    width - margin - 60, height - margin - 50,
-                    width=60, height=60, preserveAspectRatio=True, mask='auto')
-    except Exception:
-        c.setFont("Helvetica-Oblique", 8)
-        c.drawString(width - margin - 50, height - margin - 10, "(Barangay seal missing)")
+    _draw_seal(
+        c, barangay_logo_url, "backend/app/assets/seals/barangay_seal.png",
+        width - margin - 60, height - margin - 50, 60, 60,
+    )
 
     # Header text centered between seals
     c.setFont("Times-Bold", 16)
@@ -125,21 +204,39 @@ def render_document(title, body_text, issued_by, issued_at, doc_id, barangay):
 
     # Certification
     c.setFont("Times-Roman", 12)
-    c.drawString(margin, margin + 100, "Certified by:")
+    c.drawString(margin, margin + 118, "Certified by:")
+
+    if signature_url:
+        _draw_signature_image(c, signature_url, margin, margin + 90, 140, 24)
+
+    c.line(margin, margin + 88, margin + 180, margin + 88)
     c.setFont("Times-Bold", 12)
-    c.drawString(margin, margin + 80, issued_by)
+    c.drawString(margin, margin + 74, issued_by)
 
     # Footer + QR
     c.setFont("Helvetica-Oblique", 8)
-    c.drawString(margin, margin, "This document is system-generated and valid without signature.")
+    footer_note = (
+        "This document is system-generated and digitally signed by the issuing officer."
+        if signature_url
+        else "This document is system-generated and valid without signature."
+    )
+    c.drawString(margin, margin, footer_note)
+    qr_size = 60
     draw_qr_code(c, doc_id, margin, width)
+
+    if valid_until:
+        c.setFont("Helvetica-Oblique", 8)
+        c.drawCentredString(
+            width - margin - qr_size / 2, margin - 4,
+            f"Valid until {valid_until.strftime('%m/%d/%y')}",
+        )
 
     c.showPage()
     c.save()
     buffer.seek(0)
     return buffer.read()
 
-def generate_barangay_clearance_pdf(data, issued_by, issued_at, doc_id):
+def generate_barangay_clearance_pdf(data, issued_by, issued_at, doc_id, signature_url=None):
     resident = data.get("resident", {})
 
     full_name = safe_text(resident.get("fullName") or resident.get("full_name") or "Unnamed")
@@ -167,10 +264,10 @@ def generate_barangay_clearance_pdf(data, issued_by, issued_at, doc_id):
         f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.\n\n"
         f"Document ID: {doc_id}"
     )
-    return render_document("BARANGAY CLEARANCE", body, issued_by, issued_at, doc_id, barangay)
+    return render_document("BARANGAY CLEARANCE", body, issued_by, issued_at, doc_id, barangay, signature_url, barangay_logo_url=data.get("barangay_logo_url"), valid_until=data.get("valid_until"), city_logo_url=data.get("city_logo_url"))
 
 
-def generate_residency_certificate_pdf(data, issued_by, issued_at, doc_id):
+def generate_residency_certificate_pdf(data, issued_by, issued_at, doc_id, signature_url=None):
     resident = data.get("resident", {})
     full_name = safe_text(resident.get("fullName", "Unnamed"))
     full_address, barangay = format_address(resident.get("address", {}))
@@ -184,10 +281,10 @@ def generate_residency_certificate_pdf(data, issued_by, issued_at, doc_id):
         f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.\n\n"
         f"Document ID: {doc_id}"
     )
-    return render_document("CERTIFICATE OF RESIDENCY", body, issued_by, issued_at, doc_id, barangay)
+    return render_document("CERTIFICATE OF RESIDENCY", body, issued_by, issued_at, doc_id, barangay, signature_url, barangay_logo_url=data.get("barangay_logo_url"), valid_until=data.get("valid_until"), city_logo_url=data.get("city_logo_url"))
 
 
-def generate_indigency_certificate_pdf(data, issued_by, issued_at, doc_id):
+def generate_indigency_certificate_pdf(data, issued_by, issued_at, doc_id, signature_url=None):
     resident = data.get("resident", {})
     full_name = safe_text(resident.get("fullName", "Unnamed"))
     full_address, barangay = format_address(resident.get("address", {}))
@@ -200,9 +297,9 @@ def generate_indigency_certificate_pdf(data, issued_by, issued_at, doc_id):
         f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.\n\n"
         f"Document ID: {doc_id}"
     )
-    return render_document("CERTIFICATE OF INDIGENCY", body, issued_by, issued_at, doc_id, barangay)
+    return render_document("CERTIFICATE OF INDIGENCY", body, issued_by, issued_at, doc_id, barangay, signature_url, barangay_logo_url=data.get("barangay_logo_url"), valid_until=data.get("valid_until"), city_logo_url=data.get("city_logo_url"))
 
-def generate_good_moral_certificate_pdf(data, issued_by, issued_at, doc_id):
+def generate_good_moral_certificate_pdf(data, issued_by, issued_at, doc_id, signature_url=None):
     resident = data.get("resident", {})
     full_name = safe_text(resident.get("fullName", "Unnamed"))
     full_address, barangay = format_address(resident.get("address", {}))
@@ -215,9 +312,9 @@ def generate_good_moral_certificate_pdf(data, issued_by, issued_at, doc_id):
         f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.\n\n"
         f"Document ID: {doc_id}"
     )
-    return render_document("CERTIFICATE OF GOOD MORAL CHARACTER", body, issued_by, issued_at, doc_id, barangay)
+    return render_document("CERTIFICATE OF GOOD MORAL CHARACTER", body, issued_by, issued_at, doc_id, barangay, signature_url, barangay_logo_url=data.get("barangay_logo_url"), valid_until=data.get("valid_until"), city_logo_url=data.get("city_logo_url"))
 
-def generate_business_clearance_pdf(data, issued_by, issued_at, doc_id):
+def generate_business_clearance_pdf(data, issued_by, issued_at, doc_id, signature_url=None):
     business_name = safe_text(data.get("business_name", "Unnamed Business"))
     resident = data.get("resident", {})
     owner = safe_text(resident.get("fullName", "Unnamed"))
@@ -230,9 +327,9 @@ def generate_business_clearance_pdf(data, issued_by, issued_at, doc_id):
         f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.\n\n"
         f"Document ID: {doc_id}"
     )
-    return render_document("BARANGAY BUSINESS CLEARANCE", body, issued_by, issued_at, doc_id, barangay)
+    return render_document("BARANGAY BUSINESS CLEARANCE", body, issued_by, issued_at, doc_id, barangay, signature_url, barangay_logo_url=data.get("barangay_logo_url"), valid_until=data.get("valid_until"), city_logo_url=data.get("city_logo_url"))
 
-def generate_activity_permit_pdf(data, issued_by, issued_at, doc_id):
+def generate_activity_permit_pdf(data, issued_by, issued_at, doc_id, signature_url=None):
     resident = data.get("resident", {})
     organizer = safe_text(resident.get("fullName", "Unnamed"))
     activity_name = safe_text(data.get("activity_name", "Unnamed Activity"))
@@ -252,9 +349,9 @@ def generate_activity_permit_pdf(data, issued_by, issued_at, doc_id):
         f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.\n\n"
         f"Document ID: {doc_id}"
     )
-    return render_document("PERMIT TO CONDUCT ACTIVITY", body, issued_by, issued_at, doc_id, barangay)
+    return render_document("PERMIT TO CONDUCT ACTIVITY", body, issued_by, issued_at, doc_id, barangay, signature_url, barangay_logo_url=data.get("barangay_logo_url"), valid_until=data.get("valid_until"), city_logo_url=data.get("city_logo_url"))
 
-def generate_blotter_report_pdf(data, issued_by, issued_at, doc_id):
+def generate_blotter_report_pdf(data, issued_by, issued_at, doc_id, signature_url=None):
     complainant = safe_text(data.get("complainant", "Unnamed"))
     respondent = safe_text(data.get("respondent", "Unnamed"))
     incident = safe_text(data.get("incident", "No details"))
@@ -270,10 +367,10 @@ def generate_blotter_report_pdf(data, issued_by, issued_at, doc_id):
         f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.\n\n"
         f"Document ID: {doc_id}"
     )
-    return render_document("BLOTTER REPORT", body, issued_by, issued_at, doc_id, barangay)
+    return render_document("BLOTTER REPORT", body, issued_by, issued_at, doc_id, barangay, signature_url, barangay_logo_url=data.get("barangay_logo_url"), valid_until=data.get("valid_until"), city_logo_url=data.get("city_logo_url"))
 
 
-def generate_health_certificate_pdf(data, issued_by, issued_at, doc_id):
+def generate_health_certificate_pdf(data, issued_by, issued_at, doc_id, signature_url=None):
     resident = data.get("resident", {})
     full_name = safe_text(resident.get("fullName", "Unnamed"))
     full_address, barangay = format_address(resident.get("address", {}))
@@ -286,7 +383,7 @@ def generate_health_certificate_pdf(data, issued_by, issued_at, doc_id):
         f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.\n\n"
         f"Document ID: {doc_id}"
     )
-    return render_document("HEALTH CERTIFICATE", body, issued_by, issued_at, doc_id, barangay)
+    return render_document("HEALTH CERTIFICATE", body, issued_by, issued_at, doc_id, barangay, signature_url, barangay_logo_url=data.get("barangay_logo_url"), valid_until=data.get("valid_until"), city_logo_url=data.get("city_logo_url"))
 
 def generate_barangay_id_pdf(data, issued_by, issued_at, doc_id):
     # Work at 4x scale for easier layout
@@ -307,18 +404,15 @@ def generate_barangay_id_pdf(data, issued_by, issued_at, doc_id):
     photo_url = resident.get("photoUrl", "")
     address_dict = resident.get("address", {}) or {}
     barangay = safe_text(address_dict.get("barangay", "Unknown"))
+    barangay_logo_url = data.get("barangay_logo_url")
+    valid_until = data.get("valid_until")
 
     # --- Watermark ---
-    try:
-        c.saveState()
-        c.setFillAlpha(0.15)
-        c.drawImage("backend/app/assets/seals/barangay_seal.png",
-                    large_width/2 - 2.4*inch, large_height/2 - 2.4*inch,
-                    width=4.8*inch, height=4.8*inch,
-                    preserveAspectRatio=True, mask='auto')
-        c.restoreState()
-    except Exception as e:
-        logger.warning("Watermark render failed: %s", e)
+    _draw_seal(
+        c, barangay_logo_url, "backend/app/assets/seals/barangay_seal.png",
+        large_width/2 - 2.4*inch, large_height/2 - 2.4*inch, 4.8*inch, 4.8*inch,
+        alpha=0.15,
+    )
 
     # --- Header ---
     try:
@@ -329,13 +423,10 @@ def generate_barangay_id_pdf(data, issued_by, issued_at, doc_id):
         c.setFont("Helvetica-Oblique", 20)
         c.drawString(0.2*inch, large_height - 1.0*inch, "(PH seal)")
 
-    try:
-        c.drawImage("backend/app/assets/seals/barangay_seal.png",
-                    large_width - 1.4*inch, large_height - 1.4*inch,
-                    width=1.2*inch, height=1.2*inch, preserveAspectRatio=True, mask='auto')
-    except Exception:
-        c.setFont("Helvetica-Oblique", 20)
-        c.drawString(large_width - 1.4*inch, large_height - 1.0*inch, "(Barangay seal)")
+    _draw_seal(
+        c, barangay_logo_url, "backend/app/assets/seals/barangay_seal.png",
+        large_width - 1.4*inch, large_height - 1.4*inch, 1.2*inch, 1.2*inch,
+    )
 
     c.setFont("Helvetica-Bold", 28)
     c.drawCentredString(large_width/2, large_height - 0.8*inch, "Republic of the Philippines")
@@ -364,7 +455,7 @@ def generate_barangay_id_pdf(data, issued_by, issued_at, doc_id):
     if photo_url:
         try:
             if photo_url.startswith("http"):
-                img_data = urlopen(photo_url).read()
+                img_data = urlopen(photo_url, timeout=10).read()
                 img = ImageReader(BytesIO(img_data))
             elif photo_url.startswith("data:image"):
                 encoded = photo_url.split(",", 1)[1]
@@ -391,7 +482,7 @@ def generate_barangay_id_pdf(data, issued_by, issued_at, doc_id):
     if signature_url:
         try:
             if signature_url.startswith("http"):
-                sig_data = urlopen(signature_url).read()
+                sig_data = urlopen(signature_url, timeout=10).read()
                 sig_img = ImageReader(BytesIO(sig_data))
             elif signature_url.startswith("data:image"):
                 encoded = signature_url.split(",", 1)[1]
@@ -428,6 +519,7 @@ def generate_barangay_id_pdf(data, issued_by, issued_at, doc_id):
         ("Occupation:", occupation),
         ("Voter Status:", "Registered Voter" if voter_status.lower() == "yes" else voter_status),
     ]
+    # Validity is shown once, under the QR code below — not duplicated here.
 
         # --- Address split into 3 lines ---
     line1 = " ".join([address_dict.get("house_number", ""), address_dict.get("street", "")]).strip()
@@ -495,11 +587,11 @@ def generate_barangay_id_pdf(data, issued_by, issued_at, doc_id):
         c.drawString(large_width - 2.0*inch, large_height - 3.6*inch, "(QR error)")
 
     # --- Validity under QR code ---
-    valid_until = issued_at + timedelta(days=365)
-    c.setFont("Helvetica-Bold", 20)
-    c.setFillColorRGB(0, 0, 0)
-    c.drawRightString(large_width - 0.6*inch, large_height - 7.4*inch,
-                      f"Valid until: {valid_until.month} / {valid_until.day} / {valid_until.strftime('%y')}")
+    if valid_until:
+        c.setFont("Helvetica-Bold", 20)
+        c.setFillColorRGB(0, 0, 0)
+        c.drawRightString(large_width - 0.6*inch, large_height - 7.4*inch,
+                          f"Valid until {valid_until.strftime('%m/%d/%y')}")
 
     # --- Scale down to ID size ---
     scale_x = (3.375 * inch) / large_width

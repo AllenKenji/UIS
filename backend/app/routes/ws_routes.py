@@ -402,17 +402,25 @@ async def websocket_notifications(websocket: WebSocket, token: str = Query(None)
 
         uid = decoded.get("uid")
         role = decoded.get("role")
+        roles = decoded.get("roles")
 
         if not role and uid:
             db = get_db()
             user_doc = db.collection("users").document(uid).get()
             if user_doc.exists:
-                role = user_doc.to_dict().get("role")
+                user_data = user_doc.to_dict()
+                role = user_data.get("role")
+                roles = user_data.get("roles")
             elif db.collection("residents").document(uid).get().exists:
                 role = "resident"
 
         role = (str(role or "resident").strip().lower())
-        user_info = {"uid": uid, "role": role, "user_id": uid, "auth_method": auth_method}
+        # A multi-role account (e.g. staff+secretary) should keep receiving live
+        # notifications for every one of its roles, not just whichever one is
+        # currently active in the session — matches the REST fetch in
+        # notification_routes.get_notifications.
+        normalized_roles = [str(r).strip().lower() for r in (roles or [role]) if r] or [role]
+        user_info = {"uid": uid, "role": role, "roles": normalized_roles, "user_id": uid, "auth_method": auth_method}
 
         await manager.connect(websocket, user_info)
         logger.info("✅ WebSocket connected for uid=%s role=%s via %s", uid, role, auth_method)

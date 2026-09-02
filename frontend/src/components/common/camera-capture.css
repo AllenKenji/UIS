@@ -1,0 +1,11 @@
+.camera-capture { display: flex; flex-direction: column; gap: 8px; }
+.camera-live { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.camera-preview {
+  width: 100%;
+  max-width: 320px;
+  border-radius: 8px;
+  border: 1px solid #9eb6aa;
+  background: #000;
+  transform: scaleX(-1); /* mirror the front camera preview, like a real mirror/selfie view */
+}
+.camera-actions { display: flex; gap: 8px; }

@@ -3,14 +3,17 @@ from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from typing import Optional
-from firebase_admin import auth as firebase_auth
+from urllib.parse import unquote
 from backend.app.models.document import Document, DocumentStatus
 import json
-from backend.app.services.resident_service import get_resident_by_id
+from backend.app.services.resident_service import get_resident_by_id, require_verified_resident
 from backend.app.services.fee_service import resolve_document_fee
-from backend.app.core.firebase import upload_file, get_storage_bucket
+from backend.app.services.tenant_service import get_tenant, get_or_create_city
+from backend.app.core.local_storage import upload_file, LocalStorage
 from backend.app.utils.firestore_utils import get_db
 from backend.app.utils.barangay_documents import (
+    with_street_abbreviation,
+    with_barangay_abbreviation,
     generate_barangay_clearance_pdf,
     generate_residency_certificate_pdf,
     generate_indigency_certificate_pdf,
@@ -24,36 +27,61 @@ from backend.app.utils.barangay_documents import (
 
 logger = logging.getLogger("uvicorn.error")
 
+# Falls back to this when a document type has no validityDays override set
+# on its fee entry (see the "Validity (days)" column on the Document Fees table).
+DEFAULT_DOCUMENT_VALIDITY_DAYS = 180
+
 
 # 📦 Document type dispatch
+# Every generator accepts an optional `signature_url` — the issuing staff
+# member's e-signature, drawn onto the "Certified by:" line when present.
 DOCUMENT_GENERATORS = {
-    "Barangay Clearance": lambda data, issued_by, issued_at, doc_id: 
-        generate_barangay_clearance_pdf(data, issued_by, issued_at, doc_id),
+    "Barangay Clearance": lambda data, issued_by, issued_at, doc_id, signature_url=None:
+        generate_barangay_clearance_pdf(data, issued_by, issued_at, doc_id, signature_url),
 
-    "Resident Certificate": lambda data, issued_by, issued_at, doc_id: 
-        generate_residency_certificate_pdf(data, issued_by, issued_at, doc_id),
+    "Resident Certificate": lambda data, issued_by, issued_at, doc_id, signature_url=None:
+        generate_residency_certificate_pdf(data, issued_by, issued_at, doc_id, signature_url),
 
-    "Indigency Certificate": lambda data, issued_by, issued_at, doc_id: 
-        generate_indigency_certificate_pdf(data, issued_by, issued_at, doc_id),
+    "Indigency Certificate": lambda data, issued_by, issued_at, doc_id, signature_url=None:
+        generate_indigency_certificate_pdf(data, issued_by, issued_at, doc_id, signature_url),
 
-    "Good Moral Certificate": lambda data, issued_by, issued_at, doc_id: 
-        generate_good_moral_certificate_pdf(data, issued_by, issued_at, doc_id),
+    "Good Moral Certificate": lambda data, issued_by, issued_at, doc_id, signature_url=None:
+        generate_good_moral_certificate_pdf(data, issued_by, issued_at, doc_id, signature_url),
 
-    "Business Clearance": lambda data, issued_by, issued_at, doc_id: 
-        generate_business_clearance_pdf(data, issued_by, issued_at, doc_id),
+    "Business Clearance": lambda data, issued_by, issued_at, doc_id, signature_url=None:
+        generate_business_clearance_pdf(data, issued_by, issued_at, doc_id, signature_url),
 
-    "Activity Permit": lambda data, issued_by, issued_at, doc_id: 
-        generate_activity_permit_pdf(data, issued_by, issued_at, doc_id),
+    "Activity Permit": lambda data, issued_by, issued_at, doc_id, signature_url=None:
+        generate_activity_permit_pdf(data, issued_by, issued_at, doc_id, signature_url),
 
-    "Blotter Report": lambda data, issued_by, issued_at, doc_id: 
-        generate_blotter_report_pdf(data, issued_by, issued_at, doc_id),
+    "Blotter Report": lambda data, issued_by, issued_at, doc_id, signature_url=None:
+        generate_blotter_report_pdf(data, issued_by, issued_at, doc_id, signature_url),
 
-    "Health Certificate": lambda data, issued_by, issued_at, doc_id: 
-        generate_health_certificate_pdf(data, issued_by, issued_at, doc_id),
+    "Health Certificate": lambda data, issued_by, issued_at, doc_id, signature_url=None:
+        generate_health_certificate_pdf(data, issued_by, issued_at, doc_id, signature_url),
 
-    "Barangay ID": lambda data, issued_by, issued_at, doc_id: 
+    "Barangay ID": lambda data, issued_by, issued_at, doc_id, signature_url=None:
         generate_barangay_id_pdf(data, issued_by, issued_at, doc_id),
 }
+
+def _resolve_local_storage_path(url: Optional[str]) -> Optional[str]:
+    """
+    Tenant logos (and every other upload) are stored as backend-relative
+    "/storage/..." URLs, not real filesystem paths or full URLs — resolve
+    back to the actual file on disk so PDF generation can read it directly,
+    rather than self-requesting the URL over HTTP (see barangay_documents'
+    e-signature fetch, which is a real self-deadlock risk for a server
+    fetching its own /storage/ endpoint mid-request).
+    """
+    if not url or not url.startswith("/storage/"):
+        return None
+    try:
+        relative = unquote(url[len("/storage/"):])
+        path = LocalStorage().blob(relative).path
+        return str(path) if path.exists() else None
+    except Exception:
+        return None
+
 
 def prepare_generator_data(doc: Document) -> dict:
     resident = {}
@@ -61,7 +89,7 @@ def prepare_generator_data(doc: Document) -> dict:
         try:
             resident_out = get_resident_by_id(doc.residentId)
             resident = resident_out.model_dump(by_alias=True)
-            logger.info("Fetched resident from Firestore: %s", resident_out.full_name)
+            logger.info("Fetched resident record: %s", resident_out.full_name)
         except Exception as e:
             logger.warning("Failed to fetch resident %s: %s", doc.residentId, e)
 
@@ -70,6 +98,22 @@ def prepare_generator_data(doc: Document) -> dict:
         resident = getattr(doc, "resident", {}) or {}
         logger.info("Using embedded resident: %s", resident)
 
+    # The barangay's own uploaded seal — falls back to the generic placeholder
+    # seal in barangay_documents.render_document when unset or the tenant
+    # can't be resolved. The city's own seal is used separately as a
+    # centered watermark.
+    barangay_logo_url = None
+    city_logo_url = None
+    if getattr(doc, "barangayId", None):
+        try:
+            tenant = get_tenant(doc.barangayId)
+            raw_logo_url = tenant.logoUrl
+            barangay_logo_url = _resolve_local_storage_path(raw_logo_url) or raw_logo_url
+            if tenant.city:
+                raw_city_logo_url = get_or_create_city(tenant.city).logoUrl
+                city_logo_url = _resolve_local_storage_path(raw_city_logo_url) or raw_city_logo_url
+        except Exception as e:
+            logger.warning("Failed to fetch tenant/city logo for barangayId=%s: %s", doc.barangayId, e)
 
     address = resident.get("address", {}) or {}
     normalized_address = {} 
@@ -103,10 +147,11 @@ def prepare_generator_data(doc: Document) -> dict:
     def format_address(addr: dict) -> str: 
         if not addr: 
             return "N/A" 
-        line1 = " ".join([addr.get("houseNumber", ""), addr.get("street", "")]).strip() 
-        line2_parts = [] 
-        if addr.get("barangay"): 
-            line2_parts.append(f"Brgy. {addr['barangay']}") 
+        street = with_street_abbreviation(addr.get("street", "")) if addr.get("street") else ""
+        line1 = " ".join([addr.get("houseNumber", ""), street]).strip()
+        line2_parts = []
+        if addr.get("barangay"):
+            line2_parts.append(with_barangay_abbreviation(addr["barangay"]))
         if addr.get("city"): 
             line2_parts.append(addr["city"]) 
         if addr.get("province"): 
@@ -135,6 +180,8 @@ def prepare_generator_data(doc: Document) -> dict:
         "occupation": getattr(doc, "occupation", None),
         "voterStatus": getattr(doc, "voterStatus", None),
         "attachments": getattr(doc, "attachments", {}),
+        "barangay_logo_url": barangay_logo_url,
+        "city_logo_url": city_logo_url,
     }
     
     # ✅ Prioritize photoAttachment over photoUrl 
@@ -297,24 +344,25 @@ def list_documents(
     issuedBy: Optional[str] = None,
     fromDate: Optional[datetime] = None,
     toDate: Optional[datetime] = None,
+    barangay_id: Optional[str] = None,
+    role: Optional[str] = None,
 ) -> list[Document]:
     db = get_db()
-    role = None
 
-    user_doc = db.collection("users").document(uid).get()
-    if user_doc.exists:
-        role = user_doc.to_dict().get("role")
-
-    # Fallback to Firebase custom claims for legacy/offline-synced accounts.
+    # Prefer the caller's active session role (passed in by the route from the
+    # current JWT) over the account's persisted role. Switching roles via
+    # /auth/switch-role only changes the session, not the DB record — for a
+    # multi-role account (e.g. staff+secretary) whose stored role is "staff"
+    # but is currently acting as "secretary", re-deriving role from the DB
+    # here would silently fall back to resident-only filtering and hide every
+    # document that isn't "owned" by the account's own uid.
     if not role:
-        try:
-            claims = firebase_auth.get_user(uid).custom_claims or {}
-            role = claims.get("role")
-        except Exception as err:
-            logger.warning("⚠️ Failed to resolve role from claims for uid=%s: %s", uid, err)
+        user_doc = db.collection("users").document(uid).get()
+        if user_doc.exists:
+            role = user_doc.to_dict().get("role")
 
-    if not role and db.collection("residents").document(uid).get().exists:
-        role = "resident"
+        if not role and db.collection("residents").document(uid).get().exists:
+            role = "resident"
 
     role = str(role or "resident").strip().lower()
 
@@ -335,6 +383,8 @@ def list_documents(
         query = query.where("issuedAt", ">=", fromDate)
     if toDate:
         query = query.where("issuedAt", "<=", toDate)
+    if barangay_id:
+        query = query.where("barangayId", "==", barangay_id)
 
     return _serialize_many(query.stream())
 
@@ -442,6 +492,7 @@ async def create_document(
         if not resident_snapshot.exists:
             raise HTTPException(status_code=404, detail="Resident not found")
         resident_data = resident_snapshot.to_dict()
+        require_verified_resident(resident_data)
 
         # Counter for sequential IDs
         counter_ref = get_db().collection("counters").document(document_type)
@@ -462,7 +513,8 @@ async def create_document(
         safe_type = document_type.replace(" ", "_")
         document_id = f"{safe_type}-{new_number:04d}"
 
-        fee_info = resolve_document_fee(document_type)
+        barangay_id = resident_data.get("barangayId")
+        fee_info = resolve_document_fee(document_type, barangay_id)
         amount = fee_info["totalFee"]
 
         # Build attachments dynamically (only include non-None values) 
@@ -488,6 +540,7 @@ async def create_document(
         document_data = {
             "documentId": document_id,
             "residentId": resident_id,
+            "barangayId": barangay_id,
             "residentName": resident_name or safe_field(resident_data, "fullName", "Unnamed"),
             "resident": { 
                 "fullName": safe_field(resident_data, "fullName", "Unnamed"), 
@@ -626,6 +679,8 @@ async def create_document(
             raise HTTPException(status_code=500, detail="Document not saved")
         return _serialize(snapshot)
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("❌ Error creating document: %s", e)
         raise HTTPException(status_code=500, detail="Failed to create document")
@@ -661,7 +716,24 @@ async def confirm_payment(doc_id: str) -> Document:
         raise HTTPException(status_code=400, detail="Payment can only be confirmed from for_payment or payment_submitted")
     return await update_document(doc_id, {"status": DocumentStatus.paid.value, "paymentStatus": "paid"})
 
-async def issue_document(doc_id: str, issued_by: str, file_url: Optional[str] = None, remarks: Optional[str] = None) -> Document:
+
+async def mark_public_printed(doc_id: str) -> Document:
+    """
+    Record that a resident has printed their issued document once through the
+    public, unauthenticated self-service lookup. The record and fileUrl are
+    left intact — this only flips a flag the public flow checks before
+    offering the print button again; staff can still view/reissue normally.
+    """
+    doc = get_and_serialize(doc_id)
+    if doc.status != DocumentStatus.approved:
+        raise HTTPException(status_code=400, detail="Only an issued (approved) document can be marked printed")
+    if not doc.fileUrl:
+        raise HTTPException(status_code=400, detail="Document has no issued file to print")
+    if doc.publicPrinted:
+        return doc
+    return await update_document(doc_id, {"publicPrinted": True})
+
+async def issue_document(doc_id: str, issued_by: str, file_url: Optional[str] = None, remarks: Optional[str] = None, issued_by_uid: Optional[str] = None) -> Document:
     doc = get_and_serialize(doc_id)
 
     if doc.amount > 0 and doc.paymentStatus != "paid":
@@ -669,16 +741,45 @@ async def issue_document(doc_id: str, issued_by: str, file_url: Optional[str] = 
 
     issued_at = datetime.now(timezone.utc)
 
+    # Pull the issuing staff member's e-signature, if they have one on file.
+    signature_url = None
+    if issued_by_uid:
+        issuer_snapshot = get_db().collection("users").document(issued_by_uid).get()
+        if issuer_snapshot.exists:
+            signature_url = (issuer_snapshot.to_dict() or {}).get("signatureUrl")
+
+    # How long this document stays valid: this document type's own override
+    # (set on its fee entry — e.g. "Barangay Clearance" vs "Barangay ID" may
+    # validly differ), falling back to the system default (6 months).
+    validity_days = DEFAULT_DOCUMENT_VALIDITY_DAYS
+    try:
+        type_validity_days = resolve_document_fee(doc.documentType, doc.barangayId).get("validityDays")
+        if type_validity_days:
+            validity_days = type_validity_days
+    except Exception as e:
+        logger.warning("Failed to fetch document-type validity override for %s: %s", doc.documentType, e)
+    valid_until = issued_at + timedelta(days=validity_days)
+
     if not file_url:
         generator = DOCUMENT_GENERATORS.get(doc.documentType)
         if not generator:
             raise HTTPException(status_code=400, detail=f"Unsupported document type: {doc.documentType}")
 
         try:
-            data = prepare_generator_data(doc)
-            pdf_bytes = generator(data, issued_by, issued_at, doc.documentId)
+            # prepare_generator_data does a blocking DB read, and the generator
+            # itself may fetch the resident's photo/signature over HTTP
+            # (barangay_documents._draw_signature_image, etc.) — those URLs are
+            # often this same server's own /storage/ endpoint. Running either
+            # synchronously here would block the single asyncio event loop, and
+            # since that loop is also what would serve that /storage/ request,
+            # it can self-deadlock the entire server, not just this request.
+            data = await run_in_threadpool(prepare_generator_data, doc)
+            data["valid_until"] = valid_until
+            pdf_bytes = await run_in_threadpool(
+                generator, data, issued_by, issued_at, doc.documentId, signature_url
+            )
 
-            bucket = get_storage_bucket()
+            bucket = LocalStorage()
             blob = bucket.blob(f"documents/{doc_id}.pdf")
             await run_in_threadpool(blob.upload_from_string, pdf_bytes, content_type="application/pdf")
             file_url = await run_in_threadpool(
@@ -708,6 +809,7 @@ async def issue_document(doc_id: str, issued_by: str, file_url: Optional[str] = 
         "issuedAt": issued_at,
         "fileUrl": file_url,
         "remarks": final_remarks,
+        "validUntil": valid_until,
     }
     if doc.referenceNumber:
         update_data["referenceNumber"] = doc.referenceNumber

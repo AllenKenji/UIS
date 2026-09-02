@@ -1,3 +1,9 @@
+.role-profile-photo, .role-profile-placeholder { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; display: inline-flex; align-items: center; justify-content: center; background: #e7f4ed; color: #087443; font-weight: 700; }
+.role-email { display: block; color: #667085; font-weight: 400; margin-top: 3px; }
+.role-editor-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(16, 24, 40, .45); display: grid; place-items: center; padding: 16px; }
+.role-editor { width: min(440px, 100%); background: var(--color-card-bg, #fff); border-radius: 8px; padding: 20px; display: grid; gap: 12px; box-shadow: 0 16px 40px rgba(16, 24, 40, .2); }
+.role-editor h3 { margin: 0; }.role-editor label { display: grid; gap: 6px; font-weight: 600; }.role-editor input { padding: 9px; }.role-editor span { font-weight: 400; color: #667085; }.role-editor-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+.role-editor-roles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; border: 1px solid var(--color-border, #d0d5dd); border-radius: 6px; padding: 10px; }.role-editor-roles legend { padding: 0 4px; font-weight: 600; }.role-editor-roles label { display: flex; align-items: center; gap: 6px; font-weight: 400; }.role-editor-roles input { padding: 0; }
 /* ===============================
 🛂 Role Manager
 ================================ */

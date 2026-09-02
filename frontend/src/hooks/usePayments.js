@@ -1,36 +1,14 @@
 import { useEffect, useState } from "react";
-import { db } from "../services/firebase";
-import { collection, onSnapshot, query, where, getDocs } from "firebase/firestore";
-import { auth } from "../services/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { ReportingAPI } from "../services/api";
 
 export function usePayments() {
   const [transactions, setTransactions] = useState([]);
   const [totals, setTotals] = useState({ collections: 0, pendingCount: 0, completedCount: 0, outstandingAmount: 0 });
   const [revenueByCategory, setRevenueByCategory] = useState({});
   const [dailySummary, setDailySummary] = useState({});
-  const [canListen, setCanListen] = useState(false);
 
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, async (user) => {
-      setCanListen(Boolean(user));
-      if (!user) {
-        setTransactions([]);
-        setTotals({ collections: 0, pendingCount: 0, completedCount: 0, outstandingAmount: 0 });
-        setRevenueByCategory({});
-        setDailySummary({});
-      }
-    });
-
-    return () => unsubAuth();
-  }, []);
-
-  useEffect(() => {
-    if (!canListen) return;
-
-    const paymentsRef = collection(db, "payments");
-    const businessesRef = collection(db, "businesses");
-    const documentsRef = collection(db, "documents");
+    let isCurrent = true;
 
     const normalizeStatus = (value) => String(value || "").trim().toLowerCase();
 
@@ -56,90 +34,36 @@ export function usePayments() {
       return "—";
     };
 
-    const findReceiptByTransaction = async (transactionId) => {
-      if (!transactionId) return null;
-      const receiptQuery = query(
-        collection(db, "receipts"),
-        where("transactionId", "==", transactionId)
-      );
-      const receiptSnap = await getDocs(receiptQuery);
-      return receiptSnap.empty ? null : receiptSnap.docs[0].data();
+    const findReceipt = (receipts, { transactionId, businessId, documentId, referenceNumber }) => {
+      return receipts.find((receipt) =>
+        (transactionId && receipt.transactionId === transactionId) ||
+        (businessId && receipt.businessId === businessId) ||
+        (documentId && receipt.documentId === documentId) ||
+        (referenceNumber && receipt.referenceNumber === referenceNumber)
+      ) || null;
     };
 
-    const findReceiptByEntity = async ({ businessId, documentId, referenceNumber }) => {
-      const candidates = [];
-      if (businessId) {
-        candidates.push(query(collection(db, "receipts"), where("businessId", "==", businessId)));
-      }
-      if (documentId) {
-        candidates.push(query(collection(db, "receipts"), where("documentId", "==", documentId)));
-      }
-      if (referenceNumber) {
-        candidates.push(query(collection(db, "receipts"), where("referenceNumber", "==", referenceNumber)));
-      }
+    const loadTransactions = async () => {
+      try {
+        const [payments, receipts, businesses, documents] = await Promise.all([
+          ReportingAPI.listTreasurerPayments(),
+          ReportingAPI.listTreasurerReceipts(),
+          ReportingAPI.listTreasurerBusinesses(),
+          ReportingAPI.listTreasurerDocuments(),
+        ]);
 
-      for (const q of candidates) {
-        const snap = await getDocs(q);
-        if (!snap.empty) {
-          return snap.docs[0].data();
-        }
-      }
+        const enrichedPayments = payments.map((tx) => {
+          const receipt = findReceipt(receipts, tx);
+          const method = tx.method || receipt?.method || tx.channel || null;
+          return {
+            ...tx,
+            entityType: "payment",
+            receiptNumber: tx.receiptNumber || receipt?.receiptNumber || null,
+            method: normalizeChannel({ ...tx, method }),
+          };
+        });
 
-      return null;
-    };
-
-    const unsubPayments = onSnapshot(
-      paymentsRef,
-      async snapshot => {
-        const rawPayments = snapshot.docs.map(docSnap => ({ 
-          id: docSnap.id, 
-          entityType: "payment", 
-          ...docSnap.data() 
-        }));
-
-        // Enrich with receipt numbers
-        const enrichedPayments = await Promise.all(
-          rawPayments.map(async tx => {
-            let receiptData = await findReceiptByTransaction(tx.transactionId);
-
-            if (!receiptData) {
-              receiptData = await findReceiptByEntity({
-                businessId: tx.businessId,
-                documentId: tx.documentId,
-                referenceNumber: tx.referenceNumber,
-              });
-            }
-
-            const receiptNumber =
-              tx.receiptNumber ||
-              receiptData?.receiptNumber ||
-              null;
-            const method =
-              tx.method ||
-              receiptData?.method ||
-              tx.channel ||
-              null;
-
-            return {
-              ...tx,
-              receiptNumber,
-              method: normalizeChannel({ ...tx, method }),
-            };
-          })
-        );
-
-        updateTransactions(enrichedPayments, "payment");
-      },
-      (err) => {
-        console.error("❌ Payments listener failed:", err);
-      }
-    );
-
-    const unsubBusinesses = onSnapshot(
-      businessesRef,
-      snapshot => {
-        const pendingBiz = snapshot.docs
-          .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
+        const pendingBusinesses = businesses
           .filter(b => b.paymentStatus === "unpaid" || b.status === "for_payment")
           .map(b => ({
             ...b,
@@ -148,106 +72,62 @@ export function usePayments() {
             paymentStatus: "unpaid",
           }));
 
-        updateTransactions(pendingBiz, "business");
-      },
-      (err) => {
-        console.error("❌ Businesses listener failed:", err);
+        const enrichedDocuments = documents.map((document) => {
+          const receipt = findReceipt(receipts, document);
+          const method = document.method || receipt?.method || document.channel || null;
+          return {
+            ...document,
+            entityType: "document",
+            entityCategory: document.documentType,
+            ownerName: document.resident?.fullName,
+            paymentStatus: document.paymentStatus || document.status || "unpaid",
+            receiptNumber: document.receiptNumber || receipt?.receiptNumber || null,
+            method: normalizeChannel({ ...document, method }),
+          };
+        });
+
+        const uniqueTransactions = mergeTransactions([
+          ...enrichedPayments,
+          ...pendingBusinesses,
+          ...enrichedDocuments,
+        ]);
+        if (isCurrent) {
+          setTransactions(uniqueTransactions);
+          setTotals(calculateTotals(uniqueTransactions));
+          setRevenueByCategory(calculateRevenueByCategory(uniqueTransactions));
+          setDailySummary(calculateDailySummary(uniqueTransactions));
+        }
+      } catch (error) {
+        console.error("Unable to load treasurer payments:", error);
       }
-    );
+    };
 
-    const unsubDocuments = onSnapshot(
-      documentsRef,
-      async snapshot => {
-        const docs = await Promise.all(
-          snapshot.docs.map(async docSnap => {
-            const data = docSnap.data();
-            let receiptNumber = data.receiptNumber || null;
-            let method = data.method || data.channel || null;
-
-            let receiptData = await findReceiptByTransaction(data.transactionId);
-
-            if (!receiptData) {
-              receiptData = await findReceiptByEntity({
-                documentId: docSnap.id,
-                referenceNumber: data.referenceNumber,
-              });
-            }
-
-            if (!receiptData && data.documentId) {
-              receiptData = await findReceiptByEntity({
-                documentId: data.documentId,
-                referenceNumber: data.referenceNumber,
-              });
-            }
-
-            if (receiptData) {
-              receiptNumber = receiptData.receiptNumber || receiptNumber;
-              method = receiptData.method || method;
-            }
-
-            return {
-              id: docSnap.id,
-              ...data,
-              entityType: "document",
-              entityCategory: data.documentType,
-              ownerName: data.resident?.fullName,
-              amount: data.amount,
-              paymentStatus: data.paymentStatus || data.status || "unpaid",
-              receiptNumber,
-              method: normalizeChannel({ ...data, method }),
-            };
-          })
-        );
-
-        updateTransactions(docs, "document");
-      },
-      (err) => {
-        console.error("❌ Documents listener failed:", err);
-      }
-    );
-
-
+    loadTransactions();
+    const intervalId = window.setInterval(loadTransactions, 30000);
 
     return () => {
-      unsubPayments();
-      unsubBusinesses();
-      unsubDocuments();
+      isCurrent = false;
+      window.clearInterval(intervalId);
     };
-  }, [canListen]);
-
-  const updateTransactions = (newItems, type) => {
-    setTransactions(prev => {
-      const merged = [...prev.filter(t => t.entityType !== type), ...newItems];
-
-      const map = new Map();
-      for (const tx of merged) {
-        const key = tx.transactionId || tx.id;
-
-        // If a payment exists, prefer it over document/business
-        if (!map.has(key)) {
-          map.set(key, tx);
-        } else {
-          const existing = map.get(key);
-          if (existing.entityType !== "payment" && tx.entityType === "payment") {
-            map.set(key, tx);
-          }
-        }
-      }
-
-      const unique = Array.from(map.values());
-
-      setTotals(calculateTotals(unique));
-      setRevenueByCategory(calculateRevenueByCategory(unique));
-      setDailySummary(calculateDailySummary(unique));
-      return unique;
-    });
-  };
+  }, []);
 
 
   return { transactions, totals, revenueByCategory, dailySummary };
 }
 
 /* ----------------- Helper Functions ----------------- */
+function mergeTransactions(transactions) {
+  const map = new Map();
+  for (const transaction of transactions) {
+    const key = transaction.transactionId || transaction.id;
+    const existing = map.get(key);
+    if (!existing || (existing.entityType !== "payment" && transaction.entityType === "payment")) {
+      map.set(key, transaction);
+    }
+  }
+  return Array.from(map.values());
+}
+
 function calculateTotals(data) {
   const collections = data
     .filter(d => d.status === "paid" || d.paymentStatus === "paid")

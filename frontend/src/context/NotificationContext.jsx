@@ -1,0 +1,254 @@
+// context/NotificationContext.js
+import { createContext, useContext, useEffect, useState, useRef } from "react";
+import { NotificationsAPI } from "../services/api";
+
+const NotificationContext = createContext();
+export const useNotifications = () => useContext(NotificationContext);
+
+function decodeToken(jwt) {
+  try {
+    return JSON.parse(atob(jwt.split(".")[1]));
+  } catch {
+    return null;
+  }
+}
+
+function normalizeWsBase(url) {
+  return url
+    .replace(/^http:/i, "ws:")
+    .replace(/^https:/i, "wss:")
+    .replace("ws://localhost:", "ws://127.0.0.1:")
+    .replace("wss://localhost:", "wss://127.0.0.1:");
+}
+
+function toMillis(value) {
+  if (!value) return 0;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "number") return value;
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+  if (typeof value === "object") {
+    const seconds = value.seconds ?? value._seconds;
+    if (typeof seconds === "number") return seconds * 1000;
+    if (value.toDate && typeof value.toDate === "function") {
+      const date = value.toDate();
+      return date instanceof Date ? date.getTime() : 0;
+    }
+  }
+  return 0;
+}
+
+function sortByNewest(list) {
+  return [...list].sort((a, b) => {
+    const left = toMillis(a.timestamp);
+    const right = toMillis(b.timestamp);
+    return right - left;
+  });
+}
+
+export const NotificationProvider = ({ children, token }) => {
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const wsRef = useRef(null);
+  const reconnectTimerRef = useRef(null);
+  const retryCountRef = useRef(0);
+  const authRetryRef = useRef(0);
+  const shouldReconnectRef = useRef(true);
+
+  const countUnread = (list) => list.filter((n) => !n.read).length;
+
+  // 📜 Load initial history
+  useEffect(() => {
+    if (!token) return;
+
+    const loadHistory = async () => {
+      try {
+        const history = await NotificationsAPI.list();
+        setNotifications(sortByNewest(history));
+        setUnreadCount(countUnread(history));
+      } catch (err) {
+        console.error("⚠️ Failed to load notifications", err);
+      }
+    };
+
+    loadHistory();
+  }, [token]);
+
+  // 🔌 WebSocket connection + reconnection
+  useEffect(() => {
+    if (!token) return;
+    shouldReconnectRef.current = true;
+
+    const connect = async (authToken = token) => {
+      const payload = decodeToken(authToken);
+
+      // Refresh if expired
+      if (!payload || Date.now() / 1000 > payload.exp) {
+        console.warn("🔄 Token expired, attempting refresh...");
+        console.error("❌ Local token expired, not reconnecting");
+        return;
+      }
+
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+      const wsBase = normalizeWsBase(import.meta.env.VITE_WS_BASE_URL || apiBase);
+      const ws = new WebSocket(`${wsBase}/ws/notifications`);
+
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ token: authToken }));
+        console.log("✅ WebSocket connected");
+        retryCountRef.current = 0;
+        authRetryRef.current = 0;
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const incoming = JSON.parse(event.data);
+          setNotifications((prev) => {
+            const deduped = prev.filter((n) => n.id !== incoming.id);
+            const updated = sortByNewest([incoming, ...deduped]);
+            setUnreadCount(countUnread(updated));
+            return updated;
+          });
+        } catch (err) {
+          console.error("⚠️ Failed to parse notification payload", err);
+        }
+      };
+
+      ws.onerror = (err) => {
+        console.error("⚠️ WebSocket error", err);
+      };
+
+      ws.onclose = async (event) => {
+        console.log("❌ WebSocket disconnected", event.code, event.reason);
+
+        if (!shouldReconnectRef.current || ws !== wsRef.current) {
+          return;
+        }
+
+        if (event.code === 4001) {
+          if (authRetryRef.current >= 2) {
+            console.error("❌ WebSocket auth failed repeatedly — stopping reconnect attempts");
+            return;
+          }
+          authRetryRef.current += 1;
+          console.error("Forbidden — local JWT was rejected; stopping reconnect");
+          return;
+        }
+
+        if (!navigator.onLine) {
+          console.error("Offline — not retrying until back online");
+          return;
+        }
+
+        if (retryCountRef.current < 5) {
+          retryCountRef.current++;
+          const delay = Math.min(5000 * retryCountRef.current, 30000);
+          reconnectTimerRef.current = setTimeout(() => connect(authToken), delay);
+        } else {
+          console.error("Max retries reached — giving up");
+        }
+      };
+    };
+
+    connect();
+
+    return () => {
+      shouldReconnectRef.current = false;
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      if (
+        wsRef.current &&
+        (wsRef.current.readyState === WebSocket.OPEN ||
+          wsRef.current.readyState === WebSocket.CONNECTING)
+      ) {
+        wsRef.current.close(1000, "Notification context cleanup");
+      }
+      wsRef.current = null;
+    };
+  }, [token]);
+
+  // 🔧 Notification actions
+  const updateState = (updater) => {
+    setNotifications((prev) => {
+      const updated = updater(prev);
+      setUnreadCount(countUnread(updated));
+      return updated;
+    });
+  };
+
+  const resetUnread = () => setUnreadCount(0);
+
+  const markAsRead = async (id) => {
+    updateState((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    try {
+      await NotificationsAPI.markAsRead(id);
+    } catch (err) {
+      console.error("⚠️ Failed to mark notification as read", err);
+      refreshNotifications();
+    }
+  };
+
+  const deleteNotification = async (id) => {
+    updateState((prev) => prev.filter((n) => n.id !== id));
+    try {
+      await NotificationsAPI.delete(id);
+    } catch (err) {
+      console.error("⚠️ Failed to delete notification", err);
+    }
+  };
+
+  const bulkDeleteNotifications = async (onlyRead = true) => {
+    updateState((prev) => (onlyRead ? prev.filter((n) => !n.read) : []));
+    try {
+      if (onlyRead) {
+        await NotificationsAPI.bulkDelete(true);
+      } else {
+        await NotificationsAPI.deleteAll();
+      }
+    } catch (err) {
+      console.error("⚠️ Failed to bulk delete notifications", err);
+      refreshNotifications();
+    }
+  };
+
+  const markAllAsRead = async () => {
+    updateState((prev) => prev.map((n) => ({ ...n, read: true })));
+    try {
+      await NotificationsAPI.markAllAsRead();
+    } catch (err) {
+      console.error("⚠️ Failed to mark all notifications as read", err);
+      refreshNotifications();
+    }
+  };
+
+  const refreshNotifications = async () => {
+    try {
+      const history = await NotificationsAPI.list();
+      setNotifications(sortByNewest(history));
+      setUnreadCount(countUnread(history));
+    } catch (err) {
+      console.error("⚠️ Failed to refresh notifications", err);
+    }
+  };
+
+  return (
+    <NotificationContext.Provider
+      value={{
+        notifications,
+        unreadCount,
+        resetUnread,
+        markAsRead,
+        deleteNotification,
+        bulkDeleteNotifications,
+        markAllAsRead,
+        refreshNotifications,
+      }}
+    >
+      {children}
+    </NotificationContext.Provider>
+  );
+};

@@ -1,6 +1,5 @@
 from typing import Dict
-from firebase_admin import firestore
-from google.cloud.firestore import Client
+from backend.app.utils.firestore_utils import get_db
 
 # ✅ Centralized permission key registry
 ALL_PERMISSION_KEYS = [
@@ -14,7 +13,7 @@ ALL_PERMISSION_KEYS = [
 
 class SettingsService:
     def __init__(self):
-        db: Client = firestore.client()
+        db = get_db()
         self.settings_ref = db.collection("settings")
         self.permissions_doc = self.settings_ref.document("permissions")
         self.fees_doc = self.settings_ref.document("fees")

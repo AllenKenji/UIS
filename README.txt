@@ -2,8 +2,10 @@ BIS/
 ├── backend/                        # Python backend 
 │   ├── __init__.py          
 │   ├── app/
-│   │   ├── core/                   # Core setup (Firebase init, config, logging)
-│   │   │   ├── firebase.py
+│   │   ├── core/                   # PostgreSQL, local auth, storage, and role setup
+│   │   │   ├── postgres_store.py
+│   │   │   ├── local_auth.py
+│   │   │   ├── local_storage.py
 │   │   │   ├── roles.py
 │   │   │   └── auth.py           
 │   │   ├── models/                 # Pydantic schemas
@@ -57,7 +59,6 @@ BIS/
 │   ├── get-pip.py
 │   ├── Dockerfile
 │   ├── requirements.txt
-│   └── serviceAccountKey.json     # Firebase credentials
 │   
 ├── config/
 │   └── role_permissions.json 
@@ -180,9 +181,9 @@ BIS/
 │   │   │   └── Unauthorized.js
 │   │   ├── routes/
 │   │   │   └── AppRoutes.js
-│   │   ├── services/              # API and Firebase logic
+│   │   ├── services/              # API client and mail delivery helpers
 │   │   │   ├── api.js
-│   │   │   └── firebase.js
+│   │   │   └── email.js
 │   │   ├── styles/   
 │   │   │   ├── components/
 │   │   │   ├── core/

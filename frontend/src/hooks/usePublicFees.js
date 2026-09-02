@@ -4,7 +4,7 @@ import { API_BASE_URL } from "../services/api";
  * Hook for residents: fetches public business/document fees
  * from /api/fees/public/... endpoints and computes totals.
  */
-export function usePublicFees() {
+export function usePublicFees(barangayId) {
   const [businessTypes, setBusinessTypes] = useState([]);
   const [documentTypes, setDocumentTypes] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -38,14 +38,20 @@ export function usePublicFees() {
   };
 
   useEffect(() => {
+    if (!barangayId) {
+      setBusinessTypes([]);
+      setDocumentTypes([]);
+      return;
+    }
+
     const fetchPublicFees = async () => {
       setLoading(true);
       setError(null);
 
       try {
         const [bizRes, docRes] = await Promise.allSettled([
-          fetch(`${API_BASE_URL}/api/fees/public/businesses`),
-          fetch(`${API_BASE_URL}/api/fees/public/documents`),
+          fetch(`${API_BASE_URL}/api/fees/public/businesses?barangayId=${encodeURIComponent(barangayId)}`),
+          fetch(`${API_BASE_URL}/api/fees/public/documents?barangayId=${encodeURIComponent(barangayId)}`),
         ]);
 
         // ✅ Handle businesses
@@ -86,7 +92,7 @@ export function usePublicFees() {
     };
 
     fetchPublicFees();
-  }, []);
+  }, [barangayId]);
 
   // 🔎 Lookup helpers
   const getBusinessFee = (type) =>

@@ -17,7 +17,7 @@ class DocumentStatus(str, Enum):
 
 class Attachment(BaseModel):
     url: Optional[str] = Field(None, description="Public or signed URL to the uploaded file")
-    path: Optional[str] = Field(None, description="Storage path inside Firebase bucket")
+    path: Optional[str] = Field(None, description="Path inside local document storage")
 
 class Document(BaseModel):
     # 🔑 Firestore document ID
@@ -30,6 +30,7 @@ class Document(BaseModel):
     residentId: str = Field(..., description="Resident ID who requested the document")
     residentName: Optional[str] = Field(None, description="Full name of the resident")
     authUid: Optional[str] = Field(None, description="Auth UID if available")
+    barangayId: Optional[str] = Field(None, description="Tenant this document belongs to")
 
     # 📄 Document details
     documentType: str = Field(..., description="Type of document requested")
@@ -61,6 +62,15 @@ class Document(BaseModel):
     # 📜 Issuance info
     issuedBy: Optional[str] = Field(None, description="Secretary/Admin who issued the document")
     fileUrl: Optional[str] = Field(None, description="URL to the issued document file")
+    validUntil: Optional[datetime] = Field(
+        None, description="Validity expiration printed on the document, per the issuing barangay's configured document validity period",
+    )
+    publicPrinted: bool = Field(
+        False,
+        description="Whether this document has already been printed once through the public "
+        "self-service lookup — once true, the public flow stops offering it (the record and "
+        "fileUrl are untouched, so staff can still view/reissue it from the admin side).",
+    )
 
     # 🧩 Flexible extra fields for type-specific data
     extraFields: Optional[Dict[str, Any]] = Field(

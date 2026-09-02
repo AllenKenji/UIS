@@ -8,23 +8,16 @@ from backend.app.services.password_service import (
     apply_password_reset,
     find_user_by_email
 )
-from firebase_admin import auth
-import requests
+from backend.app.services.email_service import send_email
 
 logger = logging.getLogger("uvicorn.error")
 router = APIRouter(prefix="/password", tags=["Password Reset"])
 
-MAIL_URL = "https://sendemailasia-phy3kbzjda-as.a.run.app"
 FRONTEND_BASE_URL = os.environ.get("FRONTEND_BASE_URL", "https://uis.lits.com.ph").rstrip("/")
 
 
 @router.post("/request")
 async def request_reset(data: ResetRequest):
-    try:
-        user = auth.get_user_by_email(data.email)
-    except Exception:
-        raise HTTPException(status_code=404, detail="User not found")
-
     user_record = find_user_by_email(data.email)
     if not user_record:
         raise HTTPException(status_code=404, detail="No matching resident or account found")
@@ -32,7 +25,7 @@ async def request_reset(data: ResetRequest):
     token = create_reset_token(data.email)
     reset_link = f"{FRONTEND_BASE_URL}/reset-password?token={token}"
 
-    full_name = user_record.full_name or user.display_name or "User"
+    full_name = user_record.full_name or "User"
     barangay = user_record.barangay or (user_record.address.barangay if user_record.address else "Unknown")
 
     payload = {
@@ -43,10 +36,11 @@ async def request_reset(data: ResetRequest):
         "resetLink": reset_link,
     }
 
-    resp = requests.post(MAIL_URL, json=payload)
-    if resp.status_code != 200:
-        logger.error("❌ Email service error [%s]: %s", resp.status_code, resp.text)
-        raise HTTPException(status_code=500, detail="Failed to send reset email")
+    try:
+        send_email("reset", data.email, full_name, reset_link)
+    except Exception as error:
+        logger.error("Email delivery failed: %s", error)
+        raise HTTPException(status_code=500, detail="Failed to send reset email") from error
 
     return {"success": True, "message": "Reset email sent"}
 

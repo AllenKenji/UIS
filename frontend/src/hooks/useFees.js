@@ -7,7 +7,11 @@ import {
   buildUsageMiscPayload,
 } from "../utils/payloadBuilders";
 
-export function useFees(delayMs = 500) { 
+export function useFees(delayMs = 500, options = {}) {
+  // `barangayId` lets a super_admin scope this hook to one barangay's fees
+  // (instead of the caller's own, token-scoped barangay); `enabled` lets
+  // callers hold off fetching until a barangay has actually been picked.
+  const { barangayId, enabled = true } = options;
   const [documentFees, setDocumentFees] = useState([]);
   const [businessFees, setBusinessFees] = useState([]);
   const [miscFees, setMiscFees] = useState([]);
@@ -20,13 +24,15 @@ export function useFees(delayMs = 500) {
   };
 
   const refreshData = useCallback(async () => {
+    if (!enabled) return;
     setLoading(true);
     setError(null);
     try {
+      const params = barangayId ? { barangayId } : {};
       const [docs, businesses, misc] = await Promise.all([
-        FeesAPI.listDocuments(),
-        FeesAPI.listBusinesses(),
-        FeesAPI.listMisc(),
+        FeesAPI.listDocuments(params),
+        FeesAPI.listBusinesses(params),
+        FeesAPI.listMisc(params),
       ]);
       setDocumentFees(docs || []);
       setBusinessFees(businesses || []);
@@ -36,16 +42,22 @@ export function useFees(delayMs = 500) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [barangayId, enabled]);
 
   // 🚀 Fetch on mount with delay
   useEffect(() => {
+    if (!enabled) {
+      setDocumentFees([]);
+      setBusinessFees([]);
+      setMiscFees([]);
+      return;
+    }
     const timer = setTimeout(() => {
       refreshData();
     }, delayMs);
 
-    return () => clearTimeout(timer); 
-  }, [refreshData, delayMs]);
+    return () => clearTimeout(timer);
+  }, [refreshData, delayMs, enabled]);
 
   return {
     documentFees,

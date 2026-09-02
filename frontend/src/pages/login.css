@@ -175,7 +175,7 @@
 /* ===============================
 📱 Responsive
 ================================ */
-@media (max-width: var(--bp-sm)) {
+@media (max-width: 576px) {
   .login-form {
     padding: var(--space-md);
   }

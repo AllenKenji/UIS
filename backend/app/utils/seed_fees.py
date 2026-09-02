@@ -1,11 +1,11 @@
 import logging
-from google.cloud import firestore
+from backend.app.utils.firestore_utils import get_db
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("seed")
 
 # Initialize Firestore client
-db = firestore.Client()
+db = get_db()
 
 # ✅ Seed data
 DOCUMENT_TYPES = [
@@ -39,7 +39,7 @@ def seed_business_types():
 
 
 def run_seed():
-    logger.info("🚀 Starting Firestore seeding...")
+    logger.info("Starting PostgreSQL seeding...")
     seed_document_types()
     seed_business_types()
     logger.info("🎉 Seeding complete!")

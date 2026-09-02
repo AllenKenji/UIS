@@ -5,7 +5,7 @@ import { calculateMiscFee, resolveMiscFees } from "../utils/fees";
  * Wraps useFees and resolves misc fees for documents and businesses.
  * Provides registrationTotal and annualTotal for businesses.
  */
-export function useResolvedFees() {
+export function useResolvedFees(options = {}) {
   const {
     documentFees,
     businessFees,
@@ -19,7 +19,7 @@ export function useResolvedFees() {
     deleteDocumentFee,
     deleteBusinessFee,
     deleteMiscFee,
-  } = useFees();
+  } = useFees(500, options);
 
   const resolvedDocuments = resolveMiscFees(documentFees, miscFees, true, "document");
   const resolvedBusinesses = resolveMiscFees(businessFees, miscFees, true, "business");

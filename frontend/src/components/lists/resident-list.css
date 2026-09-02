@@ -1,3 +1,47 @@
+/* ⏳ Verification badges & pending banner */
+.pending-verification-banner {
+  text-align: center;
+  background: #fff3cd;
+  color: #7a5b00;
+  border: 1px solid #ffeeba;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+.pending-verification-banner button {
+  background: none;
+  border: none;
+  color: #0066cc;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+}
+
+.verification-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin: 4px 0;
+}
+.verification-badge.verified { background: #d4edda; color: #155724; }
+.verification-badge.pending { background: #fff3cd; color: #7a5b00; }
+.verification-badge.rejected { background: #f8d7da; color: #721c24; }
+
+.id-document-section, .verification-actions {
+  margin-top: 14px;
+}
+.verification-actions textarea {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 6px 0;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
+
 /* 🔖 General layout */
 .resident-list {
   max-width: 1000px;

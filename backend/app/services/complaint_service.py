@@ -1,6 +1,6 @@
 import logging
 from typing import Optional, List
-from google.cloud import firestore
+from backend.app.core.postgres_store import SERVER_TIMESTAMP
 from backend.app.utils.firestore_utils import get_db
 from backend.app.models.complaint import (
     ComplaintCreate,
@@ -8,6 +8,7 @@ from backend.app.models.complaint import (
     ComplaintWithResident,
     ComplaintStatus,
 )
+from backend.app.services.resident_service import require_verified_resident
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -83,11 +84,16 @@ def file_complaint(data: ComplaintCreate) -> Optional[Complaint]:
     # Ensure filed_for is set: if not provided, default to filed_by (resident self-filing)
     filed_for = data.filed_for or data.filed_by
 
+    if filed_for:
+        subject_doc = get_db().collection(RESIDENT_COLLECTION).document(filed_for).get()
+        if subject_doc.exists:
+            require_verified_resident(subject_doc.to_dict() or {})
+
     payload = {
         **data.model_dump(),
         "filed_by": data.filed_by,       # who entered the complaint
         "filed_for": filed_for,          # resident the complaint is about
-        "timestamp": firestore.SERVER_TIMESTAMP,
+        "timestamp": SERVER_TIMESTAMP(),
         "updated_at": None,
         "status": ComplaintStatus.open.value,
     }
@@ -141,6 +147,7 @@ def list_complaints_by_resident_id(auth_uid: str, limit: Optional[int] = None):
 def list_complaints_with_residents(
     limit: Optional[int] = None,
     status: Optional[ComplaintStatus] = None,
+    barangay_id: Optional[str] = None,
 ) -> List[ComplaintWithResident]:
     results: List[ComplaintWithResident] = []
 
@@ -151,6 +158,8 @@ def list_complaints_with_residents(
 
         if status:
             query = query.where("status", "==", status.value)
+        if barangay_id:
+            query = query.where("barangayId", "==", barangay_id)
         if limit:
             query = query.limit(limit)
 
@@ -181,7 +190,7 @@ def update_complaint_status(
 
         update_data = {
             "status": status.value,
-            "updated_at": firestore.SERVER_TIMESTAMP,
+            "updated_at": SERVER_TIMESTAMP(),
         }
 
         if notes:

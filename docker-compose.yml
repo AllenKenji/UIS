@@ -1,6 +1,23 @@
 version: "3.9"
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bis-postgres
+    environment:
+      POSTGRES_USER: bis
+      POSTGRES_PASSWORD: bis_local_password
+      POSTGRES_DB: bis
+    ports:
+      - "5432:5432"
+    volumes:
+      - bis_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bis -d bis"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   backend:
     build:
       context: .
@@ -8,11 +25,14 @@ services:
     container_name: bis-backend
     ports:
       - "8000:8000"
-    env_file:
-      - .env   # inject all variables from your local .env
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
-      GOOGLE_APPLICATION_CREDENTIALS: /app/serviceAccountKey.json
+      DATABASE_URL: postgresql://bis:bis_local_password@postgres:5432/bis
     volumes:
-      - ./backend/serviceAccountKey.json:/app/serviceAccountKey.json
       - ./config:/app/config
     restart: unless-stopped
+
+volumes:
+  bis_postgres_data:

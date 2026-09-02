@@ -6,14 +6,11 @@ from datetime import datetime, timezone
 from urllib import request as urllib_request
 from urllib.error import HTTPError, URLError
 from fastapi import HTTPException, status
-from firebase_admin import auth
-from firebase_admin.exceptions import FirebaseError
-from firebase_admin._auth_utils import UserNotFoundError
-from google.cloud import firestore
+from datetime import datetime, timezone
 from backend.app.utils.firestore_utils import get_db
 from backend.app.models.account import AccountCreate, AccountResponse, RoleEnum
 from backend.app.core.roles import ROLE_PERMISSIONS
-from backend.app.core.firebase import get_firestore
+from backend.app.core.local_auth import create_user, delete_user
 
 logger: logging.Logger = logging.getLogger("uvicorn.error")
 CFDP_SYNC_ROLES = {"surveyor", "supervisor"}
@@ -28,80 +25,45 @@ def sanitize_account_payload(data: AccountCreate, created_by: str) -> dict:
         "full_name": data.full_name,
         "email": data.email,
         "role": data.role.value,
+        "roles": [data.role.value],
+        "barangayId": data.barangayId,
         "createdBy": created_by,
-        "createdAt": firestore.SERVER_TIMESTAMP,
-        "updatedAt": firestore.SERVER_TIMESTAMP,
+        "createdAt": datetime.now(timezone.utc),
+        "updatedAt": datetime.now(timezone.utc),
     }
 
 
-def create_firebase_user(data: AccountCreate) -> str:
-    """Create a Firebase Auth user and return UID."""
+def create_local_user(data: AccountCreate) -> str:
+    """Create a local PostgreSQL user and return its UID."""
     try:
-        user = auth.create_user(email=data.email, password=data.password)
-        logger.info("🔐 Firebase Auth user created: %s", user.uid)
-        return user.uid
-    except FirebaseError as e:
-        if "EMAIL_EXISTS" in str(e).upper():
+        uid = create_user(data.email, data.password, {"full_name": data.full_name, "role": data.role.value, "roles": [data.role.value], "barangayId": data.barangayId})
+        logger.info("Local auth user created: %s", uid)
+        return uid
+    except ValueError as e:
+        if "Email already" in str(e):
             logger.warning("⚠️ Email already in use: %s", data.email)
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Email already in use. Please choose a different one.",
             )
-        logger.error("❌ Firebase Auth creation failed: %s", str(e), exc_info=True)
+        logger.error("Local auth creation failed: %s", str(e), exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to create Firebase user: {str(e)}",
+            detail=f"Failed to create local user: {str(e)}",
         )
 
 
 def set_user_claims(uid: str, role: RoleEnum):
-    """Assign custom claims for Firestore rules enforcement."""
-    try:
-        permissions = ROLE_PERMISSIONS.get(str(role), {})
-        auth.set_custom_user_claims(uid, {
-            "role": role.value,
-            "permissions": permissions
-        })
-        logger.info("🔐 Custom claims set for UID %s → role=%s, permissions=%s", uid, role, permissions)
-    except Exception as e:
-        logger.error("❌ Failed to set custom claims for UID %s: %s", uid, str(e), exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to set custom claims: {str(e)}"
-        )
+    """Persist role and permissions in the local user profile."""
+    get_db().collection("users").document(uid).update({
+        "role": role.value,
+        "permissions": ROLE_PERMISSIONS.get(role.value, {}),
+    })
 
 
-def delete_firebase_user(uid: str, email: Optional[str] = None):
-    """Delete a Firebase Auth user by UID, with email fallback for legacy/mismatched IDs."""
-    try:
-        auth.delete_user(uid)
-        logger.info("🗑️ Firebase Auth user deleted by UID: %s", uid)
-        return
-    except UserNotFoundError:
-        logger.warning("⚠️ Firebase UID not found for deletion: %s", uid)
-    except FirebaseError as e:
-        logger.error("❌ Firebase Auth deletion by UID failed: %s", str(e), exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to delete Firebase user by UID: {str(e)}",
-        )
-
-    # Some legacy records may pass a Firestore doc id instead of Firebase UID.
-    if email:
-        try:
-            user = auth.get_user_by_email(email)
-            auth.delete_user(user.uid)
-            logger.info("🗑️ Firebase Auth user deleted by email fallback: %s (%s)", email, user.uid)
-            return
-        except UserNotFoundError:
-            logger.warning("⚠️ Firebase user not found by email fallback: %s", email)
-            return
-        except FirebaseError as e:
-            logger.error("❌ Firebase Auth deletion by email failed: %s", str(e), exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Failed to delete Firebase user by email: {str(e)}",
-            )
+def delete_local_user(uid: str, email: Optional[str] = None):
+    """Delete a local PostgreSQL user."""
+    delete_user(uid)
 
 
 def rollback_account_creation(uid: str):
@@ -112,9 +74,9 @@ def rollback_account_creation(uid: str):
         logger.warning("⚠️ Rollback Firestore delete failed for UID %s: %s", uid, err)
 
     try:
-        auth.delete_user(uid)
+        delete_user(uid)
     except Exception as err:
-        logger.warning("⚠️ Rollback Firebase Auth delete failed for UID %s: %s", uid, err)
+        logger.warning("Local auth rollback failed for UID %s: %s", uid, err)
 
 
 def provision_cfdp_local_user(uid: str, data: AccountCreate):
@@ -194,10 +156,10 @@ def provision_cfdp_local_user(uid: str, data: AccountCreate):
 
 
 def write_firestore_profile(uid: str, payload: dict):
-    """Write user profile to Firestore."""
+    """Write user profile to PostgreSQL."""
     try:
         get_db().collection("users").document(uid).set(payload, merge=True)
-        logger.info("✅ Firestore profile created for UID: %s", uid)
+        logger.info("Local profile created for UID: %s", uid)
     except Exception as e:
         logger.error("❌ Firestore write failed: %s", str(e), exc_info=True)
         raise HTTPException(
@@ -207,16 +169,16 @@ def write_firestore_profile(uid: str, payload: dict):
 
 
 def delete_firestore_profile(uid: str, deleted_by: str):
-    """Delete user profile from Firestore and log audit trail."""
+    """Delete user profile from PostgreSQL and log the audit trail."""
     try:
         get_db().collection("users").document(uid).delete()
-        logger.info("🗑️ Firestore profile deleted for UID: %s", uid)
+        logger.info("Local profile deleted for UID: %s", uid)
 
         get_db().collection("role_changes").add({
             "action": "delete",
             "target_user": uid,
             "changed_by": deleted_by,
-            "timestamp": firestore.SERVER_TIMESTAMP,
+            "timestamp": datetime.now(timezone.utc),
         })
     except Exception as e:
         logger.error("❌ Firestore deletion failed: %s", str(e), exc_info=True)
@@ -244,7 +206,8 @@ def update_user_role(uid: str, new_role: RoleEnum, changed_by: str) -> AccountRe
         # 🔄 Update Firestore role
         user_ref.update({
             "role": new_role.value,
-            "updatedAt": firestore.SERVER_TIMESTAMP,
+            "roles": list(dict.fromkeys([*(data.get("roles") or []), new_role.value])),
+            "updatedAt": datetime.now(timezone.utc),
         })
         logger.info("✅ Role updated to %s for UID: %s", new_role, uid)
 
@@ -257,7 +220,7 @@ def update_user_role(uid: str, new_role: RoleEnum, changed_by: str) -> AccountRe
             "target_user": uid,
             "new_role": new_role.value,
             "changed_by": changed_by,
-            "timestamp": firestore.SERVER_TIMESTAMP,
+            "timestamp": datetime.now(timezone.utc),
         })
 
         return AccountResponse(
@@ -265,6 +228,7 @@ def update_user_role(uid: str, new_role: RoleEnum, changed_by: str) -> AccountRe
             email=data.get("email"),
             full_name=data.get("full_name"),
             role=new_role,
+            barangayId=data.get("barangayId"),
             created_by=data.get("createdBy", changed_by),
             created_at=data.get("createdAt", datetime.now(timezone.utc)),
             updated_at=datetime.now(timezone.utc),
@@ -287,7 +251,7 @@ async def create_barangay_account(
     skip_cfdp_provision: bool = False,
 ) -> AccountResponse:
     """Create a Firebase Auth user, Firestore profile, and set claims."""
-    uid = create_firebase_user(data)
+    uid = create_local_user(data)
     payload = sanitize_account_payload(data, created_by)
 
     try:
@@ -306,7 +270,7 @@ async def create_barangay_account(
             "target_user": uid,
             "new_role": data.role.value,
             "changed_by": created_by,
-            "timestamp": firestore.SERVER_TIMESTAMP,
+            "timestamp": datetime.now(timezone.utc),
         })
         logger.info("📝 Audit trail logged for account creation: %s", uid)
     except Exception as e:
@@ -317,9 +281,12 @@ async def create_barangay_account(
         email=data.email,
         full_name=data.full_name,
         role=data.role,
+        barangayId=data.barangayId,
         created_by=created_by,
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
+            photo_url=None,
+            roles=[data.role],
     )
 
 
@@ -330,35 +297,47 @@ async def delete_barangay_account(uid: str, deleted_by: str):
     if user_doc.exists:
         user_email = user_doc.to_dict().get("email")
 
-    delete_firebase_user(uid, user_email)
+    delete_local_user(uid, user_email)
     delete_firestore_profile(uid, deleted_by)
     return {"detail": f"Account {uid} deleted successfully"}
 
-async def list_barangay_accounts( 
-        role: RoleEnum | None = None, 
-        limit: int = 20, 
-        offset: int = 0, 
-        order_by: str = "createdAt"
+async def list_barangay_accounts(
+        role: RoleEnum | None = None,
+        limit: int = 20,
+        offset: int = 0,
+        order_by: str = "createdAt",
+        barangay_id: str | None = None,
     ) -> list[AccountResponse]:
-        """List all barangay accounts, optionally filtered by role."""
+        """List all barangay accounts, optionally filtered by role and/or barangay."""
         try:
             query = get_db().collection("users").order_by(order_by)
             if role:
                 query = query.where("role", "==", role.value)
+            if barangay_id:
+                query = query.where("barangayId", "==", barangay_id)
             snapshots = query.limit(limit).offset(offset).stream()
 
             accounts = []
             for snap in snapshots:
                 data = snap.to_dict()
-                accounts.append(AccountResponse(
-                    uid=snap.id,
-                    email=data.get("email"),
-                    full_name=data.get("full_name"),
-                    role=RoleEnum(data.get("role")),
-                    created_by=data.get("createdBy"),
-                    created_at=data.get("createdAt", datetime.now(timezone.utc)),
-                    updated_at=data.get("updatedAt", datetime.now(timezone.utc)),
-                ))
+                try:
+                    accounts.append(AccountResponse(
+                        uid=snap.id,
+                        email=data.get("email"),
+                        full_name=data.get("full_name"),
+                        role=RoleEnum(data.get("role")),
+                        barangayId=data.get("barangayId"),
+                        created_by=data.get("createdBy"),
+                        created_at=data.get("createdAt", datetime.now(timezone.utc)),
+                        updated_at=data.get("updatedAt", datetime.now(timezone.utc)),
+                        photo_url=data.get("photoUrl"),
+                        signature_url=data.get("signatureUrl"),
+                        roles=[RoleEnum(r) for r in data.get("roles") or [data.get("role")] if r in RoleEnum._value2member_map_],
+                    ))
+                except ValueError:
+                    # Skip legacy/non-staff accounts (e.g. resident logins) that don't fit RoleEnum
+                    # rather than failing the whole listing.
+                    logger.warning("⚠️ Skipping account %s with unrecognized role=%s", snap.id, data.get("role"))
             return accounts
         except Exception as e:
             logger.error("❌ Failed to list accounts: %s", str(e), exc_info=True)

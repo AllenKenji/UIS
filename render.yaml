@@ -7,14 +7,6 @@ services:
     startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips '*'
     healthCheckPath: /api/status
     envVars:
-      - key: FIREBASE_STORAGE_BUCKET
-        sync: false
-      - key: FIREBASE_PROJECT_ID
-        sync: false
-      - key: GOOGLE_CLOUD_PROJECT
-        sync: false
-      - key: FIREBASE_SERVICE_ACCOUNT
-        sync: false
       - key: PAYMONGO_SECRET_KEY
         sync: false
       - key: PAYMONGO_PUBLIC_KEY
@@ -45,8 +37,6 @@ services:
       - key: REACT_APP_API_BASE_URL
         sync: false
       - key: REACT_APP_WS_BASE_URL
-        sync: false
-      - key: REACT_APP_MAIL_URL
         sync: false
       - key: REACT_APP_CFDP_SURVEY_URL
         sync: false

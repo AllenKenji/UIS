@@ -3,7 +3,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime
 from backend.app.models.document import Document, DocumentStatus
-from backend.app.core.auth import require_permission
+from backend.app.core.auth import require_permission, get_current_user, resolve_tenant_scope
 from backend.app.services import document_service
 from backend.app.services.notification_service import NotificationService
 import logging
@@ -57,6 +57,7 @@ async def _notify_document_status_change(doc: Document):
     except Exception as notify_err:
         logger.warning("⚠️ Document status notification failed: %s", notify_err)
 
+
 # ===============================
 # 📤 List Documents
 # ===============================
@@ -67,6 +68,8 @@ async def list_documents(
     issuedBy: Optional[str] = Query(None),
     fromDate: Optional[datetime] = Query(None),
     toDate: Optional[datetime] = Query(None),
+    barangayId: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user),
     uid: str = Depends(require_permission("viewDocuments"))
 ) -> List[Document]:
     return document_service.list_documents(
@@ -76,6 +79,8 @@ async def list_documents(
         issuedBy=issuedBy,
         fromDate=fromDate,
         toDate=toDate,
+        barangay_id=resolve_tenant_scope(current_user, barangayId),
+        role=current_user.get("role"),
     )
 
 @router.get("/my", response_model=List[Document])
@@ -192,20 +197,34 @@ async def confirm_payment(doc_id: str) -> Document:
     return updated
 
 # ===============================
+# 🖨️ Public one-time print
+# ===============================
+@router.patch("/{doc_id}/public-print", response_model=Document)
+async def mark_public_printed(doc_id: str) -> Document:
+    """
+    No auth on purpose — matches the rest of the public self-service document
+    flow (GET /documents/my, etc.), which identifies the resident by
+    email/mobile + birth date rather than a login.
+    """
+    return await document_service.mark_public_printed(doc_id)
+
+# ===============================
 # 📜 Issue Document
 # ===============================
-class IssuePayload(BaseModel): 
-    issued_by: str 
+class IssuePayload(BaseModel):
+    issued_by: str
     file_url: Optional[str] = None
     remarks: Optional[str] = None
+    issuedByUid: Optional[str] = None
 
 @router.patch("/{doc_id}/issue", response_model=Document)
 async def issue_document(doc_id: str, payload: IssuePayload) -> Document:
     updated = await document_service.issue_document(
-        doc_id, 
-        payload.issued_by, 
-        payload.file_url, 
-        payload.remarks
+        doc_id,
+        payload.issued_by,
+        payload.file_url,
+        payload.remarks,
+        issued_by_uid=payload.issuedByUid,
     )
     await _notify_document_status_change(updated)
     return updated

@@ -4,11 +4,10 @@ Use this checklist immediately after any secret exposure.
 
 ## Rotate now
 
-1. Firebase service account key(s)
-2. PayMongo secret, public, and webhook keys
-3. Gmail OAuth client secret and refresh token
-4. JWT secrets and API keys used by integrated services
-5. Database credentials and connection strings
+1. PayMongo secret, public, and webhook keys
+2. Gmail OAuth client secret and refresh token
+3. JWT secrets and API keys used by integrated services
+4. Database credentials and connection strings
 
 ## After rotation
 

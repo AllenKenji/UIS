@@ -1,7 +1,9 @@
 import logging
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from typing import List, Optional
+
+from backend.app.core.auth import get_current_user, require_permission, resolve_tenant_scope
 
 from backend.app.models.incident import (
     IncidentCreate,
@@ -72,6 +74,8 @@ async def report_incident(incident: IncidentCreate):
             logger.warning("⚠️ Incident submit notification failed: %s", notify_err)
 
         return created
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("❌ Failed to create incident: %s", e, exc_info=True)
         raise HTTPException(status_code=400, detail="Failed to create incident")
@@ -95,9 +99,20 @@ def get_incident(incident_id: str):
 
 # 📋 List all incidents with resident info
 @router.get("", response_model=List[IncidentWithResident])
-def get_all_incidents(status: Optional[str] = None):
+def get_all_incidents(
+    status: Optional[str] = None,
+    barangayId: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+    _: None = Depends(require_permission(["viewIncidents", "viewOwnIncidents"])),
+):
     try:
-        incidents = list_incidents_with_residents(status=status)
+        if current_user.get("role") not in ("admin", "staff", "super_admin"):
+            # Residents (and any other non-staff role) only ever see their own incidents.
+            all_incidents = list_incidents_with_residents(status=status)
+            incidents = [i for i in all_incidents if i.residentId == current_user.get("uid")]
+        else:
+            scope = resolve_tenant_scope(current_user, barangayId)
+            incidents = list_incidents_with_residents(status=status, barangay_id=scope)
         logger.info("📋 Retrieved %d incidents (status=%s)", len(incidents), status)
         return incidents
     except Exception as e:

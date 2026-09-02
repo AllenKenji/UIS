@@ -9,24 +9,27 @@ def _normalize_key(value: str) -> str:
     """Normalize type strings for comparison (lowercase, underscores)."""
     return value.strip().lower().replace(" ", "_")
 
-def _find_fee_record(collection: str, id_field: str, type_value: str) -> dict | None:
+def _find_fee_record(collection: str, id_field: str, type_value: str, barangay_id: str | None = None) -> dict | None:
     """Find a fee record in Firestore collections with misc support."""
     fees = list_with_misc(collection) if collection in ["business_types", "document_types"] else list_collection(collection)
     key = _normalize_key(type_value)
     for fee in fees:
-        if _normalize_key(fee[id_field]) == key:
-            return fee
+        if _normalize_key(fee[id_field]) != key:
+            continue
+        if barangay_id is not None and fee.get("barangayId") != barangay_id:
+            continue
+        return fee
     return None
 
 # -----------------------------
 # 💰 Generic Fee Resolver
 # -----------------------------
-def resolve_fee(collection: str, id_field: str, type_value: str, fee_type: str | None = None) -> dict:
+def resolve_fee(collection: str, id_field: str, type_value: str, fee_type: str | None = None, barangay_id: str | None = None) -> dict:
     """
     Generic fee resolver for business, document, and misc types.
     Returns a breakdown dict with base, main, misc, and total.
     """
-    fee_record = _find_fee_record(collection, id_field, type_value)
+    fee_record = _find_fee_record(collection, id_field, type_value, barangay_id)
     if not fee_record:
         raise ValueError(f"Fee not found for {type_value} in {collection}")
 
@@ -61,22 +64,26 @@ def resolve_fee(collection: str, id_field: str, type_value: str, fee_type: str |
         "miscFee": misc,
         "totalFee": total,
         "feeType": fee_type or "standard",
-        "typeValue": type_value
+        "typeValue": type_value,
+        # Per-document-type override of how long an issued document stays
+        # valid; None means "use the barangay/system default" (see
+        # document_service.DEFAULT_DOCUMENT_VALIDITY_DAYS).
+        "validityDays": fee_record.get("validityDays"),
     }
 
 # -----------------------------
 # 📄 Specific Resolvers
 # -----------------------------
-def resolve_document_fee(document_type: str) -> dict:
+def resolve_document_fee(document_type: str, barangay_id: str | None = None) -> dict:
     """Resolve fee for a document type, including misc if enabled."""
-    return resolve_fee("document_types", "documentType", document_type)
+    return resolve_fee("document_types", "documentType", document_type, barangay_id=barangay_id)
 
-def resolve_business_fee(business_type: str, fee_type: str) -> dict:
+def resolve_business_fee(business_type: str, fee_type: str, barangay_id: str | None = None) -> dict:
     """
     Resolve fee for a business type.
     fee_type must be "registrationFee" or "annualFee".
     """
-    return resolve_fee("business_types", "businessType", business_type, fee_type=fee_type)
+    return resolve_fee("business_types", "businessType", business_type, fee_type=fee_type, barangay_id=barangay_id)
 
 def resolve_misc_fee(misc_type: str) -> dict:
     """Resolve fee for a standalone misc type."""

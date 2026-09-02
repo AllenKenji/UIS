@@ -24,7 +24,6 @@ Frontend is a static React site. Deploy separately:
 6. Add environment variables:
    - REACT_APP_API_BASE_URL
    - REACT_APP_WS_BASE_URL
-   - REACT_APP_MAIL_URL
    - REACT_APP_CFDP_SURVEY_URL
 
 ## Services to create
@@ -52,13 +51,15 @@ uvicorn app.main:app --host 0.0.0.0 --port $PORT
 
 ### Required environment variables
 
-- `FIREBASE_STORAGE_BUCKET`
-- `FIREBASE_PROJECT_ID`
-- `GOOGLE_CLOUD_PROJECT`
-- `FIREBASE_SERVICE_ACCOUNT` (JSON string secret)
+- `DATABASE_URL`
+- `JWT_SECRET`
+- `LOCAL_STORAGE_DIR`
 - `PAYMONGO_SECRET_KEY`
 - `PAYMONGO_PUBLIC_KEY`
 - `PAYMONGO_WEBHOOK_SECRET`
+- `GMAIL_CLIENT_ID`
+- `GMAIL_CLIENT_SECRET`
+- `GMAIL_REFRESH_TOKEN`
 
 ### Optional CFDP provisioning variables (for surveyor/supervisor sync)
 
@@ -87,7 +88,6 @@ build
 
 - `REACT_APP_API_BASE_URL=https://<your-bis-backend>.onrender.com`
 - `REACT_APP_WS_BASE_URL=wss://<your-bis-backend>.onrender.com`
-- `REACT_APP_MAIL_URL=<your-firebase-function-url>`
 - `REACT_APP_CFDP_SURVEY_URL=https://<your-cfdp-frontend>.onrender.com`
 
 ## Post-deploy checks

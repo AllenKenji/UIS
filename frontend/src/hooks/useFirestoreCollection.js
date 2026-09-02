@@ -1,27 +1,43 @@
 import { useEffect, useState } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
-import { db } from "../services/firebase"; // adjust path if needed
+import { YouthEventsAPI, YouthFeedbackAPI, YouthProgramsAPI } from "../services/api";
 
 /**
- * Generic Firestore collection listener
- * @param {string} collectionName - Firestore collection to listen to
+ * REST-backed loader for migrated youth collections.
+ * @param {string} collectionName - Collection name retained for call-site compatibility
  * @returns {Array} documents - Array of { id, ...data }
  */
 export const useFirestoreCollection = (collectionName) => {
   const [documents, setDocuments] = useState([]);
 
   useEffect(() => {
-    const ref = collection(db, collectionName);
+    const collectionApis = {
+      sk_programs: YouthProgramsAPI,
+      sk_events: YouthEventsAPI,
+      youth_feedback: YouthFeedbackAPI,
+    };
+    const collectionApi = collectionApis[collectionName];
+    if (!collectionApi) {
+      setDocuments([]);
+      return undefined;
+    }
 
-    const unsubscribe = onSnapshot(ref, (snapshot) => {
-      const docs = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setDocuments(docs);
-    });
+    let active = true;
+    const load = async () => {
+      try {
+        const records = await collectionApi.list();
+        if (active) setDocuments(records);
+      } catch (error) {
+        console.error(`Failed to load ${collectionName}`, error);
+      }
+    };
 
-    return () => unsubscribe();
+    load();
+    window.addEventListener("youth-data-changed", load);
+
+    return () => {
+      active = false;
+      window.removeEventListener("youth-data-changed", load);
+    };
   }, [collectionName]);
 
   return documents;

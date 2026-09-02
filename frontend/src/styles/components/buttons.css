@@ -65,24 +65,24 @@ button:disabled,
 /* ===============================
 📏 Responsive Size Variants
 ================================ */
-@media (min-width: var(--bp-sm)) {
+@media (min-width: 576px) {
   .btn-sm-sm { font-size: var(--font-size-sm); padding: var(--space-xs) var(--space-md); }
   .btn-lg-sm { font-size: var(--font-size-lg); padding: var(--space-md) var(--space-lg); }
 }
 
-@media (min-width: var(--bp-md)) {
+@media (min-width: 768px) {
   .btn-sm-md { font-size: var(--font-size-sm); padding: var(--space-xs) var(--space-md); }
   .btn-lg-md { font-size: var(--font-size-lg); padding: var(--space-md) var(--space-lg); }
   .btn-xl-md { font-size: var(--font-size-xl); padding: var(--space-lg) var(--space-xl); }
 }
 
-@media (min-width: var(--bp-lg)) {
+@media (min-width: 992px) {
   .btn-sm-lg { font-size: var(--font-size-sm); padding: var(--space-xs) var(--space-md); }
   .btn-lg-lg { font-size: var(--font-size-lg); padding: var(--space-md) var(--space-lg); }
   .btn-xl-lg { font-size: var(--font-size-xl); padding: var(--space-lg) var(--space-xl); }
 }
 
-@media (min-width: var(--bp-xl)) {
+@media (min-width: 1200px) {
   .btn-sm-xl { font-size: var(--font-size-sm); padding: var(--space-xs) var(--space-md); }
   .btn-lg-xl { font-size: var(--font-size-lg); padding: var(--space-md) var(--space-lg); }
   .btn-xl-xl { font-size: var(--font-size-xl); padding: var(--space-lg) var(--space-xl); }

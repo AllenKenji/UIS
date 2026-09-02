@@ -19,6 +19,10 @@ def load_role_permissions(path: Path = CONFIG_PATH) -> Dict[str, Dict[str, bool]
         for role, keys in overrides.items()
     }
 
+    # super_admin is not hand-maintained in role_permissions.json — it always
+    # gets every permission that exists, so it can never drift out of date.
+    role_maps["super_admin"] = {perm: True for perm in all_perms}
+
     return role_maps, all_perms
 
 ROLE_PERMISSIONS, ALL_PERMISSIONS = load_role_permissions()

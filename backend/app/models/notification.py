@@ -17,7 +17,8 @@ class Notification(BaseModel):
         "business", "business_update",
         "document", "document_update",
         "payment", "payment_update",
-        "sk_expense"
+        "sk_expense",
+        "resident_verification", "resident_verification_update"
     ]
     
     # Scope clarifies login/logout context

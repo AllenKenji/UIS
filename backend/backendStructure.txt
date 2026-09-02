@@ -4,7 +4,9 @@ BIS/
 │   │   ├── core/
 │   │   │   ├── auth.py
 │   │   │   ├── roles.py
-│   │   │   └── firebase.py
+│   │   │   ├── local_auth.py
+│   │   │   ├── local_storage.py
+│   │   │   └── postgres_store.py
 │   │   ├── models/
 │   │   │   ├── __init__.py
 │   │   │   ├── account.py
@@ -52,4 +54,3 @@ BIS/
 │   ├── assign_claims.py
 │   ├── Dockerfile
 │   ├── requirements.txt
-│   └── serviceAccountKey.json

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
-import { db } from "../services/firebase";
+import { ReportingAPI } from "../services/api";
 
 /**
  * Subscribe to a Firestore collection and return aggregated stats by status
@@ -14,29 +13,38 @@ export const useFirestoreStats = (
   statuses = []
 ) => {
   const [stats, setStats] = useState({ total: 0 });
+  const statusesKey = statuses.join("|");
 
   useEffect(() => {
-    const ref = collection(db, collectionName);
+    let isCurrent = true;
+    const requestedStatuses = statusesKey ? statusesKey.split("|") : [];
 
-    const unsubscribe = onSnapshot(ref, (snapshot) => {
-      const counts = { total: snapshot.size };
+    if (collectionName !== "documents" || statusField !== "status") {
+      setStats({ total: 0 });
+      return undefined;
+    }
 
-      // Initialize counts
-      statuses.forEach((s) => (counts[s] = 0));
+    const loadStats = async () => {
+      try {
+        const result = await ReportingAPI.documentStatuses();
+        const counts = { total: result.total || 0 };
+        requestedStatuses.forEach((status) => {
+          counts[status] = result.counts?.[status] || 0;
+        });
+        if (isCurrent) setStats(counts);
+      } catch (error) {
+        console.error("Unable to load document status totals:", error);
+      }
+    };
 
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        const status = data[statusField];
-        if (status && counts[status] !== undefined) {
-          counts[status]++;
-        }
-      });
+    loadStats();
+    const intervalId = window.setInterval(loadStats, 30000);
 
-      setStats(counts);
-    });
-
-    return () => unsubscribe();
-  }, [collectionName, statusField, statuses]);
+    return () => {
+      isCurrent = false;
+      window.clearInterval(intervalId);
+    };
+  }, [collectionName, statusField, statusesKey]);
 
   return stats;
 };

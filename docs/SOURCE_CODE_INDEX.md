@@ -6,18 +6,17 @@ Barangay Information System (BIS) is a full-stack system composed of:
 
 - FastAPI backend for core business logic, records, workflow state updates, and integrations.
 - React frontend for role-based dashboard interfaces.
-- Firebase Auth, Firestore, and Storage for identity, persistence, and file handling.
-- Cloud functions support under the `functions` folder.
+- PostgreSQL for application persistence, with JSONB compatibility records during the incremental typed-table migration.
+- Local JWT authentication, local filesystem uploads, and Gmail OAuth2 email delivery through FastAPI.
 
 ## High-Level Structure
 
 - `backend/app/main.py`: FastAPI app factory, router registration, CORS, health endpoint.
-- `backend/app/core`: Firebase bootstrap, auth dependencies, role utilities.
+- `backend/app/core`: PostgreSQL document-store compatibility API, local JWT auth, local storage, and role utilities.
 - `backend/app/models`: Pydantic request and response schemas.
 - `backend/app/routes`: HTTP and websocket API route handlers.
-- `backend/app/services`: Service-layer business logic and Firestore operations.
+- `backend/app/services`: Service-layer business logic, local mail delivery, and PostgreSQL-backed records.
 - `frontend/src`: UI pages, reusable components, context, route definitions, API client.
-- `functions`: auxiliary cloud functions.
 - `config/role_permissions.json`: role permission matrix.
 
 ## Backend Route Modules
@@ -35,10 +34,13 @@ Barangay Information System (BIS) is a full-stack system composed of:
 - `password_routes.py`
 - `payment_routes.py`
 - `paymongo_routes.py`
+- `reporting_routes.py`
 - `resident_routes.py`
 - `role_routes.py`
 - `settings_routes.py`
+- `storage_routes.py`
 - `ws_routes.py`
+- `youth_routes.py`
 
 ## API Surface Summary
 
@@ -50,6 +52,10 @@ The backend registers routers in `backend/app/main.py` with the following prefix
 - `/api/complaints`
 - `/api/paymongo`
 - `/api/document_audit`
+- `/api/reporting`
+- `/api/storage`
+- `/api/youth`
+- `/api/email`
 - `/dashboard`
 - `/api` for payments, fees, disbursements, roles, password reset, notifications
 - websocket notifications via `/ws/notifications`
@@ -66,6 +72,8 @@ Representative endpoints include:
 - Disbursements: `/api/disbursements`, `/api/disbursements/{id}`
 - Accounts: `/api/admin/create-account`, `/api/admin/accounts`
 - Password reset: `/api/password/request`, `/api/password/verify/{token}`, `/api/password/apply`
+- Email: `/api/email`
+- Uploads: `/api/storage/upload`, with local files served at `/storage/...`
 
 ## Frontend Route Map
 
@@ -97,18 +105,22 @@ Feature pages:
 
 Backend-critical variables observed in source:
 
-- `FIREBASE_STORAGE_BUCKET`
-- `FIREBASE_SERVICE_ACCOUNT` (inline JSON credentials option)
-- `GOOGLE_APPLICATION_CREDENTIALS` (local key file option)
+- `DATABASE_URL`
+- `JWT_SECRET`
+- `LOCAL_STORAGE_DIR`
 - `PAYMONGO_SECRET_KEY`
 - `PAYMONGO_PUBLIC_KEY`
 - `PAYMONGO_WEBHOOK_SECRET`
+- `GMAIL_CLIENT_ID`
+- `GMAIL_CLIENT_SECRET`
+- `GMAIL_REFRESH_TOKEN`
 - `CORS_ORIGINS`
 
 Frontend variables observed in source:
 
 - `REACT_APP_API_BASE_URL`
-- `REACT_APP_FIREBASE_STORAGE_BUCKET`
+- `REACT_APP_WS_BASE_URL`
+- `REACT_APP_CFDP_SURVEY_URL`
 
 ## Local Run Reference
 
@@ -124,9 +136,9 @@ Frontend local:
 
 Docker:
 
-- `docker-compose.yml` defines `backend` service and mounts Firebase key file.
+- `docker-compose.yml` defines the backend and PostgreSQL services for local development.
 - `Dockerfile` starts backend with Uvicorn.
 
 ## Full Source Export
 
-Use `docs/generate_source_documentation.ps1` to regenerate `docs/SOURCE_CODE_FULL_GENERATED.md`.
+Use `docs/generate_source_documentation.ps1` to generate a timestamped source reference from the current files.

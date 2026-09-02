@@ -1,14 +1,14 @@
 # backend/app/utils/firestore_utils.py
 import logging
 from fastapi import HTTPException
-from backend.app.core.firebase import get_firestore
+from backend.app.core.postgres_store import get_database
 from datetime import datetime
 
 logger = logging.getLogger("uvicorn.error")
 
 def get_db(): 
-    """Return a Firestore client lazily.""" 
-    return get_firestore()
+    """Return the PostgreSQL document-store compatibility client lazily."""
+    return get_database()
 
 # -----------------------------
 # 🔧 Unified Fee Validator

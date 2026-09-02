@@ -13,12 +13,15 @@ class RoleEnum(str, Enum):
     admin = "admin"
     surveyor = "surveyor"
     supervisor = "supervisor"
+    super_admin = "super_admin"
 
 # 🧾 Base account schema
 class AccountBase(BaseModel):
     email: EmailStr
     full_name: str = Field(..., min_length=2, max_length=100)
     role: RoleEnum
+    # None only for super_admin accounts, which aren't scoped to a single barangay.
+    barangayId: Optional[str] = None
 
 # 🆕 Account creation schema
 class AccountCreate(AccountBase):
@@ -30,6 +33,9 @@ class AccountResponse(AccountBase):
     created_by: str
     created_at: datetime
     updated_at: Optional[datetime] = None
+    photo_url: Optional[str] = None
+    signature_url: Optional[str] = None
+    roles: list[RoleEnum] = []
 
 # 🛠️ Firestore payload schema
 class AccountFirestorePayload(AccountBase):
@@ -46,5 +52,6 @@ class AccountFirestorePayload(AccountBase):
 # 🔄 Account update schema
 class AccountUpdate(BaseModel):
     full_name: Optional[str] = Field(None, min_length=2, max_length=100)
+    email: Optional[EmailStr] = None
     role: Optional[RoleEnum] = None
     updated_at: datetime = Field(default_factory=datetime.utcnow)

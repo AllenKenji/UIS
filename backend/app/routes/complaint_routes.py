@@ -18,7 +18,7 @@ from backend.app.services.complaint_service import (
     update_complaint_status,
     delete_complaint,
 )
-from backend.app.core.auth import require_permission
+from backend.app.core.auth import require_permission, get_current_user, resolve_tenant_scope
 from backend.app.services.notification_service import NotificationService
 
 logger = logging.getLogger("uvicorn.error")
@@ -52,7 +52,8 @@ class StatusUpdateRequest(BaseModel):
 )
 async def submit_complaint(
     complaint: ComplaintCreate,
-    current_user=Depends(require_permission(["fileComplaints", "fileComplaintsForResidents"])),
+    current_user: dict = Depends(get_current_user),
+    _: str = Depends(require_permission(["fileComplaints", "fileComplaintsForResidents"])),
 ):
     """
     Submit a complaint.
@@ -63,6 +64,7 @@ async def submit_complaint(
         # Ensure filed_for is set: if not provided, default to self-filing
         if not complaint.filed_for:
             complaint.filed_for = complaint.filed_by
+        complaint.barangayId = current_user.get("barangayId")
 
         created = file_complaint(complaint)
         if not created:
@@ -130,11 +132,14 @@ def get_my_complaints(
     summary="Admin/staff lists all complaints with resident + filer info",
 )
 def get_all_complaints(
+    current_user: dict = Depends(get_current_user),
     _: None = Depends(require_permission("viewAllComplaints")),
     limit: Optional[int] = Query(None, ge=0, le=100),
     status: Optional[ComplaintStatus] = Query(None),
+    barangayId: Optional[str] = Query(None),
 ):
-    return list_complaints_with_residents(limit, status)
+    scope = resolve_tenant_scope(current_user, barangayId)
+    return list_complaints_with_residents(limit, status, scope)
 
 # ---------------------------------------------------------
 # ✅ 4. Get a specific complaint by ID

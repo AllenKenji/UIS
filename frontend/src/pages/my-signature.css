@@ -1,0 +1,29 @@
+.my-signature-page { max-width: 520px; margin: 0 auto; padding: 20px; color: var(--color-text); }
+.my-signature-page h1 { margin-bottom: 8px; }
+.my-signature-page > p { color: var(--color-text); opacity: 0.75; margin-bottom: 20px; }
+.my-signature-page > button {
+  margin-top: 14px;
+  padding: 10px 20px;
+  border: 0;
+  border-radius: var(--radius-md, 6px);
+  background: var(--color-accent);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+.my-signature-page > button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.signature-current {
+  margin-bottom: 20px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-card-bg);
+}
+.signature-current img {
+  max-width: 240px;
+  max-height: 100px;
+  background: #fff;
+  border-radius: 4px;
+  padding: 6px;
+}

@@ -13,10 +13,11 @@ const safeNumber = (val) => {
 // 📄 Document payload builder
 export const buildDocumentPayload = (item, key, value) => ({
   fee: safeNumber(key === "fee" ? value : item.fee),
-  miscType: item.miscType || null,
+  miscType: (key === "miscType" ? value : item.miscType) || null,
   miscFeeType: key === "miscFeeType" ? value : item.miscFeeType || null,
   miscFeeRate: safeNumber(key === "miscFeeValue" ? value : item.miscFeeRate),
   enabled: key === "enabled" ? !!value : !!item.enabled,
+  validityDays: safeNumber(key === "validityDays" ? value : item.validityDays),
   documentType: item.documentType || item.id || null, // ✅ always include
 });
 
@@ -29,7 +30,7 @@ export const buildBusinessPayload = (item, key, value) => ({
   annualFee: safeNumber(
     key === "annualFee" ? value : item.annualFee
   ),
-  miscType: item.miscType || null,
+  miscType: (key === "miscType" ? value : item.miscType) || null,
   miscFeeType: key === "miscFeeType" ? value : item.miscFeeType || null,
   miscFeeRate: safeNumber(key === "miscFeeValue" ? value : item.miscFeeRate),
   enabled: key === "enabled" ? !!value : !!item.enabled,

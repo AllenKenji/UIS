@@ -1,22 +1,28 @@
 import { useEffect, useState } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
-import { db } from "../services/firebase";
+import { ReportingAPI } from "../services/api";
 
 export const useDocumentCounters = () => {
   const [counters, setCounters] = useState([]);
 
   useEffect(() => {
-    const ref = collection(db, "counters");
+    let isCurrent = true;
 
-    const unsubscribe = onSnapshot(ref, (snapshot) => {
-      const docs = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setCounters(docs);
-    });
+    const loadCounters = async () => {
+      try {
+        const counters = await ReportingAPI.listCounters();
+        if (isCurrent) setCounters(counters);
+      } catch (error) {
+        console.error("Unable to load document counters:", error);
+      }
+    };
 
-    return () => unsubscribe();
+    loadCounters();
+    const intervalId = window.setInterval(loadCounters, 30000);
+
+    return () => {
+      isCurrent = false;
+      window.clearInterval(intervalId);
+    };
   }, []);
 
   return counters;

@@ -6,6 +6,7 @@ from typing import Literal, Optional
 # -----------------------------
 class BaseFee(BaseModel):
     """Common fields shared by all fee types."""
+    barangayId: Optional[str] = Field(default=None, description="Tenant this fee belongs to")
     fee: int = Field(..., ge=0, description="Base/base fee amount")
     enabled: bool = Field(default=True, description="Enable/disable this fee")
     miscType: Optional[str] = Field(
@@ -28,10 +29,16 @@ class BaseFee(BaseModel):
 class DocumentFee(BaseFee):
     """Update model for existing document fees."""
     documentType: Optional[str] = Field(None, min_length=1, description="Type of document")
+    validityDays: Optional[int] = Field(
+        default=None, ge=1, le=3650,
+        description="How long a document of this type stays valid once issued, printed on the document "
+        "itself. None means fall back to the barangay/system default.",
+    )
 
 class NewDocumentFee(BaseFee):
     """Creation model for new document fees."""
     documentType: str = Field(..., min_length=1, description="Type of document")
+    validityDays: Optional[int] = Field(default=None, ge=1, le=3650)
 
 # -----------------------------
 # 🏢 Business Fee Models

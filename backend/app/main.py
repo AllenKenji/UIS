@@ -7,11 +7,14 @@ from backend.app.config import settings
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.encoders import ENCODERS_BY_TYPE
 
-from backend.app.core.firebase import ensure_firebase_initialized
+from backend.app.core.postgres_store import initialize_database
+from backend.app.core.local_storage import LocalStorage
 from backend.app.routes import (
     resident_routes,
     dashboard,
@@ -29,6 +32,13 @@ from backend.app.routes import (
     password_routes,
     ws_routes,
     notification_routes,
+    reporting_routes,
+    storage_routes,
+    youth_routes,
+    email_routes,
+    message_routes,
+    public_routes,
+    super_admin_routes,
 )
 
 logger = logging.getLogger("barangay")
@@ -37,13 +47,10 @@ logger = logging.getLogger("barangay")
 async def lifespan(app: FastAPI):
     # Startup logic
     try:
-        bucket_env = os.environ.get("FIREBASE_STORAGE_BUCKET") 
-        logger.info("🔍 FIREBASE_STORAGE_BUCKET env var = %s", bucket_env)
-        
-        logger.info("🚀 Initializing Firebase...")
-        ensure_firebase_initialized()
+        logger.info("🚀 Initializing PostgreSQL document store...")
+        initialize_database()
     except Exception as e:
-        logger.error(f"❌ Firebase initialization failed: {e}")
+        logger.error(f"❌ PostgreSQL initialization failed: {e}")
         raise
 
     yield  # <-- app runs here
@@ -66,6 +73,9 @@ def create_app() -> FastAPI:
     cors_env = os.environ.get("CORS_ORIGINS", "")
     allowed_origins = [origin.strip() for origin in cors_env.split(",") if origin] or [
         "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
         "https://barangay-1721d.web.app",
     ]
 
@@ -95,6 +105,23 @@ def create_app() -> FastAPI:
     app.include_router(password_routes.router, prefix=f"{api_prefix}", tags=["Password Reset"])
     app.include_router(ws_routes.router, tags=["websocket"])
     app.include_router(notification_routes.router, prefix=f"{api_prefix}", tags=["notifications"])
+    app.include_router(reporting_routes.router, prefix=api_prefix, tags=["Reporting"])
+    app.include_router(storage_routes.router, prefix=api_prefix)
+    app.include_router(youth_routes.router, prefix=api_prefix)
+    app.include_router(email_routes.router, prefix=api_prefix)
+    app.include_router(message_routes.router, prefix=api_prefix)
+    app.include_router(public_routes.router, prefix=api_prefix)
+    app.include_router(super_admin_routes.router, prefix=api_prefix)
+    storage_root = LocalStorage().root
+    storage_root.mkdir(parents=True, exist_ok=True)
+    logger.info("Serving local storage from %s", storage_root)
+
+    @app.get("/storage/{file_path:path}", include_in_schema=False)
+    def serve_storage_file(file_path: str):
+        candidate = (storage_root / file_path).resolve()
+        if storage_root not in candidate.parents or not candidate.is_file():
+            raise HTTPException(status_code=404, detail="File not found")
+        return FileResponse(candidate)
 
     # 🧪 Health Check
     @app.get(f"{api_prefix}/status", tags=["Health"])
@@ -107,10 +134,13 @@ def create_app() -> FastAPI:
         if "paymongo" not in request.url.path:
             body = await request.body()
             if request.headers.get("content-type", "").startswith("application/json"):
-                try:
-                    body_text = body.decode("utf-8")
-                except UnicodeDecodeError:
-                    body_text = "<invalid utf-8>"
+                if request.url.path.startswith("/api/public/"):
+                    body_text = "<redacted public request body>"
+                else:
+                    try:
+                        body_text = body.decode("utf-8")
+                    except UnicodeDecodeError:
+                        body_text = "<invalid utf-8>"
             else:
                 body_text = f"<non-text body, length={len(body)}>"
             logger.info("📦 %s %s → %s", request.method, request.url.path, body_text or "<empty>")

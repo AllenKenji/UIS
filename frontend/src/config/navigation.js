@@ -35,6 +35,12 @@ const links = {
   youthAddEvent: { path: "/youth/events/add", label: "➕ Add Event", action: "viewDashboard" },
   youthFeedback: { path: "/youth/feedback", label: "💬 Feedback", action: "viewDashboard" },
   home: { path: "/", label: "🏠 Home", action: "viewDashboard" },
+  messages: { path: "/messages", label: "💬 Messages", action: "viewDashboard" },
+  mySignature: { path: "/my-signature", label: "✍️ My Signature", action: "viewDashboard" },
+  superAdmin: { path: "/super-admin", label: "🛡️ Barangays & Cities", action: "viewDashboard" },
+  superAdminAccounts: { path: "/super-admin/accounts", label: "👥 Accounts", action: "viewDashboard" },
+  superAdminPayments: { path: "/super-admin/payments", label: "💰 Payment Collections", action: "viewDashboard" },
+  superAdminSettings: { path: "/super-admin/settings", label: "⚙️ Barangay Settings", action: "viewDashboard" },
 
   // Secretary-specific links
   requestForDocuments: { path: "/secretary/documents", label: "📝 Document Request", action: "documentRequest" },
@@ -50,8 +56,17 @@ const links = {
 };
 
 const sidebarLinks = {
+  super_admin: [
+    links.superAdmin,
+    links.superAdminAccounts,
+    links.superAdminPayments,
+    links.superAdminSettings,
+    links.messages,
+  ],
   admin: [
     links.dashboard("/admin"),
+    links.messages,
+    links.mySignature,
     links.adminAudit,
     links.skDashboard,
     links.cfdpSurvey,
@@ -66,6 +81,8 @@ const sidebarLinks = {
   ],
   staff: [
     links.dashboard("/staff"),
+    links.messages,
+    links.mySignature,
     links.cfdpSurvey,
     links.residents,
     links.addResident,
@@ -76,13 +93,17 @@ const sidebarLinks = {
     links.fileComplaint,
   ],
   surveyor: [
+    links.messages,
     links.cfdpSurvey,
   ],
   supervisor: [
+    links.messages,
     links.cfdpSurvey,
   ],
   secretary: [
     links.dashboard("/secretary"),
+    links.messages,
+    links.mySignature,
     links.cfdpSurvey,
     links.requestForDocuments,
     links.pendingRequests,
@@ -93,6 +114,8 @@ const sidebarLinks = {
   ],
   treasurer: [
     links.dashboard("/treasurer"),
+    links.messages,
+    links.mySignature,
     links.cfdpSurvey,
     links.incomingPayments,
     links.expenses,
@@ -101,6 +124,8 @@ const sidebarLinks = {
   ],
   sk: [
     links.youth,
+    links.messages,
+    links.mySignature,
     links.youthRegistry,
     links.youthPrograms,
     links.youthAddProgram,
@@ -111,6 +136,7 @@ const sidebarLinks = {
   ],
   dilg: [
     links.dilgAuditOverview,
+    links.messages,
     links.dilgAuditRegistry,
     links.dilgAuditDocuments,
     links.dilgAuditExports,
@@ -118,6 +144,7 @@ const sidebarLinks = {
   ],
   resident: [
     links.dashboard("/resident"),
+    links.messages,
     links.cfdpSurvey,
     links.fileComplaint,     
     links.viewOwnComplaints,   
