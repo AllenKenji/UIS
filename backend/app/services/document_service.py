@@ -369,10 +369,16 @@ def list_documents(
     query = db.collection("documents")
 
     # Role-based filtering
-    if role in ("admin", "secretary") and residentId:
-        query = query.where("residentId", "==", residentId)
-    elif role not in ("admin", "secretary"):
+    # Only an actual resident is confined to their own documents. Every staff
+    # role (admin, secretary, treasurer, super_admin, staff, sk, dilg, ...)
+    # can see the full list, optionally narrowed via the residentId param —
+    # previously only "admin"/"secretary" got that, so super_admin and other
+    # staff roles were silently filtered down to residentId == their own uid,
+    # which matches nothing since they aren't residents.
+    if role == "resident":
         query = query.where("residentId", "==", uid)
+    elif residentId:
+        query = query.where("residentId", "==", residentId)
 
     # Apply filters
     if documentType:
@@ -694,6 +700,38 @@ async def mark_resubmitted(doc_id: str) -> Document:
         raise HTTPException(status_code=400, detail="Only rejected documents can be resubmitted")
     return await update_document(doc_id, {"resubmitted": True})
 
+def _log_document_payment(doc: Document) -> None:
+    """Record a payments/receipts entry for a document verified as paid
+    through the staff review flow (for_payment/payment_submitted -> paid).
+
+    The cash-payment endpoint (/paymongo/payments/document) and the PayMongo
+    webhook both call log_payment_record when they mark a document paid, but
+    this manual "verify payment" path — a secretary/admin confirming a
+    resident's payment — never did, so those verified payments silently never
+    showed up in the payments/receipts collections, which is what the
+    super-admin Payment Collections page (and totals) are built from.
+    """
+    if not doc.amount:
+        return  # free documents never go through a payment step
+    from backend.app.services.payment_service import log_payment_record
+    try:
+        log_payment_record(
+            reference_number=doc.referenceNumber or doc.documentId,
+            transaction_id=doc.transactionId or doc.documentId,
+            amount=doc.amount,
+            status="paid",
+            fee_type="document_fee",
+            document_id=doc.documentId,
+            owner_name=doc.residentName,
+            document_type=doc.documentType,
+            event_type="staff.verify",
+            method="manual",
+            barangay_id=doc.barangayId,
+        )
+    except Exception as e:
+        logger.warning("⚠️ Failed to log payment record for document %s: %s", doc.id, e)
+
+
 async def update_status(doc_id: str, new_status: DocumentStatus, remarks: Optional[str]) -> Document:
     doc = get_and_serialize(doc_id)
     if doc.amount == 0 and new_status in [DocumentStatus.for_payment, DocumentStatus.payment_submitted]:
@@ -708,13 +746,18 @@ async def update_status(doc_id: str, new_status: DocumentStatus, remarks: Option
         raise HTTPException(status_code=400, detail=f"Invalid transition {doc.status.value} → {new_status.value}")
     if new_status == DocumentStatus.rejected and not remarks:
         raise HTTPException(status_code=422, detail="Rejection reason required")
-    return await update_document(doc_id, {"status": new_status.value, "remarks": remarks})
+    updated = await update_document(doc_id, {"status": new_status.value, "remarks": remarks})
+    if new_status == DocumentStatus.paid:
+        _log_document_payment(updated)
+    return updated
 
 async def confirm_payment(doc_id: str) -> Document:
     doc = get_and_serialize(doc_id)
     if doc.status not in (DocumentStatus.for_payment, DocumentStatus.payment_submitted):
         raise HTTPException(status_code=400, detail="Payment can only be confirmed from for_payment or payment_submitted")
-    return await update_document(doc_id, {"status": DocumentStatus.paid.value, "paymentStatus": "paid"})
+    updated = await update_document(doc_id, {"status": DocumentStatus.paid.value, "paymentStatus": "paid"})
+    _log_document_payment(updated)
+    return updated
 
 
 async def mark_public_printed(doc_id: str) -> Document:
@@ -831,14 +874,16 @@ async def delete_document(doc_id: str, uid: str):
     # Perform deletion
     doc_ref.delete()
 
-    # --- Delete related payments ---
-    payments = get_db().collection("payments").where("documentId", "==", doc_id).get()
-    for pay in payments:
-        pay.reference.delete()
-
-    # --- Delete related receipts ---
-    receipts = get_db().collection("receipts").where("documentId", "==", doc_id).get()
-    for rec in receipts:
-        rec.reference.delete()
+    # --- Delete related payments/receipts ---
+    # Payment records store the human-readable documentId (e.g.
+    # "Barangay_Clearance-0001"), not the Firestore doc id passed in here —
+    # match on both since the manual cash-payment endpoint has historically
+    # logged the Firestore id instead (see payment_routes.record_document_payment).
+    human_id = deleted_doc.documentId
+    candidate_ids = {doc_id} | ({human_id} if human_id else set())
+    for collection_name in ("payments", "receipts"):
+        for candidate in candidate_ids:
+            for record in get_db().collection(collection_name).where("documentId", "==", candidate).get():
+                record.reference.delete()
 
     return deleted_doc

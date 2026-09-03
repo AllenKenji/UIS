@@ -2,13 +2,33 @@ import uuid
 from datetime import datetime, timezone
 import logging
 from backend.app.core.local_storage import delete_file
-from backend.app.services.paymongo_service import create_payment_link
 from backend.app.services.fee_service import resolve_business_fee, determine_business_fee_type
 from backend.app.services.resident_service import require_verified_resident
 from backend.app.utils.firestore_utils import get_db
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 
 logger = logging.getLogger("uvicorn.error")
+
+
+def is_business_name_taken(barangay_id: str, business_name: str, exclude_id: str | None = None) -> bool:
+    """Case/whitespace-insensitive check within a barangay. Rejected
+    applications don't hold the name — a resident can reuse it — so those
+    are excluded."""
+    normalized = (business_name or "").strip().lower()
+    if not normalized or not barangay_id:
+        return False
+
+    query = get_db().collection("businesses").where("barangayId", "==", barangay_id)
+    for doc in query.stream():
+        if exclude_id and doc.id == exclude_id:
+            continue
+        existing = doc.to_dict() or {}
+        if str(existing.get("status", "")).lower() == "rejected":
+            continue
+        if str(existing.get("businessName", "")).strip().lower() == normalized:
+            return True
+    return False
+
 
 def create_business_application(data):
     business = data.business
@@ -22,6 +42,15 @@ def create_business_application(data):
     require_verified_resident(owner_data)
     barangay_id = owner_data.get("barangayId")
 
+    # Franchise branches legitimately share a name within the same barangay
+    # (e.g. two branches of the same chain) — only block true duplicates.
+    if not business.is_franchise and is_business_name_taken(barangay_id, business.name):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f'A business named "{business.name}" is already registered in this barangay. '
+                   'If this is a franchise branch, mark it as a franchise to continue.',
+        )
+
     # Decide fee type (registration vs annual)
     fee_type = determine_business_fee_type(business.dict())
     fee_breakdown = resolve_business_fee(business.type, fee_type, barangay_id)
@@ -30,13 +59,6 @@ def create_business_application(data):
     doc_ref = get_db().collection("businesses").document()
     year = datetime.now().year
     business_id = f"BIZ-{business.barangay.upper()}-{year}-{uuid.uuid4().hex[:4]}"
-
-    # Create PayMongo link
-    paymongo = create_payment_link(
-        amount=amount,
-        description=f"{fee_type} for {business.name}",
-        remarks=f"business_id:{business_id}"
-    )
 
     biz_data = business.dict()
 
@@ -64,19 +86,20 @@ def create_business_application(data):
         "city": biz_data.get("city"),
         "province": biz_data.get("province"),
         "address": f"{biz_data.get('street', '')}, Brgy. {biz_data.get('barangay', '')}, {biz_data.get('city', '')}, {biz_data.get('province', '')}",
+        "isFranchise": biz_data.get("is_franchise", False),
         "documents": documents_data,
         "amount": amount,
         "feeType": fee_type,
-        "status": "awaiting_payment",
+        # Staff must verify the submitted documents before this moves to
+        # "for_payment" (via BusinessEvaluationModal) — no payment link is
+        # created yet. ResidentBusinessPayment requests one on demand once
+        # the resident can actually pay, so nothing here goes unused either.
+        "status": "pending_evaluation",
         "paymentStatus": "unpaid",
-        "paymongoLinkId": paymongo["paymongoLinkId"],
-        "checkoutUrl": paymongo["checkoutUrl"],
-        "referenceNumber": paymongo["referenceNumber"]
     })
 
     return {
         "business_id": business_id,
-        "checkout_url": paymongo["checkoutUrl"],
         "fee_breakdown": fee_breakdown
     }
 

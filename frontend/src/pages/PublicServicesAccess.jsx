@@ -1,9 +1,14 @@
-import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { PublicServicesAPI, API_BASE_URL } from "../services/api";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { PublicServicesAPI, API_BASE_URL, BusinessesAPI, ComplaintsAPI, IncidentsAPI } from "../services/api";
 import PublicBackBar from "../components/public/PublicBackBar";
 import MyDocuments from "../components/resident/MyDocuments";
+import ResidentBusinessDashboard from "../components/resident/ResidentBusinessDashboard";
+import MyIncidents from "../components/resident/MyIncidents";
+import ComplaintList from "../components/dashboard/ComplaintList";
 import { formatAddress } from "../utils/addressFormat";
+import { useMyDocuments } from "../hooks/useMyDocuments";
+import { getLastSeen, markSeen } from "../utils/attentionTracking";
 import "./public-services.css";
 
 const SERVICE_ROUTES = {
@@ -113,14 +118,96 @@ function RequestUpdateForm({ profile, onSubmitted }) {
   );
 }
 
+const STATUS_TABS = [
+  { key: "documents", label: "📄 Documents" },
+  { key: "businesses", label: "🏢 Businesses" },
+  { key: "complaints", label: "📢 Complaints" },
+  { key: "incidents", label: "🚨 Incidents" },
+];
+
+// Small tab badges for "My Requests" — flags a tab only when something
+// there actually needs the resident to look/act, not for every record in a
+// terminal state forever:
+// - Documents: rejected-and-not-yet-resubmitted, or awaiting payment —
+//   self-clears once the resident acts, so no "seen" tracking needed.
+// - Businesses: expired, rejected, or approved but expiring within 30
+//   days — same, self-clears on renewal/resubmission.
+// - Complaints/Incidents: just informational status changes (no resident
+//   action resolves them), so these use the "last seen" tracking in
+//   attentionTracking.js instead — flagged only until the resident opens
+//   that tab, then cleared until the next update.
+function useAttentionCounts(residentId) {
+  const { docs } = useMyDocuments(residentId);
+  const [businesses, setBusinesses] = useState([]);
+  const [complaints, setComplaints] = useState([]);
+  const [incidents, setIncidents] = useState([]);
+
+  useEffect(() => {
+    if (!residentId) return;
+    BusinessesAPI.listMine(residentId)
+      .then((data) => setBusinesses(Array.isArray(data) ? data : []))
+      .catch(() => setBusinesses([]));
+    ComplaintsAPI.listMinePublic(residentId)
+      .then((data) => setComplaints(Array.isArray(data) ? data : []))
+      .catch(() => setComplaints([]));
+    IncidentsAPI.listMinePublic(residentId)
+      .then((data) => setIncidents(Array.isArray(data) ? data : []))
+      .catch(() => setIncidents([]));
+  }, [residentId]);
+
+  const documentsCount = docs.filter(
+    (d) => (d.status === "rejected" && !d.resubmitted) || d.status === "for_payment"
+  ).length;
+
+  const businessesCount = businesses.filter((b) => {
+    const status = String(b.status || "").toLowerCase();
+    if (status === "expired" || status === "rejected") return true;
+    if (status === "approved" && b.validUntil) {
+      const daysLeft = Math.ceil((new Date(b.validUntil) - new Date()) / (1000 * 60 * 60 * 24));
+      return daysLeft <= 30;
+    }
+    return false;
+  }).length;
+
+  const toDate = (value) => {
+    if (!value) return null;
+    if (typeof value === "object" && typeof value.seconds === "number") return new Date(value.seconds * 1000);
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const complaintsLastSeen = getLastSeen(residentId, "complaints");
+  const complaintsCount = complaints.filter((c) => {
+    if (String(c.status || "").toLowerCase() !== "resolved") return false;
+    const changedAt = toDate(c.resolved_at || c.updatedAt || c.timestamp);
+    return changedAt && (!complaintsLastSeen || changedAt > complaintsLastSeen);
+  }).length;
+
+  const incidentsLastSeen = getLastSeen(residentId, "incidents");
+  const incidentsCount = incidents.filter((i) => {
+    const status = String(i.status || "").toLowerCase();
+    if (!["resolved", "escalated"].includes(status)) return false;
+    const changedAt = toDate(i.updatedAt);
+    return changedAt && (!incidentsLastSeen || changedAt > incidentsLastSeen);
+  }).length;
+
+  return { documents: documentsCount, businesses: businessesCount, complaints: complaintsCount, incidents: incidentsCount };
+}
+
 export default function PublicServicesAccess() {
   const { barangayId } = useParams();
   const navigate = useNavigate();
-  const [profile, setProfile] = useState(null);
+  const { state } = useLocation();
+  // "Back to My Profile" (PublicBackBar) navigates here with the already
+  // looked-up profile in state, so this page shouldn't ask for the
+  // email/mobile + birth date again — only the very first visit should.
+  const [profile, setProfile] = useState(state?.profile || null);
   const [identifier, setIdentifier] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [statusTab, setStatusTab] = useState("documents");
+  const attentionCounts = useAttentionCounts(profile?.residentId);
 
   const lookup = async (event) => {
     event?.preventDefault();
@@ -210,7 +297,49 @@ export default function PublicServicesAccess() {
         <p className="public-note">Choose a service to use your saved information for form prefill.</p>
 
         {/* Status of anything already filed, incl. Pay Now once staff verifies attachments and moves a request to "for_payment" */}
-        <MyDocuments residentId={profile.residentId} allowResubmit={false} publicPrintMode />
+        <section className="public-status-section">
+          <h2>My Requests</h2>
+          <div className="public-status-tabs" role="tablist">
+            {STATUS_TABS.map((tab) => {
+              const count = attentionCounts[tab.key] || 0;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={statusTab === tab.key}
+                  className={statusTab === tab.key ? "active" : ""}
+                  onClick={() => {
+                    setStatusTab(tab.key);
+                    // Complaints/incidents are informational-only (no
+                    // resident action clears them), so opening the tab is
+                    // what marks the update "seen" — see useAttentionCounts.
+                    if (tab.key === "complaints" || tab.key === "incidents") {
+                      markSeen(profile.residentId, tab.key);
+                    }
+                  }}
+                >
+                  {tab.label}
+                  {count > 0 && <span className="tab-badge">{count}</span>}
+                </button>
+              );
+            })}
+          </div>
+          <div className="public-status-panel">
+            {statusTab === "documents" && (
+              <MyDocuments residentId={profile.residentId} allowResubmit={false} publicPrintMode />
+            )}
+            {statusTab === "businesses" && (
+              <ResidentBusinessDashboard residentId={profile.residentId} />
+            )}
+            {statusTab === "complaints" && (
+              <ComplaintList residentId={profile.residentId} title="📢 My Complaints" />
+            )}
+            {statusTab === "incidents" && (
+              <MyIncidents residentId={profile.residentId} />
+            )}
+          </div>
+        </section>
 
         <h2>My Account</h2>
         <div className="public-account-actions">
@@ -226,7 +355,7 @@ export default function PublicServicesAccess() {
   return (
     <main className="public-services">
       <PublicBackBar barangayId={barangayId} />
-      <section className="public-card">
+      <section className={`public-card${profile ? " public-card--profile" : ""}`}>
         {!profile ? (
           <>
             <h1>Barangay Services</h1>

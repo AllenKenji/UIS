@@ -44,6 +44,8 @@ import PublicResidentRegistration from "../pages/PublicResidentRegistration";
 import PublicServicesAccess from "../pages/PublicServicesAccess";
 import LocationPicker from "../pages/public/LocationPicker";
 import BarangayPortal from "../pages/public/BarangayPortal";
+import VerifyBusiness from "../pages/public/VerifyBusiness";
+import VerifyReceipt from "../pages/public/VerifyReceipt";
 import PublicDocumentRequest from "../pages/public/PublicDocumentRequest";
 import PublicBusinessRegistration from "../pages/public/PublicBusinessRegistration";
 import PublicComplaintForm from "../pages/public/PublicComplaintForm";
@@ -53,9 +55,11 @@ import MySignaturePage from "../pages/MySignaturePage";
 import TenantsPage from "../pages/super-admin/TenantsPage";
 import AccountsPage from "../pages/super-admin/AccountsPage";
 import PaymentsPage from "../pages/super-admin/PaymentsPage";
+import ReceiptsPage from "../pages/super-admin/ReceiptsPage";
 import SettingsPage from "../pages/super-admin/SettingsPage";
 
 import ComplaintList from "../components/dashboard/ComplaintList";
+import MyReceipts from "../components/staff/MyReceipts";
 
 // Resident sidebar components
 import ResidentDocumentRequestForm from "../components/resident/ResidentDocumentRequestForm";
@@ -98,6 +102,8 @@ const AppRoutes = ({ isDarkMode, toggleDarkMode }) => {
             <Route path="/payment-success" element={<PaymentSuccessPage />} />
             <Route path="/payment-cancel" element={<PaymentCancelPage />} /> 
             <Route path="/" element={<LocationPicker />} />
+            <Route path="/verify/business/:businessId" element={<VerifyBusiness />} />
+            <Route path="/verify/receipt/:receiptNumber" element={<VerifyReceipt />} />
             <Route path="/b/:barangayId" element={<BarangayPortal />} />
             <Route path="/b/:barangayId/register" element={<PublicResidentRegistration />} />
             <Route path="/b/:barangayId/public-services" element={<PublicServicesAccess />} />
@@ -123,6 +129,7 @@ const AppRoutes = ({ isDarkMode, toggleDarkMode }) => {
             <Route path="/super-admin" element={<ProtectedRoute allowedRoles={["super_admin"]} allowAdminOverride={false}><TenantsPage /></ProtectedRoute>} />
             <Route path="/super-admin/accounts" element={<ProtectedRoute allowedRoles={["super_admin"]} allowAdminOverride={false}><AccountsPage /></ProtectedRoute>} />
             <Route path="/super-admin/payments" element={<ProtectedRoute allowedRoles={["super_admin"]} allowAdminOverride={false}><PaymentsPage /></ProtectedRoute>} />
+            <Route path="/super-admin/receipts" element={<ProtectedRoute allowedRoles={["super_admin"]} allowAdminOverride={false}><ReceiptsPage /></ProtectedRoute>} />
             <Route path="/super-admin/settings" element={<ProtectedRoute allowedRoles={["super_admin"]} allowAdminOverride={false}><SettingsPage /></ProtectedRoute>} />
 
             {/* Admin */}
@@ -133,6 +140,7 @@ const AppRoutes = ({ isDarkMode, toggleDarkMode }) => {
             {/* Staff */}
             <Route path="/staff" element={<ProtectedRoute allowedRoles={["staff"]}><StaffDashboard /></ProtectedRoute>} />
             <Route path="/complaints/evaluate" element={<ProtectedRoute allowedRoles={["staff"]}><Complaints /></ProtectedRoute>} />
+            <Route path="/myReceipts" element={<ProtectedRoute allowedRoles={["staff"]}><MyReceipts /></ProtectedRoute>} />
 
             {/* Resident */}
             <Route path="/resident" element={<ProtectedRoute allowedRoles={["resident"]} allowAdminOverride={false}><ResidentDashboard residentId={userInfo?.uid} /></ProtectedRoute>} /> 

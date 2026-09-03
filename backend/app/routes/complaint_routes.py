@@ -122,6 +122,28 @@ def get_my_complaints(
     return list_complaints_by_resident_id(resident_uid, limit)
 
 # ---------------------------------------------------------
+# ✅ 2b. Public resident (no login) lists their own complaints
+#    (STATIC ROUTE — must come BEFORE /{complaint_id})
+# ---------------------------------------------------------
+
+@router.get(
+    "/my",
+    response_model=List[Complaint],
+    summary="Public resident (no login) lists their own complaints",
+)
+def get_my_complaints_public(
+    resident_id: str = Query(...),
+    limit: Optional[int] = Query(None, ge=0, le=100),
+):
+    """No auth on purpose — mirrors /documents/my, /businesses/my, and
+    /incidents/my: public residents filing complaints via the barangay
+    portal never log in, so they're identified by resident_id directly
+    instead of a session (unlike /mine above, which is for logged-in
+    residents)."""
+    return list_complaints_by_resident_id(resident_id, limit)
+
+
+# ---------------------------------------------------------
 # ✅ 3. Admin/staff lists ALL complaints
 #    (STATIC ROUTE — must come BEFORE /{complaint_id})
 # ---------------------------------------------------------

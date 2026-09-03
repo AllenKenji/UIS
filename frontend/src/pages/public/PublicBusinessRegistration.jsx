@@ -11,11 +11,11 @@ export default function PublicBusinessRegistration() {
 
   if (!profile) return <Navigate to={`/b/${barangayId}/public-services`} replace />;
 
-  const backToServices = () => navigate(`/b/${barangayId}/public-services`);
+  const backToServices = () => navigate(`/b/${barangayId}/public-services`, { state: { profile } });
 
   return (
     <main className="public-services">
-      <PublicBackBar barangayId={barangayId} />
+      <PublicBackBar barangayId={barangayId} profile={profile} />
       <section className="public-card">
         <BusinessForm residentProfile={profile} onCancel={backToServices} onBusinessAdded={backToServices} />
       </section>

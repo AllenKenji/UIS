@@ -1,17 +1,38 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { SuperAdminAPI } from "../../services/api";
 import { useTenants } from "../../hooks/useTenants";
 import "../../styles/fee-dashboard.css";
 
-const emptyContactForm = { province: "", zipCode: "", contactNumber: "", email: "", emergencyHotline: "", officeHours: "" };
+const emptyContactForm = { zipCode: "", contactNumber: "", email: "", emergencyHotline: "", officeHours: "" };
 
 export default function TenantsPage() {
   const { tenants, cities, loading, error: loadError, refresh } = useTenants();
-  const [form, setForm] = useState({ city: "", province: "", barangay: "", zipCode: "" });
+  const [provinces, setProvinces] = useState([]);
+  const [provincesError, setProvincesError] = useState("");
+  const [provinceForm, setProvinceForm] = useState({ name: "" });
+  const [editingProvinceId, setEditingProvinceId] = useState(null);
+  const [provinceNameDraft, setProvinceNameDraft] = useState("");
+  const [cityForm, setCityForm] = useState({ name: "", province: "" });
+  const [form, setForm] = useState({ city: "", barangay: "", zipCode: "" });
   const [editingTenantId, setEditingTenantId] = useState(null);
   const [contactForm, setContactForm] = useState(emptyContactForm);
+  const [editingCityId, setEditingCityId] = useState(null);
+  const [cityNameDraft, setCityNameDraft] = useState("");
+  const [cityProvinceDraft, setCityProvinceDraft] = useState("");
   const [error, setError] = useState("");
   const [cityFilter, setCityFilter] = useState("");
+
+  const refreshProvinces = useCallback(() => {
+    SuperAdminAPI.listProvinces()
+      .then(setProvinces)
+      .catch((err) => setProvincesError(err.response?.data?.detail || "Failed to load provinces"));
+  }, []);
+
+  useEffect(refreshProvinces, [refreshProvinces]);
+
+  // The barangay form no longer lets province be typed — it's locked to
+  // whichever province the selected city was registered under.
+  const selectedCityProvince = cities.find((c) => c.name === form.city)?.province || "";
 
   // Derived from the actual barangay records, not the cities collection, so
   // the filter always matches what's really filterable — even if a city was
@@ -25,12 +46,94 @@ export default function TenantsPage() {
     [tenants, cityFilter]
   );
 
+  const handleCreateProvince = async (event) => {
+    event.preventDefault();
+    setProvincesError("");
+    try {
+      await SuperAdminAPI.createProvince(provinceForm);
+      setProvinceForm({ name: "" });
+      refreshProvinces();
+    } catch (err) {
+      setProvincesError(err.response?.data?.detail || "Failed to create province");
+    }
+  };
+
+  const startEditingProvince = (province) => {
+    setEditingProvinceId(province.id);
+    setProvinceNameDraft(province.name);
+  };
+
+  const cancelEditingProvince = () => {
+    setEditingProvinceId(null);
+    setProvinceNameDraft("");
+  };
+
+  const handleRenameProvince = async (provinceId) => {
+    setProvincesError("");
+    try {
+      await SuperAdminAPI.updateProvince(provinceId, { name: provinceNameDraft });
+      cancelEditingProvince();
+      refreshProvinces();
+      refresh(); // city/tenant province strings may have cascaded
+    } catch (err) {
+      setProvincesError(err.response?.data?.detail || "Failed to rename province");
+    }
+  };
+
+  const handleDeleteProvince = async (province) => {
+    if (!window.confirm(`Delete ${province.name}? This only works if it has no cities registered under it.`)) return;
+    setProvincesError("");
+    try {
+      await SuperAdminAPI.deleteProvince(province.id);
+      refreshProvinces();
+    } catch (err) {
+      setProvincesError(err.response?.data?.detail || "Failed to delete province");
+    }
+  };
+
+  const handleCreateCity = async (event) => {
+    event.preventDefault();
+    setError("");
+    try {
+      await SuperAdminAPI.createCity(cityForm);
+      setCityForm({ name: "", province: "" });
+      refresh();
+    } catch (err) {
+      setError(err.response?.data?.detail || "Failed to create city");
+    }
+  };
+
+  const startEditingCity = (city) => {
+    setEditingCityId(city.id);
+    setCityNameDraft(city.name);
+    setCityProvinceDraft(city.province || "");
+  };
+
+  const cancelEditingCity = () => {
+    setEditingCityId(null);
+    setCityNameDraft("");
+    setCityProvinceDraft("");
+  };
+
+  const handleRenameCity = async (cityId) => {
+    setError("");
+    try {
+      await SuperAdminAPI.updateCity(cityId, { name: cityNameDraft, province: cityProvinceDraft || undefined });
+      cancelEditingCity();
+      refresh();
+    } catch (err) {
+      setError(err.response?.data?.detail || "Failed to rename city");
+    }
+  };
+
   const handleCreateTenant = async (event) => {
     event.preventDefault();
     setError("");
     try {
-      await SuperAdminAPI.createTenant(form);
-      setForm({ city: "", province: "", barangay: "", zipCode: "" });
+      // province isn't a form field anymore — it's locked to the selected
+      // city's own registered province, not typed by hand.
+      await SuperAdminAPI.createTenant({ ...form, province: selectedCityProvince });
+      setForm({ city: "", barangay: "", zipCode: "" });
       refresh();
     } catch (err) {
       setError(err.response?.data?.detail || "Failed to create barangay");
@@ -83,7 +186,6 @@ export default function TenantsPage() {
   const startEditingTenant = (tenant) => {
     setEditingTenantId(tenant.id);
     setContactForm({
-      province: tenant.province || "",
       zipCode: tenant.zipCode || "",
       contactNumber: tenant.contactNumber || "",
       email: tenant.email || "",
@@ -110,38 +212,139 @@ export default function TenantsPage() {
 
   return (
     <div className="fee-dashboard">
-      <h1>🛡️ Barangays &amp; Cities</h1>
+      <h1>🛡️ Provinces, Cities &amp; Barangays</h1>
       {(error || loadError) && <p className="error">{error || loadError}</p>}
+      {provincesError && <p className="error">{provincesError}</p>}
       {loading && <p className="loading">Loading...</p>}
 
       <div className="fee-section">
-        <h2>Add a Barangay</h2>
-        <form onSubmit={handleCreateTenant} style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "flex-end" }}>
-          <label>City<br /><input value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} required /></label>
-          <label>Province<br /><input value={form.province} onChange={(e) => setForm((f) => ({ ...f, province: e.target.value }))} required /></label>
-          <label>Barangay<br /><input value={form.barangay} onChange={(e) => setForm((f) => ({ ...f, barangay: e.target.value }))} required /></label>
-          <label>Zip Code<br /><input value={form.zipCode} onChange={(e) => setForm((f) => ({ ...f, zipCode: e.target.value }))} placeholder="e.g. 1700" /></label>
-          <button type="submit">Add Barangay</button>
+        <h2>Add a Province</h2>
+        <form onSubmit={handleCreateProvince} style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "flex-end" }}>
+          <label>Province Name<br /><input value={provinceForm.name} onChange={(e) => setProvinceForm({ name: e.target.value })} required /></label>
+          <button type="submit">Add Province</button>
         </form>
+      </div>
+
+      <div className="fee-section">
+        <h2>Provinces ({provinces.length})</h2>
+        <table className="fee-table">
+          <thead>
+            <tr><th>Province</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            {provinces.length === 0 ? (
+              <tr><td colSpan={2}>No provinces registered yet.</td></tr>
+            ) : (
+              provinces.map((p) => (
+                <tr key={p.id}>
+                  <td>
+                    {editingProvinceId === p.id ? (
+                      <input value={provinceNameDraft} onChange={(e) => setProvinceNameDraft(e.target.value)} />
+                    ) : (
+                      p.name
+                    )}
+                  </td>
+                  <td>
+                    {editingProvinceId === p.id ? (
+                      <>
+                        <button onClick={() => handleRenameProvince(p.id)}>Save</button>
+                        <button onClick={cancelEditingProvince}>Cancel</button>
+                      </>
+                    ) : (
+                      <button onClick={() => startEditingProvince(p)}>Edit</button>
+                    )}
+                    <button onClick={() => handleDeleteProvince(p)}>Delete</button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="fee-section">
+        <h2>Add a City</h2>
+        <form onSubmit={handleCreateCity} style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "flex-end" }}>
+          <label>City Name<br /><input value={cityForm.name} onChange={(e) => setCityForm((f) => ({ ...f, name: e.target.value }))} required /></label>
+          <label>
+            Province<br />
+            <select value={cityForm.province} onChange={(e) => setCityForm((f) => ({ ...f, province: e.target.value }))} required>
+              <option value="">-- Select a registered province --</option>
+              {provinces.map((p) => (
+                <option key={p.id} value={p.name}>{p.name}</option>
+              ))}
+            </select>
+          </label>
+          <button type="submit" disabled={provinces.length === 0}>Add City</button>
+        </form>
+        {provinces.length === 0 && <p className="status-message">Add a province above first.</p>}
       </div>
 
       <div className="fee-section">
         <h2>Cities ({cities.length})</h2>
         <table className="fee-table">
           <thead>
-            <tr><th>Logo</th><th>City</th><th>Upload Logo</th><th>Actions</th></tr>
+            <tr><th>Logo</th><th>City</th><th>Province</th><th>Upload Logo</th><th>Actions</th></tr>
           </thead>
           <tbody>
             {cities.map((c) => (
               <tr key={c.id}>
                 <td>{c.logoUrl ? <img src={c.logoUrl} alt={c.name} style={{ width: 40, height: 40, objectFit: "contain" }} /> : "—"}</td>
-                <td>{c.name}</td>
+                <td>
+                  {editingCityId === c.id ? (
+                    <input value={cityNameDraft} onChange={(e) => setCityNameDraft(e.target.value)} />
+                  ) : (
+                    c.name
+                  )}
+                </td>
+                <td>
+                  {editingCityId === c.id ? (
+                    <select value={cityProvinceDraft} onChange={(e) => setCityProvinceDraft(e.target.value)}>
+                      <option value="">-- Select a registered province --</option>
+                      {provinces.map((p) => (
+                        <option key={p.id} value={p.name}>{p.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    c.province || "—"
+                  )}
+                </td>
                 <td><input type="file" accept="image/*" onChange={(e) => handleCityLogoChange(c.id, e.target.files?.[0])} /></td>
-                <td><button onClick={() => handleDeleteCity(c)}>Delete</button></td>
+                <td>
+                  {editingCityId === c.id ? (
+                    <>
+                      <button onClick={() => handleRenameCity(c.id)}>Save</button>
+                      <button onClick={cancelEditingCity}>Cancel</button>
+                    </>
+                  ) : (
+                    <button onClick={() => startEditingCity(c)}>Edit</button>
+                  )}
+                  <button onClick={() => handleDeleteCity(c)}>Delete</button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="fee-section">
+        <h2>Add a Barangay</h2>
+        <form onSubmit={handleCreateTenant} style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "flex-end" }}>
+          <label>
+            City<br />
+            <select value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} required>
+              <option value="">-- Select a registered city --</option>
+              {cities.map((c) => (
+                <option key={c.id} value={c.name}>{c.name}</option>
+              ))}
+            </select>
+          </label>
+          <label>Province<br /><input value={selectedCityProvince} readOnly placeholder="Auto-filled from City" /></label>
+          <label>Barangay<br /><input value={form.barangay} onChange={(e) => setForm((f) => ({ ...f, barangay: e.target.value }))} required /></label>
+          <label>Zip Code<br /><input value={form.zipCode} onChange={(e) => setForm((f) => ({ ...f, zipCode: e.target.value }))} placeholder="e.g. 1700" /></label>
+          <button type="submit" disabled={cities.length === 0}>Add Barangay</button>
+        </form>
+        {cities.length === 0 && <p className="status-message">Add a city above first.</p>}
       </div>
 
       <div className="fee-section">
@@ -180,13 +383,10 @@ export default function TenantsPage() {
                 </td>
                 <td>{t.barangay}</td>
                 <td>{t.city}</td>
-                <td>
-                  {editingTenantId === t.id ? (
-                    <input value={contactForm.province} onChange={(e) => setContactForm((f) => ({ ...f, province: e.target.value }))} />
-                  ) : (
-                    t.province
-                  )}
-                </td>
+                {/* Derived from the barangay's city, not directly editable here
+                    — rename the province (or reassign the city, once that's
+                    supported) to change it. */}
+                <td>{t.province || "—"}</td>
                 <td>
                   {editingTenantId === t.id ? (
                     <input value={contactForm.zipCode} onChange={(e) => setContactForm((f) => ({ ...f, zipCode: e.target.value }))} placeholder="e.g. 1700" />

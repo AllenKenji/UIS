@@ -600,8 +600,15 @@ async def business_registration(resident_name: str, user: dict = Depends(get_cur
 
 
 @router.post("/business-submitted", response_model=List[Notification])
-async def business_submitted(payload: BusinessSubmittedPayload, user: dict = Depends(get_current_user)):
-    """Admin + staff receive business submission notifications."""
+async def business_submitted(payload: BusinessSubmittedPayload):
+    """Admin + staff receive business submission notifications.
+
+    Unauthenticated on purpose: public residents submit business
+    applications without ever logging in (see /businesses/applications),
+    and this handler never used the `user` dependency for anything beyond
+    gating the request — it just blocked those callers with a 422 for a
+    missing Authorization header.
+    """
     business_suffix = f" ({payload.business_name})" if payload.business_name else ""
     return await _notify_multiple([
         {

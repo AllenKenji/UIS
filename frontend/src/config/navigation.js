@@ -40,6 +40,7 @@ const links = {
   superAdmin: { path: "/super-admin", label: "🛡️ Barangays & Cities", action: "viewDashboard" },
   superAdminAccounts: { path: "/super-admin/accounts", label: "👥 Accounts", action: "viewDashboard" },
   superAdminPayments: { path: "/super-admin/payments", label: "💰 Payment Collections", action: "viewDashboard" },
+  superAdminReceipts: { path: "/super-admin/receipts", label: "🧾 Receipts", action: "viewDashboard" },
   superAdminSettings: { path: "/super-admin/settings", label: "⚙️ Barangay Settings", action: "viewDashboard" },
 
   // Secretary-specific links
@@ -48,6 +49,8 @@ const links = {
   paidRequests: { path: "/secretary/payments", label: "💳 Paid Requests", action: "paidRequests" },
   issuedDocuments: { path: "/secretary/issued", label: "✅ Issued Documents", action: "issuedDocuments" },
   rejectedRequests: { path: "/secretary/rejected", label: "❌ Rejected Requests", action: "rejectedRequests" },
+
+  myReceipts: { path: "/myReceipts", label: "🧾 My Receipts", action: "viewOwnReceipts" },
 
   incomingPayments: { path: "/treasurer/incoming", label: "💳 Incoming Payments", action: "incomingPayments" },
   expenses: { path: "/treasurer/expenses", label: "💸 Expenses", action: "barangayExpenses" },
@@ -60,6 +63,7 @@ const sidebarLinks = {
     links.superAdmin,
     links.superAdminAccounts,
     links.superAdminPayments,
+    links.superAdminReceipts,
     links.superAdminSettings,
     links.messages,
   ],
@@ -91,6 +95,7 @@ const sidebarLinks = {
     links.incidents,
     links.viewAllComplaints,
     links.fileComplaint,
+    links.myReceipts,
   ],
   surveyor: [
     links.messages,

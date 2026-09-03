@@ -7,7 +7,13 @@ const LEGACY_BARANGAY_ALIASES = {
 const normalizeBarangay = (value) => {
   const trimmed = (value || "").trim();
   const normalized = LEGACY_BARANGAY_ALIASES[trimmed] || trimmed;
-  return PARANAQUE.barangays.includes(normalized) ? normalized : null;
+  // No longer gated on the static PARANAQUE.barangays list — this value
+  // always comes from the resident form's read-only Barangay field, which
+  // is itself resolved from the actual tenant record (see ResidentForm's
+  // getTenant() call), not free text. Rejecting anything outside the old
+  // hardcoded 16-barangay array silently nulled out the address for any
+  // barangay registered after that list was written.
+  return normalized || null;
 };
 
 /**
@@ -43,8 +49,13 @@ export const cleanPayload = (data, uploads = {}) => {
       street: street || null,
       purok: purok || null,
       barangay: normalizeBarangay(barangay),
-      city: PARANAQUE.city,
-      province: PARANAQUE.province,
+      // ResidentForm already resolves these from the resident's actual
+      // tenant record (see its getTenant() call) and submits them as
+      // city/province — trust that instead of force-overwriting with the
+      // single hardcoded PARANAQUE city/province, which silently mislabeled
+      // every resident registered under a barangay in a different city.
+      city: city || PARANAQUE.city,
+      province: province || PARANAQUE.province,
       zipCode: zipCode || null,
     },
     isHeadOfFamily: data.isHeadOfFamily === "true",

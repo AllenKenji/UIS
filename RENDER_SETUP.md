@@ -22,9 +22,9 @@ Frontend is a static React site. Deploy separately:
 4. Build command: `npm ci && npm run build`
 5. Root directory: `frontend`
 6. Add environment variables:
-   - REACT_APP_API_BASE_URL
-   - REACT_APP_WS_BASE_URL
-   - REACT_APP_CFDP_SURVEY_URL
+   - VITE_API_BASE_URL
+   - VITE_WS_BASE_URL
+   - VITE_CFDP_SURVEY_URL
 
 ## Services to create
 
@@ -60,6 +60,7 @@ uvicorn app.main:app --host 0.0.0.0 --port $PORT
 - `GMAIL_CLIENT_ID`
 - `GMAIL_CLIENT_SECRET`
 - `GMAIL_REFRESH_TOKEN`
+- `BUSINESS_PERMIT_CHECK_KEY` (shared secret required by `POST /api/internal/business-permits/check-expirations` in the `X-BIS-Permit-Check-Key` header — see "Business permit expiration cron job" below)
 
 ### Optional CFDP provisioning variables (for surveyor/supervisor sync)
 
@@ -86,9 +87,29 @@ build
 
 ### Required environment variables
 
-- `REACT_APP_API_BASE_URL=https://<your-bis-backend>.onrender.com`
-- `REACT_APP_WS_BASE_URL=wss://<your-bis-backend>.onrender.com`
-- `REACT_APP_CFDP_SURVEY_URL=https://<your-cfdp-frontend>.onrender.com`
+- `VITE_API_BASE_URL=https://<your-bis-backend>.onrender.com`
+- `VITE_WS_BASE_URL=wss://<your-bis-backend>.onrender.com`
+- `VITE_CFDP_SURVEY_URL=https://<your-cfdp-frontend>.onrender.com`
+
+## Business permit expiration cron job
+
+Business permits warn residents by email 30 days before `validUntil` and
+automatically flip to `expired` on the day they lapse without a renewal
+payment. Nothing in the backend runs this on a timer — it's a plain
+endpoint that needs an external daily trigger:
+
+1. Render → New → Cron Job (same repo, root directory `BIS/backend`).
+2. Schedule: `0 0 * * *` (once daily; time doesn't matter much).
+3. Command:
+
+```bash
+curl -X POST "$BACKEND_URL/api/internal/business-permits/check-expirations" \
+  -H "X-BIS-Permit-Check-Key: $BUSINESS_PERMIT_CHECK_KEY"
+```
+
+4. Set `BACKEND_URL` and `BUSINESS_PERMIT_CHECK_KEY` as env vars on the Cron
+   Job service — `BUSINESS_PERMIT_CHECK_KEY` must match the value set on
+   the **bis-backend** web service, or the endpoint returns 403.
 
 ## Post-deploy checks
 

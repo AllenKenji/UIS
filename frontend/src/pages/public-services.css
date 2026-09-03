@@ -44,3 +44,23 @@
 .public-footer-seal { width: 64px; height: 64px; object-fit: contain; margin-bottom: 10px; }
 .public-footer-copyright { max-width: 1120px; margin: 28px auto 0; padding-top: 16px; border-top: 1px solid rgba(255,255,255,.15); font-size: .82rem; opacity: .7; text-align: center; }
 @media (max-width: 760px) { .public-footer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }.public-announcements { max-width: 1120px; margin: 28px auto 0; padding: 20px; background: #fff; border: 1px solid #c9d9d1; border-radius: 8px; }.public-announcements h2 { margin-top: 0; color: #172b23; }.public-announcement-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }.public-announcement-columns h3 { margin: 0 0 8px; font-size: 1rem; color: #087443; }.public-announcement-columns ul { list-style: none; padding: 0; display: grid; gap: 14px; }.public-announcement-card { padding: 0; background: #edf7f1; border-radius: 6px; overflow: hidden; }.public-announcement-card img { width: 100%; max-height: 180px; object-fit: cover; display: block; }.public-announcement-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }.public-announcement-meta { color: #52655c; font-size: .9rem; }.public-announcement-body p { margin: 4px 0 0; font-size: .92rem; color: #33463c; }.public-help { max-width: 1120px; margin: 28px auto 0; padding: 20px; background: #d9eee3; border-radius: 8px; }.public-help h2 { margin-top: 0; color: #172b23; } @media (max-width: 760px) { .public-portal-header { flex-direction: column; }.public-service-tabs { grid-template-columns: 1fr; }.public-announcement-columns { grid-template-columns: 1fr; } }
+
+/* Widen the card once a profile is loaded — the lookup form stays a narrow
+   720px column, but status tables (documents/businesses/complaints/incidents)
+   need more room to breathe. */
+.public-card--profile { width: min(1080px, 100%); padding: 28px clamp(20px, 3vw, 40px); }
+
+.public-status-section { margin: 28px 0; padding: 20px; background: #f7fbf8; border: 1px solid #c9d9d1; border-radius: 8px; }
+.public-status-section h2 { margin: 0 0 14px; }
+.public-status-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; border-bottom: 1px solid #c9d9d1; padding-bottom: 12px; }
+.public-status-tabs button { padding: 8px 16px; border: 1px solid #9eb6aa; border-radius: 999px; background: #fff; color: #33463c; font-weight: 600; font-size: .9rem; cursor: pointer; transition: background .15s ease, color .15s ease, border-color .15s ease; }
+.public-status-tabs button:hover { border-color: #087443; color: #087443; }
+.public-status-tabs button.active { background: #087443; border-color: #087443; color: #fff; }
+.public-status-tabs button { display: inline-flex; align-items: center; gap: 6px; }
+.tab-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #d64545; color: #fff; font-size: .72rem; font-weight: 700; line-height: 1; }
+.public-status-tabs button.active .tab-badge { background: #fff; color: #087443; }
+.public-status-panel { background: #fff; border-radius: 6px; overflow-x: auto; }
+.public-status-panel table { width: 100%; border-collapse: collapse; }
+.public-status-panel th, .public-status-panel td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e4ede8; font-size: .92rem; }
+.public-status-panel th { background: #edf7f1; color: #172b23; font-weight: 700; }
+@media (max-width: 640px) { .public-status-tabs { gap: 6px; } .public-status-tabs button { flex: 1 1 calc(50% - 6px); text-align: center; padding: 8px 10px; } }

@@ -1,104 +1,38 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
-import jsPDF from "jspdf";
-import QRCode from "qrcode";
-import logo from "../../assets/barangay_logo.png";
+import { resolveReceiptLogo, buildReceiptDoc } from "../../utils/receiptPdf";
+import defaultLogo from "../../assets/barangay_logo.png";
 
 const ReceiptPreview = ({ receiptData, onGeneratePDF }) => {
-  
-  const generatePDF = useCallback(async () => {
-    if (!receiptData) return;
+  const [logoSrc, setLogoSrc] = useState(defaultLogo);
 
-    const doc = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: [80, 200],
+  useEffect(() => {
+    let cancelled = false;
+    resolveReceiptLogo(receiptData?.barangayId).then((src) => {
+      if (!cancelled) setLogoSrc(src);
     });
-
-    const margin = 5;
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const lineHeight = 10;
-
-    // Logo
-    let headerY = margin + 10;
-    try {
-      const img = new Image();
-      img.src = logo;
-      await new Promise((resolve) => { img.onload = resolve; });
-      doc.addImage(img, "PNG", margin, headerY - 6, 12, 12);
-    } catch {
-      console.warn("Logo not found, skipping image.");
-    }
-
-    // Header text
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    const headerText =
-      receiptData.entityType === "document"
-        ? "Barangay Document Payment Receipt"
-        : "Barangay Business Payment Receipt";
-    const headerLines = doc.splitTextToSize(headerText, pageWidth - (margin + 20));
-    doc.text(headerLines, margin + 18, headerY);
-
-    // Divider
-    doc.setLineWidth(0.3);
-    doc.line(margin, headerY + 8, pageWidth - margin, headerY + 8);
-
-    // Details
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-
-    let y = headerY + 16;
-    const labelX = margin;
-
-    const drawField = (label, value) => {
-      doc.text(label, labelX, y);
-      doc.text(value || "", labelX + doc.getTextWidth(label) + 2, y);
-      y += lineHeight;
+    return () => {
+      cancelled = true;
     };
+  }, [receiptData?.barangayId]);
 
-    drawField("Receipt #:", receiptData.receiptNumber);
-    drawField(
-      receiptData.entityType === "document" ? "Document ID:" : "Business ID:",
-      receiptData.customEntityId || receiptData.entityId   // ✅ use custom ID if available
-    );
-    drawField("Resident:", receiptData.residentName);
-    drawField("Type:", receiptData.description);
-    drawField("Amount Paid:", "PHP " + getCleanAmount(receiptData.amount).toFixed(2));
-    drawField("Payment Method:", receiptData.method);
-    drawField("Date Issued:", new Date(receiptData.issuedAt).toLocaleString());
-    drawField("Processed By:", receiptData.processedBy);
-
-    // Footer
-    y += lineHeight;
-    doc.setFontSize(9);
-    doc.text("This receipt serves as proof of payment.", pageWidth / 2, y, { align: "center" });
-    y += lineHeight;
-    doc.text("Thank you.", pageWidth / 2, y, { align: "center" });
-
-    // Signature line centered
-    y += lineHeight * 2;
-    const lineWidth = 40; // length of signature line
-    const lineX = (pageWidth - lineWidth) / 2; // center horizontally
-    doc.line(lineX, y, lineX + lineWidth, y);
-    doc.text("Authorized Signature", pageWidth / 2, y + 4, { align: "center" });
-
-    // QR code
-    const qrDataUrl = await QRCode.toDataURL(JSON.stringify(receiptData));
-    const qrSize = 25;
-    doc.addImage(qrDataUrl, "PNG", pageWidth / 2 - qrSize / 2, pageHeight - qrSize - margin, qrSize, qrSize);
-
-    // doc.save(`${receiptData.receiptNumber}.pdf`);
-    doc.autoPrint(); 
+  // Called directly from a button's onClick below — keep it a close
+  // continuation of that click. Routing this through setState/effects/
+  // timers first (as MyReceipts.jsx's list-row actions used to) makes
+  // browsers stop treating the resulting window.open/save as a trusted
+  // user gesture and silently block it.
+  const printPDF = useCallback(async () => {
+    if (!receiptData) return;
+    const doc = await buildReceiptDoc(receiptData, logoSrc);
+    doc.autoPrint();
     doc.output("dataurlnewwindow");
-  }, [receiptData]);
+  }, [receiptData, logoSrc]);
 
   useEffect(() => {
     if (onGeneratePDF) {
-      onGeneratePDF(() => generatePDF);
+      onGeneratePDF(() => printPDF);
     }
-  }, [onGeneratePDF, generatePDF]);
+  }, [onGeneratePDF, printPDF]);
 
   if (!receiptData) return null;
 
@@ -111,6 +45,7 @@ const ReceiptPreview = ({ receiptData, onGeneratePDF }) => {
 
   return (
     <div className="receipt-preview">
+      <img src={logoSrc} alt="Barangay seal" className="receipt-logo" />
       <h3>✅ Receipt Preview</h3>
       <p><strong>Receipt #:</strong> {receiptData.receiptNumber}</p>
       {receiptData.entityType === "document" && (
@@ -131,7 +66,7 @@ const ReceiptPreview = ({ receiptData, onGeneratePDF }) => {
       <p><strong>Processed By:</strong> {receiptData.processedBy}</p>
 
       <div className="qr-preview">
-        <QRCodeCanvas value={JSON.stringify(receiptData)} size={150} />
+        <QRCodeCanvas value={`${window.location.origin}/verify/receipt/${receiptData.receiptNumber}`} size={150} />
         <p>Scan QR to verify receipt</p>
       </div>
 
@@ -142,7 +77,7 @@ const ReceiptPreview = ({ receiptData, onGeneratePDF }) => {
           : `Approved by ${receiptData.barangay || "Barangay"} Staff`}
       </p>
 
-      <button type="button" onClick={generatePDF}>Download PDF Receipt</button>
+      <button type="button" onClick={printPDF}>🖨️ Print Receipt</button>
     </div>
   );
 };

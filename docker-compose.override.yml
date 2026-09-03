@@ -2,6 +2,10 @@ version: "3.9"
 
 services:
   backend:
+    env_file:
+      - .env   # loads GMAIL_*, PAYMONGO_*, BUSINESS_PERMIT_CHECK_KEY, etc. into the container —
+               # docker-compose.yml only sets DATABASE_URL explicitly, so without this the
+               # container never sees anything else you put in the root .env file.
     volumes:
       - ./backend:/app/backend        # bind‑mount your source code
       - ./config:/app/config          # mount config folder

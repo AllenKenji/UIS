@@ -63,6 +63,7 @@ const PaymentForm = ({
               amount: fee,
               method: data.method,
               processedBy,
+              staffUid: currentStaff.uid,
             }
           : {
               documentId: entityId,
@@ -72,6 +73,7 @@ const PaymentForm = ({
               method: data.method,
               processedBy,
               residentName,
+              staffUid: currentStaff.uid,
             };
 
       const { data: result } = await api.post(url, payload);
@@ -89,6 +91,7 @@ const PaymentForm = ({
           processedBy,
           issuedAt: new Date().toISOString(),
           entityType,
+          barangayId: result.barangayId,
         };
 
         const receiptData =

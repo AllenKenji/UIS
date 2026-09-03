@@ -13,9 +13,9 @@ export default function PublicIncidentReport() {
 
   return (
     <main className="public-services">
-      <PublicBackBar barangayId={barangayId} />
+      <PublicBackBar barangayId={barangayId} profile={profile} />
       <section className="public-card">
-        <IncidentForm residentProfile={profile} onSubmitSuccess={() => navigate(`/b/${barangayId}/public-services`)} />
+        <IncidentForm residentProfile={profile} onSubmitSuccess={() => navigate(`/b/${barangayId}/public-services`, { state: { profile } })} />
       </section>
     </main>
   );

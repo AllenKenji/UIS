@@ -42,6 +42,7 @@ const IncidentEvaluation = ({ incident, role, onClose, onUpdate }) => {
   const preferredAssignee = incident.assigned_to_uid || incident.assigned_to_name || "";
   const [status, setStatus] = useState(normalizeStatus(incident.status));
   const [assignedTo, setAssignedTo] = useState(preferredAssignee);
+  const [remarks, setRemarks] = useState(incident.remarks || "");
   const [assignees, setAssignees] = useState([]);
   const [loadingAssignees, setLoadingAssignees] = useState(false);
 
@@ -93,6 +94,7 @@ const IncidentEvaluation = ({ incident, role, onClose, onUpdate }) => {
       const payload = {
         status: normalizeStatus(status),
         assigned_to: assignedTo || undefined,
+        remarks: remarks.trim() || undefined,
       };
 
       await IncidentsAPI.patchStatus(incident.id, payload);
@@ -118,6 +120,9 @@ const IncidentEvaluation = ({ incident, role, onClose, onUpdate }) => {
         <p><strong>Reported By:</strong> {incident.reported_by_name}</p>
         <p><strong>Current Status:</strong> {incident.status}</p>
         <p><strong>Created At:</strong> {formatDateTime(incident.timestamp || incident.createdAt)}</p>
+        {incident.remarks && (
+          <p><strong>Remarks:</strong> {incident.remarks}</p>
+        )}
       </div>
 
       <div className="evaluation-actions">
@@ -145,6 +150,17 @@ const IncidentEvaluation = ({ incident, role, onClose, onUpdate }) => {
               </option>
             ))}
           </select>
+        </label>
+
+        {/* 📝 Staff notes on how the incident was handled */}
+        <label>
+          Remarks:
+          <textarea
+            value={remarks}
+            onChange={(e) => setRemarks(e.target.value)}
+            placeholder="Notes on how this incident was handled or resolved..."
+            rows={3}
+          />
         </label>
 
         <div className="buttons">

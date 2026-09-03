@@ -8,6 +8,7 @@ export default function LocationPicker() {
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [province, setProvince] = useState("");
   const [city, setCity] = useState("");
   const [barangayId, setBarangayId] = useState("");
 
@@ -18,13 +19,17 @@ export default function LocationPicker() {
       .finally(() => setLoading(false));
   }, []);
 
-  const cities = useMemo(
-    () => [...new Set(tenants.map((t) => t.city))].sort(),
+  const provinces = useMemo(
+    () => [...new Set(tenants.map((t) => t.province).filter(Boolean))].sort(),
     [tenants]
   );
+  const citiesForProvince = useMemo(
+    () => [...new Set(tenants.filter((t) => t.province === province).map((t) => t.city))].sort(),
+    [tenants, province]
+  );
   const barangaysForCity = useMemo(
-    () => tenants.filter((t) => t.city === city).sort((a, b) => a.barangay.localeCompare(b.barangay)),
-    [tenants, city]
+    () => tenants.filter((t) => t.province === province && t.city === city).sort((a, b) => a.barangay.localeCompare(b.barangay)),
+    [tenants, province, city]
   );
 
   const handleContinue = (event) => {
@@ -36,7 +41,7 @@ export default function LocationPicker() {
     <main className="public-services">
       <section className="public-card">
         <h1>Welcome to the Barangay Information System</h1>
-        <p>Select your city, then your barangay, to continue to its services portal.</p>
+        <p>Select your province, city, then your barangay, to continue to its services portal.</p>
         {loading && <p className="public-note">Loading barangays...</p>}
         {error && <p className="public-error">{error}</p>}
         {!loading && !error && tenants.length === 0 && (
@@ -45,10 +50,26 @@ export default function LocationPicker() {
         {!loading && tenants.length > 0 && (
           <form className="public-lookup" onSubmit={handleContinue}>
             <label>
+              Province
+              <select
+                value={province}
+                onChange={(e) => { setProvince(e.target.value); setCity(""); setBarangayId(""); }}
+                required
+              >
+                <option value="">Select a province</option>
+                {provinces.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </label>
+            <label>
               City
-              <select value={city} onChange={(e) => { setCity(e.target.value); setBarangayId(""); }} required>
+              <select
+                value={city}
+                onChange={(e) => { setCity(e.target.value); setBarangayId(""); }}
+                required
+                disabled={!province}
+              >
                 <option value="">Select a city</option>
-                {cities.map((c) => <option key={c} value={c}>{c}</option>)}
+                {citiesForProvince.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </label>
             <label>

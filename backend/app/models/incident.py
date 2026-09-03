@@ -47,6 +47,9 @@ class Incident(BaseModel):
     timestamp: datetime
     updated_at: Optional[datetime] = None
     status: IncidentStatus = IncidentStatus.pending
+    remarks: Optional[str] = Field(
+        None, description="Staff notes on how the incident was handled/resolved"
+    )
 
     class Config:
         validate_by_name = True

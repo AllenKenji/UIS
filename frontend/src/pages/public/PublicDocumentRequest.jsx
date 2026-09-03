@@ -12,13 +12,14 @@ export default function PublicDocumentRequest() {
 
   return (
     <main className="public-services">
-      <PublicBackBar barangayId={barangayId} />
+      <PublicBackBar barangayId={barangayId} profile={profile} />
       <section className="public-card">
         <ResidentDocumentRequestForm
           residentId={profile.residentId}
           residentName={profile.fullName}
           barangayId={barangayId}
           redirectTo={`/b/${barangayId}/public-services`}
+          redirectState={{ profile }}
           showConfirmation
         />
       </section>

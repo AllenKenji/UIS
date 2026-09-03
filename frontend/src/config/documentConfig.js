@@ -53,7 +53,11 @@ const documentConfig = {
         label: "Activity Location",
         type: "group",
         fields: [
-          { name: "location.barangay", label: "Barangay", type: "select", required: true, options: PARANAQUE.barangays },
+          // options intentionally omitted — populated at render time from the
+          // super admin's registered barangays for the current city (see
+          // SecretaryDocumentForm / ResidentDocumentRequestForm), not this
+          // static list, so it always matches what's actually registered.
+          { name: "location.barangay", label: "Barangay", type: "select", required: true },
           { name: "location.street", label: "(Blk# / Lot#), Street", type: "text" },
           { name: "location.city", label: "City", type: "text", default: PARANAQUE.city, readOnly: true },
           { name: "location.province", label: "Province", type: "text", default: PARANAQUE.province, readOnly: true },
@@ -75,7 +79,11 @@ const documentConfig = {
         label: "Incident Location",
         type: "group",
         fields: [
-          { name: "location.barangay", label: "Barangay", type: "select", required: true, options: PARANAQUE.barangays },
+          // options intentionally omitted — populated at render time from the
+          // super admin's registered barangays for the current city (see
+          // SecretaryDocumentForm / ResidentDocumentRequestForm), not this
+          // static list, so it always matches what's actually registered.
+          { name: "location.barangay", label: "Barangay", type: "select", required: true },
           { name: "location.street", label: "(Blk# / Lot#), Street", type: "text" },
           { name: "location.city", label: "City", type: "text", default: PARANAQUE.city , readOnly: true},
           { name: "location.province", label: "Province", type: "text", default: PARANAQUE.province , readOnly: true},

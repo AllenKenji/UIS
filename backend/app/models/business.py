@@ -5,8 +5,15 @@ class BusinessDetails(BaseModel):
     name: str
     type: str
     barangay: str
+    street: Optional[str] = None
+    city: Optional[str] = None
+    province: Optional[str] = None
     address: str
     registration_date: str
+    # Franchise branches legitimately share the same business name within a
+    # barangay (e.g. multiple branches of the same chain) — skips the
+    # duplicate-name check in create_business_application when true.
+    is_franchise: bool = False
 
 class BusinessDocuments(BaseModel):
     valid_id: str

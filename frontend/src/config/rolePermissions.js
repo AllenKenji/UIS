@@ -71,7 +71,8 @@ const rolePermissions = {
     "viewBusinesses",
     "viewIncidents",
     "viewAllComplaints",
-    "fileComplaintsForResidents"
+    "fileComplaintsForResidents",
+    "viewOwnReceipts"
   ],
   resident: [
     "viewDashboard",

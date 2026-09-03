@@ -3,40 +3,54 @@ import { useUser } from "../../context/UserContext";
 import { API_BASE_URL, BusinessesAPI } from "../../services/api";
 import { QRCodeCanvas } from "qrcode.react";
 import ResidentBusinessPayment from "./ResidentBusinessPayment";
+import BusinessResubmissionForm from "./BusinessResubmissionForm";
 import "../../styles/resident/resident-business-dashboard.css";
+
+// Documents are stored server-side under snake_case keys (valid_id,
+// proof_of_address, dti_cert, business_logo — see BusinessDocuments in
+// backend/app/models/business.py), and their url is a backend-relative
+// path (e.g. "/storage/...") that needs the API host prefixed.
+const resolveUrl = (url) => (url?.startsWith("/") ? `${API_BASE_URL}${url}` : url || null);
 
 const resolveDocumentUrl = (business, key) => {
   const nested = business?.documents?.[key];
-  if (typeof nested === "string") return nested;
-  if (nested && typeof nested === "object") return nested.url || null;
+  if (typeof nested === "string") return resolveUrl(nested);
+  if (nested && typeof nested === "object") return resolveUrl(nested.url);
 
   const legacy = business?.[key];
-  if (typeof legacy === "string") return legacy;
-  if (legacy && typeof legacy === "object") return legacy.url || null;
+  if (typeof legacy === "string") return resolveUrl(legacy);
+  if (legacy && typeof legacy === "object") return resolveUrl(legacy.url);
 
   return null;
 };
 
-const ResidentBusinessDashboard = () => {
+const ResidentBusinessDashboard = ({ residentId } = {}) => {
   const { userInfo: user } = useUser();
+  // Public residents (registered via the barangay portal) never log in, so
+  // they're identified by residentId passed in directly rather than the
+  // logged-in user context — same pattern as MyDocuments/useMyDocuments.
+  const ownerUid = residentId || user?.uid;
   const [businesses, setBusinesses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("inProgress");
+  const [resubmittingId, setResubmittingId] = useState(null);
   const reconciledRef = useRef(new Set());
 
-  useEffect(() => {
-    if (!user?.email) {
+  const refresh = () => {
+    if (!ownerUid) {
       setBusinesses([]);
       setLoading(false);
       return;
     }
 
     setLoading(true);
-    BusinessesAPI.listAll()
-      .then((all) => setBusinesses((Array.isArray(all) ? all : []).filter((business) => business.email === user.email || business.ownerUid === user.uid)))
+    BusinessesAPI.listMine(ownerUid)
+      .then((all) => setBusinesses(Array.isArray(all) ? all : []))
       .catch((error) => console.error("Failed to load businesses:", error))
       .finally(() => setLoading(false));
-  }, [user]);
+  };
+
+  useEffect(refresh, [ownerUid]);
 
   useEffect(() => {
     const reconcileAwaiting = async () => {
@@ -72,22 +86,49 @@ const ResidentBusinessDashboard = () => {
   const renderStatus = (b) => {
     const rawStatus = String(b.status || "").toLowerCase();
     const rawPaymentStatus = String(b.paymentStatus || "").toLowerCase();
-    const status = ["approved", "rejected"].includes(rawStatus)
+    const status = ["approved", "expired", "rejected"].includes(rawStatus)
       ? rawStatus
       : (rawPaymentStatus === "paid" || rawPaymentStatus === "succeeded")
         ? "paid"
         : (rawStatus || rawPaymentStatus || "pending_evaluation");
 
     if (status === "approved") {
-      const approvedDate = b.submittedAt ? new Date(b.submittedAt) : new Date();
-      const validUntil = new Date(approvedDate);
-      validUntil.setFullYear(validUntil.getFullYear() + 1);
+      // validUntil is set server-side the moment a business is approved
+      // (see _assign_permit_fields in business_routes.py). Older records
+      // approved before that existed won't have it — fall back to the old
+      // submittedAt+1yr estimate only for those.
+      const validUntil = b.validUntil
+        ? new Date(b.validUntil)
+        : (() => {
+            const approvedDate = b.submittedAt ? new Date(b.submittedAt) : new Date();
+            const fallback = new Date(approvedDate);
+            fallback.setFullYear(fallback.getFullYear() + 1);
+            return fallback;
+          })();
+      const daysLeft = Math.ceil((validUntil - new Date()) / (1000 * 60 * 60 * 24));
+      const isExpiringSoon = daysLeft <= 30;
 
       return (
         <div className="qr-wrapper">
           <p><strong>Permit Number:</strong> {b.permitNumber}</p>
-          <QRCodeCanvas value={b.businessId || b.id} size={96} />
+          <QRCodeCanvas value={`${window.location.origin}/verify/business/${b.businessId || b.id}`} size={96} />
           <p><strong>Valid Until:</strong> {validUntil.toLocaleDateString()}</p>
+          {isExpiringSoon && (
+            <div className="warning-text">
+              <p>⚠️ Your permit expires in {daysLeft} day{daysLeft === 1 ? "" : "s"}. Pay the annual renewal fee to keep it active.</p>
+              <ResidentBusinessPayment business={b} feeType="annual" />
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (status === "expired") {
+      return (
+        <div className="warning-text">
+          <p>⛔ This permit has expired. Pay the annual renewal fee to reactivate it.</p>
+          {b.permitNumber && <p><strong>Permit Number:</strong> {b.permitNumber}</p>}
+          <ResidentBusinessPayment business={b} feeType="annual" />
         </div>
       );
     }
@@ -106,12 +147,31 @@ const ResidentBusinessDashboard = () => {
       case "payment_submitted":
       case "paid":
         return <p className="info-text">⏳ Payment submitted. Awaiting staff verification.</p>;
-      case "rejected":
+      case "rejected": {
+        const identifier = b.businessId || b.id;
+        if (resubmittingId === identifier) {
+          return (
+            <BusinessResubmissionForm
+              business={b}
+              onCancel={() => setResubmittingId(null)}
+              onSuccess={() => {
+                setResubmittingId(null);
+                refresh();
+              }}
+            />
+          );
+        }
         return (
-          <p className="warning-text">
-            ❌ Application was rejected. Notes: {b.notes || "No reason provided."}
-          </p>
+          <div>
+            <p className="warning-text">
+              ❌ Application was rejected. Notes: {b.notes || "No reason provided."}
+            </p>
+            <button type="button" onClick={() => setResubmittingId(identifier)}>
+              🔄 Reapply
+            </button>
+          </div>
         );
+      }
       default:
         return <p className="info-text">ℹ️ Status: {status}</p>;
     }
@@ -119,10 +179,10 @@ const ResidentBusinessDashboard = () => {
 
   const renderDocuments = (b) => {
     const docs = [
-      { key: "validId", label: "Valid ID" },
-      { key: "proofOfAddress", label: "Proof of Address" },
-      { key: "dtiCert", label: "DTI Certificate" },
-      { key: "businessLogo", label: "Business Logo" },
+      { key: "valid_id", label: "Valid ID" },
+      { key: "proof_of_address", label: "Proof of Address" },
+      { key: "dti_cert", label: "DTI Certificate" },
+      { key: "business_logo", label: "Business Logo" },
     ];
 
     return (
@@ -143,6 +203,10 @@ const ResidentBusinessDashboard = () => {
     );
   };
 
+  // "Approved" means currently valid — an expired permit needs the resident
+  // to act (pay the renewal fee), same as a pending/for_payment application,
+  // so it belongs in "In Progress" instead of sitting in "Approved" looking
+  // like nothing's wrong.
   const approvedBusinesses = businesses.filter((b) => b.status === "approved");
   const inProgressBusinesses = businesses.filter((b) => b.status !== "approved");
   const listToRender = activeTab === "inProgress" ? inProgressBusinesses : approvedBusinesses;

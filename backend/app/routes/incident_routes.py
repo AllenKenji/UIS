@@ -32,6 +32,7 @@ class ActionResponse(BaseModel):
 class AdminStatusUpdateRequest(BaseModel):
     status: IncidentStatus
     assigned_to: Optional[str] = None
+    remarks: Optional[str] = None
 
 
 def _resolve_incident_owner_resident_uid(incident_obj: Incident) -> Optional[str]:
@@ -79,6 +80,16 @@ async def report_incident(incident: IncidentCreate):
     except Exception as e:
         logger.error("❌ Failed to create incident: %s", e, exc_info=True)
         raise HTTPException(status_code=400, detail="Failed to create incident")
+
+
+# 👤 Public resident (no login) lists their own incidents
+@router.get("/my", response_model=List[IncidentWithResident])
+def get_my_incidents(resident_id: str):
+    """No auth on purpose — mirrors /documents/my, /businesses/my, and
+    /complaints/my: public residents who report incidents via the barangay
+    portal never log in, so they're identified by resident_id directly."""
+    all_incidents = list_incidents_with_residents()
+    return [i for i in all_incidents if i.residentId == resident_id]
 
 
 # 🔍 Get a specific incident
@@ -132,14 +143,16 @@ async def admin_update_status(incident_id: str, payload: AdminStatusUpdateReques
             incident_id,
             payload.status.value,
             assigned_to=payload.assigned_to,
+            remarks=payload.remarks,
         )
         if not success:
             raise HTTPException(status_code=404, detail="Incident not found")
         logger.info(
-            "🔧 Incident %s updated: status=%s, assigned_to=%s",
+            "🔧 Incident %s updated: status=%s, assigned_to=%s, remarks=%s",
             incident_id,
             payload.status.value,
             payload.assigned_to,
+            payload.remarks,
         )
 
         try:

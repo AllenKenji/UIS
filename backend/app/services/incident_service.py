@@ -39,6 +39,7 @@ def _normalize_incident(doc) -> dict:
         "authUid": data.get("authUid"),
         "residentId": data.get("residentId") or data.get("filed_for"),
         "assigned_to_uid": data.get("assigned_to_name"),
+        "remarks": data.get("remarks"),
     }
 
 
@@ -187,7 +188,10 @@ def list_staff_incidents(staff_name: str, limit: int = 50) -> List[IncidentWithR
 
 # 🔧 Update incident status
 def update_incident_status(
-    incident_id: str, status: str, assigned_to: Optional[str] = None
+    incident_id: str,
+    status: str,
+    assigned_to: Optional[str] = None,
+    remarks: Optional[str] = None,
 ) -> bool:
     doc_ref = get_db().collection(INCIDENT_COLLECTION).document(incident_id)
     try:
@@ -200,13 +204,16 @@ def update_incident_status(
         }
         if assigned_to:
             update_data["assigned_to_name"] = assigned_to
+        if remarks is not None:
+            update_data["remarks"] = remarks
 
         doc_ref.update(update_data)
         logger.info(
-            "🔧 Incident %s updated: status=%s, assigned_to=%s",
+            "🔧 Incident %s updated: status=%s, assigned_to=%s, remarks=%s",
             incident_id,
             status,
             assigned_to,
+            remarks,
         )
         return True
     except Exception as e:

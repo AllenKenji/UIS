@@ -12,7 +12,7 @@ from backend.app.services.paymongo_service import (
     get_payment_intent,
     get_payment_link_payments,
 )
-from backend.app.services.payment_service import log_payment_record
+from backend.app.services.payment_service import log_payment_record, build_business_renewal_update
 from backend.app.models.paymongo import DocumentPaymentRequest, BusinessPaymentRequest, AttachPaymentRequest
 from backend.app.routes.fee_routes import (
     compute_document_fee,
@@ -215,7 +215,6 @@ async def create_business_payment_link(payload: BusinessPaymentRequest) -> dict:
             update_data = {
                 "fee": fee,
                 "feeType": payload.feeType,
-                "status": "awaiting_payment",
                 "paymentStatus": result["paymentStatus"],
                 "checkoutUrl": result["checkoutUrl"],
                 "referenceNumber": result.get("referenceNumber"),
@@ -223,6 +222,14 @@ async def create_business_payment_link(payload: BusinessPaymentRequest) -> dict:
                 "paymongoClientKey": result.get("paymongoClientKey"),
                 "paymongoLinkId": result.get("paymongoLinkId")
             }
+            # Annual renewal payments happen on an already-approved,
+            # operating business (or one that just expired) — don't bump it
+            # into "awaiting_payment" (that status means "new application
+            # pending its first payment") while the link is open. It stays
+            # "approved"/"expired" until the payment actually completes; see
+            # build_business_renewal_update below.
+            if payload.feeType != "annual":
+                update_data["status"] = "awaiting_payment"
             await run_in_threadpool(doc.reference.update, update_data)
         else:
             logger.warning("⚠️ No Firestore business found for %s", payload.businessId)
@@ -371,14 +378,12 @@ async def reconcile_return(payload: dict) -> dict:
                     "status": data.get("status"),
                 }
 
-            await run_in_threadpool(
-                doc.reference.update,
-                {
-                    "paymentStatus": "paid",
-                    "status": "paid",
-                    "referenceNumber": reference_number or data.get("referenceNumber"),
-                },
-            )
+            is_renewal = str(data.get("feeType") or "").strip().lower() == "annual"
+            renewal_update = build_business_renewal_update(data) if is_renewal else None
+            update_payload = renewal_update or {"paymentStatus": "paid", "status": "paid"}
+            update_payload["referenceNumber"] = reference_number or data.get("referenceNumber")
+
+            await run_in_threadpool(doc.reference.update, update_payload)
 
             refreshed = doc.to_dict() or {}
             _ensure_reconciled_receipt(
@@ -387,7 +392,12 @@ async def reconcile_return(payload: dict) -> dict:
                 status="paid",
                 event_type="paymongo.reconcile_return",
             )
-            return {"success": True, "updated": True, "paymentStatus": "paid", "status": "paid"}
+            return {
+                "success": True,
+                "updated": True,
+                "paymentStatus": "paid",
+                "status": update_payload["status"],
+            }
 
         document_id = str(payload.get("documentId") or "").strip()
         if not document_id:

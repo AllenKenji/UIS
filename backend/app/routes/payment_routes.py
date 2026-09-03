@@ -3,8 +3,15 @@ import hmac
 import hashlib
 import os
 from datetime import datetime, timezone
+from backend.app.core.auth import get_current_user
 from backend.app.services.notification_service import NotificationService
-from fastapi import APIRouter, Request
+from backend.app.services.payment_service import (
+    _get_business_doc,
+    _next_receipt_number,
+    build_business_renewal_update,
+    log_payment_record,
+)
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from fastapi.concurrency import run_in_threadpool
 from backend.app.utils.firestore_utils import get_db
@@ -81,6 +88,17 @@ def verify_signature(raw_body: bytes, header_signature: str) -> bool:
     if not valid:
         logger.warning("⚠️ Signature mismatch. computed=%s provided=%s", computed, provided)
     return valid
+
+def _business_webhook_update(update_data: dict, status: str, metadata: dict, business_data: dict) -> dict:
+    """Annual renewal payments shouldn't collapse the business into the
+    generic "paid" status (that means "new/renewal application awaiting
+    staff verification") — a renewal just extends validUntil and restores
+    "approved" directly. See build_business_renewal_update."""
+    fee_type = str(metadata.get("feeType") or business_data.get("feeType") or "").strip().lower()
+    if status == "paid" and fee_type == "annual":
+        return {**update_data, **build_business_renewal_update(business_data)}
+    return update_data
+
 
 def _next_transaction_id():
     counter_ref = get_db().collection("counters").document("transactions")
@@ -205,7 +223,9 @@ async def paymongo_webhook(request: Request):
         if "businessId" in metadata:
             docs = get_db().collection("businesses").where("businessId", "==", metadata["businessId"]).limit(1).get()
             if docs:
-                await run_in_threadpool(docs[0].reference.update, update_data)
+                pre_update_business = docs[0].to_dict() or {}
+                resolved_update = _business_webhook_update(update_data, status, metadata, pre_update_business)
+                await run_in_threadpool(docs[0].reference.update, resolved_update)
                 logger.info("✅ Updated business=%s status=%s", metadata["businessId"], status)
 
                 business_data = docs[0].to_dict()
@@ -278,10 +298,12 @@ async def paymongo_webhook(request: Request):
             # Try businesses first
             docs = get_db().collection("businesses").where("referenceNumber", "==", reference_number).limit(1).get()
             if docs:
-                await run_in_threadpool(docs[0].reference.update, update_data)
+                pre_update_business = docs[0].to_dict() or {}
+                resolved_update = _business_webhook_update(update_data, status, metadata, pre_update_business)
+                await run_in_threadpool(docs[0].reference.update, resolved_update)
                 logger.info("✅ Updated business via referenceNumber=%s status=%s", reference_number, status)
 
-                business_data = docs[0].to_dict() 
+                business_data = docs[0].to_dict()
                 log_payment_record( 
                     reference_number=reference_number or transaction_id, 
                     transaction_id=transaction_id, 
@@ -355,7 +377,9 @@ async def paymongo_webhook(request: Request):
                     break
 
             if docs:
-                await run_in_threadpool(docs[0].reference.update, update_data)
+                pre_update_business = docs[0].to_dict() or {}
+                resolved_update = _business_webhook_update(update_data, status, metadata, pre_update_business)
+                await run_in_threadpool(docs[0].reference.update, resolved_update)
                 logger.info("✅ Updated business via paymongoLinkId=%s status=%s", matched_link_id, status)
 
                 business_data = docs[0].to_dict()
@@ -404,6 +428,8 @@ async def record_business_payment(payload: dict):
     business_id = payload["businessId"]
     amount = payload["amount"]
     method = payload.get("method")
+    processed_by = payload.get("processedBy")
+    staff_uid = payload.get("staffUid")
 
     # fetch business doc
     doc = _get_business_doc(business_id)
@@ -430,19 +456,22 @@ async def record_business_payment(payload: dict):
         method=method,
         receipt_number=receipt_number,   # pass explicitly
         barangay_id=business_data.get("barangayId"),
+        processed_by=processed_by,
+        staff_uid=staff_uid,
     )
 
-    response = { 
+    response = {
         "success": True, 
         "receiptNumber": receipt_number, 
         "transactionId": transaction_id,
         "businessId": business_id, 
         "businessName": business_data.get("businessName"), 
         "ownerName": business_data.get("ownerName"), 
-        "businessType": business_data.get("businessType"), 
-        "barangay": business_data.get("barangay"), 
+        "businessType": business_data.get("businessType"),
+        "barangay": business_data.get("barangay"),
+        "barangayId": business_data.get("barangayId"),
         "method": method
-    } 
+    }
     await _notify_payment_roles(
         _build_payment_message(
             "Business",
@@ -462,6 +491,8 @@ async def record_document_payment(payload: dict):
         document_id = payload.get("documentId")
         amount = payload.get("amount")
         method = payload.get("method")
+        processed_by = payload.get("processedBy")
+        staff_uid = payload.get("staffUid")
 
         if not document_id:
             return JSONResponse(
@@ -513,6 +544,8 @@ async def record_document_payment(payload: dict):
             method=method,
             receipt_number=receipt_number,
             barangay_id=doc_data.get("barangayId"),
+            processed_by=processed_by,
+            staff_uid=staff_uid,
         )
 
         response = {
@@ -523,6 +556,8 @@ async def record_document_payment(payload: dict):
             "documentType": doc_data.get("documentType"),
             "ownerName": doc_data.get("ownerName") or doc_data.get("residentName"),
             "businessName": doc_data.get("businessName"),
+            "barangay": doc_data.get("barangay"),
+            "barangayId": doc_data.get("barangayId"),
             "method": method
         }
         await _notify_payment_roles(
@@ -540,3 +575,16 @@ async def record_document_payment(payload: dict):
     except Exception as e:
         logger.exception("❌ Document payment failed: %s", e)
         return JSONResponse(status_code=500, content={"success": False, "message": "Payment error", "details": str(e)})
+
+
+@router.get("/receipts/mine")
+def list_my_receipts(user: dict = Depends(get_current_user)):
+    """Receipts the currently logged-in staff member personally issued
+    (recorded a cash/manual payment for). Scoped to the authenticated
+    user's own uid server-side — never accepts a client-supplied staff id —
+    so staff can only ever see their own issuance history."""
+    staff_uid = user.get("uid")
+    if not staff_uid:
+        return []
+    docs = get_db().collection("receipts").where("staffUid", "==", staff_uid).stream()
+    return [{"id": doc.id, **doc.to_dict()} for doc in docs]

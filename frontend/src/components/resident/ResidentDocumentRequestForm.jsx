@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { api, endpoints, BusinessesAPI } from "../../services/api";
+import { api, endpoints, BusinessesAPI, PublicServicesAPI } from "../../services/api";
 import { usePublicFees } from "../../hooks/usePublicFees";
 import documentConfig from "../../config/documentConfig";
 import { resolveLocation } from "../../utils/resolveLocation";
@@ -7,10 +7,14 @@ import { useNavigate } from "react-router-dom";
 import "../../styles/resident/resident-document-form.css";
 import { PARANAQUE } from "../../data/locations";
 
-const ResidentDocumentRequestForm = ({ residentId = "", residentName = "", barangayId = "", onRequestSubmitted, redirectTo = "/ownDocuments", showConfirmation = false }) => {
+const ResidentDocumentRequestForm = ({ residentId = "", residentName = "", barangayId = "", onRequestSubmitted, redirectTo = "/ownDocuments", redirectState = null, showConfirmation = false }) => {
   const { documentTypes, loading, error } = usePublicFees(barangayId);
   const navigate = useNavigate();
   const [residentBusinesses, setResidentBusinesses] = useState([]);
+  // Options for the Activity/Incident Location "Barangay" field — sourced
+  // from the barangays actually registered under the super admin account
+  // for this city, not a hardcoded list, so it can't drift out of date.
+  const [barangayOptions, setBarangayOptions] = useState([]);
 
   const [formData, setFormData] = useState({
     resident_id: residentId,
@@ -31,8 +35,36 @@ const ResidentDocumentRequestForm = ({ residentId = "", residentName = "", baran
   const [status, setStatus] = useState({ message: null, type: null });
   const [submittedDoc, setSubmittedDoc] = useState(null);
 
-  useEffect(() => { 
-    if (residentName) { 
+  useEffect(() => {
+    // Resolve the current barangay's own "city" value first, rather than
+    // assuming it matches the PARANAQUE.city constant exactly — the super
+    // admin's "City" field on Barangays & Cities is free text, so a tenant
+    // registered as e.g. "Paranaque" (no tilde) would never match a
+    // hardcoded "Parañaque" and silently leave this dropdown empty.
+    if (!barangayId) {
+      setBarangayOptions([]);
+      return;
+    }
+    let active = true;
+    Promise.all([
+      PublicServicesAPI.getTenant(barangayId),
+      PublicServicesAPI.listTenants(),
+    ])
+      .then(([ownTenant, allTenants]) => {
+        if (!active) return;
+        const names = (Array.isArray(allTenants) ? allTenants : [])
+          .filter((t) => t.city === ownTenant?.city)
+          .map((t) => t.barangay)
+          .filter(Boolean)
+          .sort();
+        setBarangayOptions(names);
+      })
+      .catch(() => active && setBarangayOptions([]));
+    return () => { active = false; };
+  }, [barangayId]);
+
+  useEffect(() => {
+    if (residentName) {
       BusinessesAPI.listByOwner(residentName)
         .then(data => setResidentBusinesses(data))
         .catch(err => console.error("❌ Failed to fetch resident businesses:", err)); 
@@ -184,7 +216,7 @@ const ResidentDocumentRequestForm = ({ residentId = "", residentName = "", baran
         // hold onto instead of silently bouncing them back after a few seconds.
         setSubmittedDoc({ documentId: data?.documentId || data?.id, documentType: formData.document_type });
       } else {
-        setTimeout(() => { navigate(redirectTo); }, 1500); // 1500ms = 1.5 seconds
+        setTimeout(() => { navigate(redirectTo, redirectState ? { state: redirectState } : undefined); }, 1500); // 1500ms = 1.5 seconds
       }
     } catch (err) {
       const msg = err.response?.data?.detail || err.message;
@@ -209,7 +241,7 @@ const ResidentDocumentRequestForm = ({ residentId = "", residentName = "", baran
           Come back anytime with your registered email or mobile number and birth date to check its status and pay
           once it's ready.
         </p>
-        <button type="button" onClick={() => navigate(redirectTo)}>Back to Barangay Services</button>
+        <button type="button" onClick={() => navigate(redirectTo, redirectState ? { state: redirectState } : undefined)}>Back to Barangay Services</button>
       </div>
     );
   }
@@ -255,7 +287,7 @@ const ResidentDocumentRequestForm = ({ residentId = "", residentName = "", baran
                     {sub.type === "select" ? (
                       <select id={sub.name} name={sub.name} value={formData[sub.name] || ""} onChange={handleChange} required={sub.required} >
                         <option value="">-- Select --</option>
-                        {sub.options?.map(opt => (
+                        {(sub.name === "location.barangay" ? barangayOptions : sub.options)?.map(opt => (
                           <option key={opt} value={opt}>{opt}</option>
                         ))}
                       </select>

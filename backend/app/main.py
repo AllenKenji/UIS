@@ -19,6 +19,7 @@ from backend.app.routes import (
     resident_routes,
     dashboard,
     business_routes,
+    business_permit_routes,
     payment_routes,
     paymongo_routes,
     document_routes,
@@ -97,6 +98,7 @@ def create_app() -> FastAPI:
     app.include_router(audit_routes.router, prefix=f"{api_prefix}/document_audit", tags=["Audit"])
     app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
     app.include_router(business_routes.router, prefix=api_prefix, tags=["Business"])
+    app.include_router(business_permit_routes.router, prefix=api_prefix, tags=["Business Permits"])
     app.include_router(payment_routes.router, prefix=api_prefix, tags=["Payments"]) 
     app.include_router(paymongo_routes.router, prefix=f"{api_prefix}/paymongo", tags=["PayMongo"])
     app.include_router(fee_routes.router, prefix=f"{api_prefix}", tags=["Fees"])

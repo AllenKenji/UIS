@@ -13,9 +13,9 @@ export default function PublicComplaintForm() {
 
   return (
     <main className="public-services">
-      <PublicBackBar barangayId={barangayId} />
+      <PublicBackBar barangayId={barangayId} profile={profile} />
       <section className="public-card">
-        <ComplaintForm residentProfile={profile} onSubmitSuccess={() => navigate(`/b/${barangayId}/public-services`)} />
+        <ComplaintForm residentProfile={profile} onSubmitSuccess={() => navigate(`/b/${barangayId}/public-services`, { state: { profile } })} />
       </section>
     </main>
   );

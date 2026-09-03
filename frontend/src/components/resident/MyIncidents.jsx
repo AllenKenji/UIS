@@ -3,23 +3,46 @@ import { IncidentsAPI } from "../../services/api";
 import { useUser } from "../../context/UserContext";
 import "../../styles/admin.css";
 
-const MyIncidents = () => {
+const formatDateTime = (value) => {
+  if (!value) return "—";
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? "—" : value.toLocaleString();
+  if (typeof value === "string" || typeof value === "number") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? "—" : parsed.toLocaleString();
+  }
+  if (typeof value === "object") {
+    const seconds = value.seconds ?? value._seconds;
+    if (typeof seconds === "number") {
+      const parsed = new Date(seconds * 1000);
+      return Number.isNaN(parsed.getTime()) ? "—" : parsed.toLocaleString();
+    }
+  }
+  return "—";
+};
+
+const MyIncidents = ({ residentId } = {}) => {
   const { userInfo } = useUser();
+  // Public residents (registered via the barangay portal) never log in, so
+  // they're identified by residentId passed in directly rather than the
+  // logged-in user context — same pattern as MyDocuments/ResidentBusinessDashboard.
+  const ownerUid = residentId || userInfo?.uid;
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchIncidents = async () => {
       try {
-        if (!userInfo?.uid) {
+        if (!ownerUid) {
           setIncidents([]);
           setLoading(false);
           return;
         }
 
-        const all = await IncidentsAPI.list();
+        const all = residentId
+          ? await IncidentsAPI.listMinePublic(residentId)
+          : await IncidentsAPI.list();
         const data = (Array.isArray(all) ? all : []).filter((incident) =>
-          incident.residentId === userInfo.uid || incident.authUid === userInfo.uid
+          incident.residentId === ownerUid || incident.authUid === ownerUid
         );
 
         // remove duplicates if any
@@ -36,7 +59,7 @@ const MyIncidents = () => {
     };
 
     fetchIncidents();
-  }, [userInfo]);
+  }, [ownerUid, residentId]);
 
   if (loading) return <p>Loading incidents…</p>;
 
@@ -55,6 +78,7 @@ const MyIncidents = () => {
               <th>Status</th>
               <th>Assigned To</th>
               <th>Location</th>
+              <th>Remarks</th>
               <th>Reported Date/Time</th>
               <th>Last Updated</th>
             </tr>
@@ -67,18 +91,9 @@ const MyIncidents = () => {
                 <td>{i.status}</td>
                 <td>{i.assigned_to_name || "—"}</td>
                 <td>{i.location}</td>
-                <td>
-                  {i.date && i.time
-                    ? `${i.date} ${i.time}`
-                    : i.createdAt
-                      ? new Date(i.createdAt.seconds * 1000).toLocaleString()
-                      : "—"}
-                </td>
-                <td>
-                  {i.updatedAt
-                    ? new Date(i.updatedAt.seconds * 1000).toLocaleString()
-                    : "—"}
-                </td>
+                <td>{i.remarks || "—"}</td>
+                <td>{formatDateTime(i.timestamp || i.createdAt)}</td>
+                <td>{formatDateTime(i.updated_at || i.updatedAt)}</td>
               </tr>
             ))}
           </tbody>

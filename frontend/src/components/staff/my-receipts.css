@@ -1,0 +1,76 @@
+.my-receipts {
+  max-width: 900px;
+  margin: 20px auto;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+
+.my-receipts h2 {
+  margin-top: 0;
+}
+
+.my-receipts-note {
+  color: #667085;
+  margin-top: 0;
+}
+
+.my-receipts-filter {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 12px 0;
+  padding: 12px;
+  background: #f5f7f6;
+  border: 1px solid #e4ede8;
+  border-radius: 6px;
+}
+
+.my-receipts-filter label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #444;
+}
+
+.my-receipts-filter input[type="date"] {
+  padding: 7px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.my-receipts-filter button {
+  align-self: flex-end;
+}
+
+.my-receipts-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+
+.my-receipts-table th,
+.my-receipts-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid #e4ede8;
+  font-size: 0.92rem;
+}
+
+.my-receipts-table th {
+  background: #f5f7f6;
+  color: #172b23;
+  font-weight: 700;
+}
+
+.my-receipts-actions {
+  display: flex;
+  gap: 6px;
+  white-space: nowrap;
+}

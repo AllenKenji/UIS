@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { PARANAQUE } from "../../data/locations";
 import { usePublicFees } from "../../hooks/usePublicFees";
 import { useResidents } from "../../hooks/useResidents";
-import { BusinessesAPI, NotificationsAPI } from "../../services/api";
+import { BusinessesAPI, NotificationsAPI, PublicServicesAPI } from "../../services/api";
 import { useUser } from "../../context/UserContext";
-import PaymentForm from "./PaymentForm"; 
+import PaymentForm from "./PaymentForm";
+import ResidentPicker from "./ResidentPicker";
 import "./business-form.css";
 
 const getDisplayName = (profile = {}, fallbackEmail = "") => {
@@ -26,7 +27,7 @@ const getDisplayName = (profile = {}, fallbackEmail = "") => {
 };
 
 const StaffBusinessForm = ({ onBusinessAdded, onCancel }) => {
-  const { register, handleSubmit, trigger, reset } = useForm();
+  const { register, handleSubmit, trigger, reset, setValue, setError, formState: { errors } } = useForm();
   const navigate = useNavigate();
   const { userInfo } = useUser();
 
@@ -36,11 +37,32 @@ const StaffBusinessForm = ({ onBusinessAdded, onCancel }) => {
   const [businessId, setBusinessId] = useState(null);
 
   const { businessTypes: businessFees } = usePublicFees(userInfo?.barangayId);
-  const { residents, loading: residentsLoading } = useResidents();
+  const { residents: allResidents, loading: residentsLoading } = useResidents();
+  // Same filter as SecretaryDocumentForm's walk-in resident picker: only
+  // exclude residents still pending/rejected verification, not ones with no
+  // verificationStatus at all (staff-entered, or predating the field).
+  const residents = allResidents.filter(
+    (r) => r.verificationStatus !== "pending" && r.verificationStatus !== "rejected"
+  );
   const [selectedResident, setSelectedResident] = useState(null);
   const [selectedFee, setSelectedFee] = useState(0);
   const [selectedBusinessType, setSelectedBusinessType] = useState("");
   const [submittedBusinessName, setSubmittedBusinessName] = useState("");
+  const [residentTouched, setResidentTouched] = useState(false);
+
+  // Staff already operate within their own barangay (their account's
+  // barangayId) — no reason to make them re-pick it from a Parañaque-wide
+  // list, same fix as the resident-facing BusinessForm.
+  const [tenant, setTenant] = useState(null);
+  useEffect(() => {
+    if (!userInfo?.barangayId) return;
+    PublicServicesAPI.getTenant(userInfo.barangayId)
+      .then((data) => {
+        setTenant(data);
+        setValue("barangay", data?.barangay || "", { shouldValidate: true });
+      })
+      .catch(() => setTenant(null));
+  }, [userInfo?.barangayId, setValue]);
 
   // 🔧 Custom ID Generators
   const generateBusinessId = (barangay) => {
@@ -72,9 +94,13 @@ const StaffBusinessForm = ({ onBusinessAdded, onCancel }) => {
       const customBusinessId = generateBusinessId(data.barangay);
       const staffEmail = userInfo.email || "";
       const staffName = getDisplayName(userInfo, staffEmail) || "Unknown Staff";
+      const fullAddress = [data.street, data.barangay, data.city, data.province]
+        .filter(Boolean)
+        .join(", ");
 
       const payload = {
         ...data,
+        address: fullAddress,
         ownerUid: selectedResident.uid || selectedResident.id,
         ownerName: selectedResident.fullName,
         contactNumber: selectedResident.contactNumber,
@@ -122,7 +148,13 @@ const StaffBusinessForm = ({ onBusinessAdded, onCancel }) => {
       setSelectedBusinessType(data.businessType);
     } catch (error) {
       console.error("❌ Error registering business:", error);
-      toast.error("❌ Failed to register business.");
+      // handleError (services/api.js) extracts a specific, readable message
+      // onto error.message (e.g. duplicate business name) — show that
+      // instead of a generic failure when we have it.
+      toast.error(error?.status ? `❌ ${error.message}` : "❌ Failed to register business.");
+      if (error?.status === 409) {
+        setError("businessName", { type: "manual", message: error.message });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -141,29 +173,44 @@ const StaffBusinessForm = ({ onBusinessAdded, onCancel }) => {
           {residentsLoading ? (
             <p>Loading residents…</p>
           ) : (
-            <select
-              value={selectedResident?.id || ""}
-              onChange={(e) =>
-                setSelectedResident(residents.find((r) => r.id === e.target.value))
-              }
-            >
-              <option value="">Select Resident</option>
-              {residents.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.fullName} — {r.address.barangay}
-                </option>
-              ))}
-            </select>
+            <div className={residentTouched && !selectedResident ? "input-error" : ""}>
+              <ResidentPicker
+                id="resident_id"
+                residents={residents}
+                value={selectedResident?.id || ""}
+                onChange={(residentId) =>
+                  setSelectedResident(residents.find((r) => r.id === residentId) || null)
+                }
+              />
+            </div>
           )}
+          {residentTouched && !selectedResident && <span className="error-text">Please select a resident</span>}
 
           <h2>🏢 Business Details</h2>
 
-          <label>Business Name
-            <input {...register("businessName", { required: true })} />
+          <label htmlFor="businessName">Business Name
+            <input
+              id="businessName"
+              className={errors.businessName ? "input-error" : ""}
+              {...register("businessName", { required: "Business name is required" })}
+            />
+            {errors.businessName && <span className="error-text">{errors.businessName.message}</span>}
           </label>
 
-          <label>Business Type
-            <select {...register("businessType", { required: true })}>
+          <label htmlFor="isFranchise" className="checkbox-label">
+            <input id="isFranchise" type="checkbox" {...register("isFranchise")} />
+            This is a franchise or branch of an existing business
+            <span className="field-hint">
+              Check this if another branch already uses this business name in this barangay.
+            </span>
+          </label>
+
+          <label htmlFor="businessType">Business Type
+            <select
+              id="businessType"
+              className={errors.businessType ? "input-error" : ""}
+              {...register("businessType", { required: "Business type is required" })}
+            >
               <option value="">Select Type</option>
               {businessFees.map((bt) => (
                 <option key={bt.id} value={bt.businessType}>
@@ -171,42 +218,58 @@ const StaffBusinessForm = ({ onBusinessAdded, onCancel }) => {
                 </option>
               ))}
             </select>
+            {errors.businessType && <span className="error-text">{errors.businessType.message}</span>}
           </label>
 
           {/* Grouped Business Address */}
           <fieldset className="address-fieldset">
             <legend>Business Address</legend>
 
-            <label>Street
-              <input {...register("street", { required: true })} />
+            <label htmlFor="street">Street
+              <input
+                id="street"
+                className={errors.street ? "input-error" : ""}
+                {...register("street", { required: "Street is required" })}
+              />
+              {errors.street && <span className="error-text">{errors.street.message}</span>}
             </label>
 
-            <label>Barangay
-              <select {...register("barangay", { required: true })}>
-                <option value="">Select Barangay</option>
-                {PARANAQUE.barangays.map((brgy) => (
-                  <option key={brgy} value={brgy}>{brgy}</option>
-                ))}
-              </select>
+            <label htmlFor="barangay">Barangay
+              <input
+                id="barangay"
+                value={tenant?.barangay || ""}
+                readOnly
+                placeholder={tenant ? "" : "Loading barangay…"}
+                className={errors.barangay ? "input-error" : ""}
+                {...register("barangay", { required: "Barangay is required" })}
+              />
+              {errors.barangay && <span className="error-text">{errors.barangay.message}</span>}
             </label>
 
-            <label>City
-              <input value={PARANAQUE.city} readOnly {...register("city")} />
+            <label htmlFor="city">City
+              <input id="city" value={PARANAQUE.city} readOnly {...register("city")} />
             </label>
 
-            <label>Province
-              <input value={PARANAQUE.province} readOnly {...register("province")} />
+            <label htmlFor="province">Province
+              <input id="province" value={PARANAQUE.province} readOnly {...register("province")} />
             </label>
           </fieldset>
 
-          <label>Registration Date
-            <input type="date" {...register("registrationDate", { required: true })} />
+          <label htmlFor="registrationDate">Registration Date
+            <input
+              id="registrationDate"
+              type="date"
+              className={errors.registrationDate ? "input-error" : ""}
+              {...register("registrationDate", { required: "Registration date is required" })}
+            />
+            {errors.registrationDate && <span className="error-text">{errors.registrationDate.message}</span>}
           </label>
 
           <button
             type="button"
             disabled={isSubmitting}
             onClick={async () => {
+              setResidentTouched(true);
               const valid = await trigger([
                 "businessName",
                 "businessType",

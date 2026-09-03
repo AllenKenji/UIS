@@ -22,6 +22,46 @@
   border-radius: 4px;
 }
 
+.business-form .input-error {
+  border: 2px solid var(--color-danger);
+  background-color: #ffe6e6;
+}
+
+.business-form .error-text {
+  color: var(--color-danger);
+  font-size: 0.8rem;
+  font-weight: normal;
+  margin-top: 4px;
+  display: block;
+}
+
+.business-form .upload-required.input-error {
+  border: 2px solid var(--color-danger);
+  background-color: #ffe6e6;
+  border-radius: 4px;
+  padding: 6px;
+}
+
+.business-form .checkbox-label {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-weight: normal;
+}
+
+.business-form .checkbox-label input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+.business-form .field-hint {
+  flex-basis: 100%;
+  font-size: 0.8rem;
+  font-weight: normal;
+  color: #6b7280;
+}
+
 .qr-wrapper {
   margin-top: 1rem;
   text-align: center;

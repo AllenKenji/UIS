@@ -36,6 +36,21 @@
   overflow-x: auto;
 }
 
+/* Date range filter row (Payment Collections, Receipts) */
+.date-filter-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 0.75rem 0 1.25rem;
+}
+
+.date-filter-row label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 /* Tables */
 .fee-table {
   width: 100%;
@@ -97,6 +112,16 @@
 .fee-table button:last-of-type {
   background: #e74c3c;
   color: #fff;
+}
+
+.fee-table .danger-btn {
+  background: #e74c3c;
+  color: #fff;
+}
+
+.fee-table .danger-btn:disabled {
+  background: #f1a9a0;
+  cursor: not-allowed;
 }
 
 .fee-table button:hover {

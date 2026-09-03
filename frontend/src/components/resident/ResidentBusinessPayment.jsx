@@ -1,7 +1,11 @@
 import { useUser } from "../../context/UserContext";
 import { API_BASE_URL } from "../../services/api";
 
-const ResidentBusinessPayment = ({ business }) => {
+// feeType: "registrationFee" for a new/resubmitted application, "annual"
+// for a permit renewal (see BusinessExpiryNotice / ResidentBusinessDashboard).
+// Matches the feeType values compute_business_registration_fee /
+// compute_business_annual_fee (fee_routes.py) branch on.
+const ResidentBusinessPayment = ({ business, feeType = "registrationFee" }) => {
   const { userInfo: user } = useUser();
 
   const handlePayment = async (method = "gcash") => {
@@ -16,8 +20,8 @@ const ResidentBusinessPayment = ({ business }) => {
         body: JSON.stringify({
           businessId: identifier,
           businessType: business.businessType,
-          feeType: "registrationFee",
-          remarks: "Business registration fee",
+          feeType,
+          remarks: feeType === "annual" ? "Business permit annual renewal fee" : "Business registration fee",
         }),
       });
 

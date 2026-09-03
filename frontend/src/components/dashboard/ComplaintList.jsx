@@ -6,20 +6,23 @@ import "../../styles/dashboard/complaint-list.css";
 
 const normalizeStatus = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
 
-const ComplaintList = ({ statusFilter = "all", excludeStatus = null, title = "📢 Complaints" }) => {
+const ComplaintList = ({ statusFilter = "all", excludeStatus = null, title = "📢 Complaints", residentId = null }) => {
   const { role, can, isAuthenticated } = useUser();
 
   const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const canViewOwn = can("viewOwnComplaints");
-  const canViewAll = can("viewAllComplaints");
+  // Public residents (registered via the barangay portal) never log in, so
+  // a residentId passed in directly bypasses the login/permission checks
+  // below — same pattern as MyDocuments/ResidentBusinessDashboard.
+  const canViewOwn = residentId || can("viewOwnComplaints");
+  const canViewAll = !residentId && can("viewAllComplaints");
   const canView = canViewOwn || canViewAll;
 
   useEffect(() => {
     const loadComplaints = async () => {
-      if (!isAuthenticated) {
+      if (!residentId && !isAuthenticated) {
         setError("❌ Not logged in.");
         setLoading(false);
         return;
@@ -31,9 +34,11 @@ const ComplaintList = ({ statusFilter = "all", excludeStatus = null, title = "�
       }
 
       try {
-        const data = canViewAll
-          ? await ComplaintsAPI.listAll()
-          : await ComplaintsAPI.listMine();
+        const data = residentId
+          ? await ComplaintsAPI.listMinePublic(residentId)
+          : canViewAll
+            ? await ComplaintsAPI.listAll()
+            : await ComplaintsAPI.listMine();
 
         const filtered = Array.isArray(data)
           ? data.filter((item) => {
@@ -56,7 +61,7 @@ const ComplaintList = ({ statusFilter = "all", excludeStatus = null, title = "�
       }
     };
     loadComplaints();
-  }, [canView, canViewAll, canViewOwn, excludeStatus, role, statusFilter, isAuthenticated]);
+  }, [canView, canViewAll, canViewOwn, excludeStatus, residentId, role, statusFilter, isAuthenticated]);
 
   const renderContent = () => {
     if (!canView) return <p>❌ You do not have access to view complaints.</p>;

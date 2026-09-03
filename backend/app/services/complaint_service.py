@@ -152,8 +152,13 @@ def list_complaints_with_residents(
     results: List[ComplaintWithResident] = []
 
     try:
+        # Postgres-backed shim, not real Firestore — order_by wants a plain
+        # "ASCENDING"/"DESCENDING" string, not firestore.Query.DESCENDING
+        # (that name was never imported; every call here threw a silent
+        # NameError, caught below, always returning an empty list to
+        # staff/admin regardless of how many complaints existed).
         query = get_db().collection(COMPLAINT_COLLECTION).order_by(
-            "timestamp", direction=firestore.Query.DESCENDING
+            "timestamp", direction="DESCENDING"
         )
 
         if status:

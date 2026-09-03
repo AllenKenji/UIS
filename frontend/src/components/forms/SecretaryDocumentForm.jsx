@@ -6,7 +6,8 @@ import PaymentForm from "./PaymentForm";
 import ResidentPicker from "./ResidentPicker";
 import documentConfig from "../../config/documentConfig";
 import { resolveLocation } from "../../utils/resolveLocation"
-import { API_BASE_URL, BusinessesAPI } from "../../services/api";
+import { API_BASE_URL, BusinessesAPI, PublicServicesAPI } from "../../services/api";
+import { PARANAQUE } from "../../data/locations";
 import "../../styles/secretary/secretary-document-form.css";
 
 const SecretaryDocumentWorkflow = ({ onCompleted }) => {
@@ -35,6 +36,10 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
   const [issuedDocUrl, setIssuedDocUrl] = useState(null);
   const [registeredBusinesses, setRegisteredBusinesses] = useState([]);
   const [issueRemarks, setIssueRemarks] = useState("");
+  // Options for the Activity/Incident Location "Barangay" field — sourced
+  // from the barangays actually registered under the super admin account
+  // for this city, not a hardcoded list, so it can't drift out of date.
+  const [barangayOptions, setBarangayOptions] = useState([]);
 
 
   // Load secretary profile
@@ -53,6 +58,34 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
       }));
     }
   }, [documentTypes]);
+
+  useEffect(() => {
+    // Resolve the current barangay's own "city" value first, rather than
+    // assuming it matches the PARANAQUE.city constant exactly — the super
+    // admin's "City" field on Barangays & Cities is free text, so a tenant
+    // registered as e.g. "Paranaque" (no tilde) would never match a
+    // hardcoded "Parañaque" and silently leave this dropdown empty.
+    if (!userInfo?.barangayId) {
+      setBarangayOptions([]);
+      return;
+    }
+    let active = true;
+    Promise.all([
+      PublicServicesAPI.getTenant(userInfo.barangayId),
+      PublicServicesAPI.listTenants(),
+    ])
+      .then(([ownTenant, allTenants]) => {
+        if (!active) return;
+        const names = (Array.isArray(allTenants) ? allTenants : [])
+          .filter((t) => t.city === ownTenant?.city)
+          .map((t) => t.barangay)
+          .filter(Boolean)
+          .sort();
+        setBarangayOptions(names);
+      })
+      .catch(() => active && setBarangayOptions([]));
+    return () => { active = false; };
+  }, [userInfo?.barangayId]);
 
   useEffect(() => {
     BusinessesAPI.listAll()
@@ -354,7 +387,7 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
                           required={sub.required}
                         >
                           <option value="">-- Select --</option>
-                          {sub.options?.map(opt => (
+                          {(sub.name === "location.barangay" ? barangayOptions : sub.options)?.map(opt => (
                             <option key={opt} value={opt}>{opt}</option>
                           ))}
                         </select>

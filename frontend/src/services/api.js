@@ -82,6 +82,8 @@ export const endpoints = {
     announcements: "/api/public/announcements",
     tenants: "/api/public/tenants",
     tenant: (id) => `/api/public/tenants/${id}`,
+    verifyBusiness: (businessId) => `/api/public/verify/business/${businessId}`,
+    verifyReceipt: (receiptNumber) => `/api/public/verify/receipt/${receiptNumber}`,
   },
   auth: { switchRole: "/api/auth/switch-role" },
   superAdmin: {
@@ -91,9 +93,14 @@ export const endpoints = {
     cities: "/api/super-admin/cities",
     city: (id) => `/api/super-admin/cities/${id}`,
     cityLogo: (id) => `/api/super-admin/cities/${id}/logo`,
+    provinces: "/api/super-admin/provinces",
+    province: (id) => `/api/super-admin/provinces/${id}`,
     accounts: "/api/super-admin/accounts",
     payments: "/api/super-admin/payments",
+    payment: (id) => `/api/super-admin/payments/${id}`,
     paymentsSummary: "/api/super-admin/payments/summary",
+    receipts: "/api/super-admin/receipts",
+    receipt: (id) => `/api/super-admin/receipts/${id}`,
   },
 };
 
@@ -213,12 +220,25 @@ IncidentsAPI.patchStatus = (id, payload) =>
     .then((res) => res.data)
     .catch((err) => handleError(err, "Incident status update"));
 
+// 🔎 Public resident (no login) lists their own incidents — mirrors
+// BusinessesAPI.listMine/DocumentsAPI's "/my" self-service pattern.
+IncidentsAPI.listMinePublic = (residentId) =>
+  api.get(`${endpoints.incidents}/my`, { params: { resident_id: residentId } })
+    .then((res) => res.data)
+    .catch((err) => handleError(err, "List my incidents"));
+
 // 📣 Complaint APIs
 export const ComplaintsAPI = {
   listMine: () =>
     api.get(endpoints.complaints.mine)
       .then((res) => res.data)
       .catch((err) => handleError(err, "GET /complaints/mine")),
+  // Public resident (no login) equivalent of listMine — identified by
+  // resident_id directly since there's no session to derive it from.
+  listMinePublic: (residentId) =>
+    api.get(`${endpoints.complaints.base}/my`, { params: { resident_id: residentId } })
+      .then((res) => res.data)
+      .catch((err) => handleError(err, "GET /complaints/my")),
   listAll: () =>
     api.get(endpoints.complaints.all)
       .then((res) => res.data)
@@ -239,6 +259,16 @@ export const ComplaintsAPI = {
 
 // 📄 Document APIs
 export const DocumentsAPI = new BaseAPI(endpoints.documents);
+
+// 💵 Payment APIs
+export const PaymentsAPI = {
+  // Receipts the logged-in staff member personally issued (cash/manual
+  // payments they recorded) — scoped server-side to their own uid.
+  listMyReceipts: () =>
+    api.get("/api/paymongo/receipts/mine")
+      .then((res) => res.data)
+      .catch((err) => handleError(err, "List my receipts")),
+};
 
 export const MessagesAPI = {
   recipients: (q = "") => api.get(`${endpoints.messages}/recipients`, { params: { q } }).then((res) => res.data),
@@ -294,8 +324,30 @@ BusinessesAPI.listByOwner = (ownerName) =>
     .then(res => res.data)
     .catch(err => handleError(err, "List resident businesses"));
 
+// 🔎 List a resident's own businesses — public/unauthenticated, matches
+// DocumentsAPI's "/my" self-service pattern for residents without a login.
+BusinessesAPI.listMine = (ownerUid) =>
+  api.get(`${endpoints.businesses}/my`, { params: { owner_uid: ownerUid } })
+    .then((res) => res.data)
+    .catch((err) => handleError(err, "List my businesses"));
+
+// `data` is a FormData instance (owner_uid + any documents being replaced)
+// — public/unauthenticated, resubmits a rejected application in place and
+// resets it to pending_evaluation for staff to re-review.
+BusinessesAPI.resubmit = (businessId, data) =>
+  api.post(`${endpoints.businesses}/${businessId}/resubmit`, data, {
+    headers: { "Content-Type": "multipart/form-data" },
+  })
+    .then((res) => res.data)
+    .catch((err) => handleError(err, "Resubmit business application"));
+
+// `data` is a FormData instance (business fields + document files) — the
+// application endpoint is public/unauthenticated and takes multipart uploads
+// directly, so no separate authenticated file-upload step is needed here.
 BusinessesAPI.createApplication = (data) =>
-  api.post(`${endpoints.businesses}/applications`, data)
+  api.post(`${endpoints.businesses}/applications`, data, {
+    headers: { "Content-Type": "multipart/form-data" },
+  })
     .then((res) => res.data)
     .catch((err) => handleError(err, "Create business application"));
 
@@ -385,6 +437,9 @@ export const PublicServicesAPI = {
   },
   submitComplaint: (payload) => api.post(endpoints.public.complaints, payload).then((res) => res.data),
   announcements: (barangayId) => api.get(endpoints.public.announcements, { params: { barangayId } }).then((res) => res.data),
+  // Backs the pages the business permit / receipt QR codes link to.
+  verifyBusiness: (businessId) => api.get(endpoints.public.verifyBusiness(businessId)).then((res) => res.data),
+  verifyReceipt: (receiptNumber) => api.get(endpoints.public.verifyReceipt(receiptNumber)).then((res) => res.data),
 };
 
 export const SuperAdminAPI = {
@@ -400,6 +455,12 @@ export const SuperAdminAPI = {
   },
   deleteTenant: (id) => api.delete(endpoints.superAdmin.tenant(id)).then((res) => res.data),
   listCities: () => api.get(endpoints.superAdmin.cities).then((res) => res.data),
+  createCity: (payload) => api.post(endpoints.superAdmin.cities, payload).then((res) => res.data),
+  updateCity: (id, payload) => api.patch(endpoints.superAdmin.city(id), payload).then((res) => res.data),
+  listProvinces: () => api.get(endpoints.superAdmin.provinces).then((res) => res.data),
+  createProvince: (payload) => api.post(endpoints.superAdmin.provinces, payload).then((res) => res.data),
+  updateProvince: (id, payload) => api.patch(endpoints.superAdmin.province(id), payload).then((res) => res.data),
+  deleteProvince: (id) => api.delete(endpoints.superAdmin.province(id)).then((res) => res.data),
   uploadCityLogo: (id, file) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -410,7 +471,10 @@ export const SuperAdminAPI = {
   deleteCity: (id) => api.delete(endpoints.superAdmin.city(id)).then((res) => res.data),
   listAccounts: (params = {}) => api.get(endpoints.superAdmin.accounts, { params }).then((res) => res.data),
   listPayments: (params = {}) => api.get(endpoints.superAdmin.payments, { params }).then((res) => res.data),
+  deletePayment: (id) => api.delete(endpoints.superAdmin.payment(id)).then((res) => res.data),
   paymentsSummary: (params = {}) => api.get(endpoints.superAdmin.paymentsSummary, { params }).then((res) => res.data),
+  listReceipts: (params = {}) => api.get(endpoints.superAdmin.receipts, { params }).then((res) => res.data),
+  deleteReceipt: (id) => api.delete(endpoints.superAdmin.receipt(id)).then((res) => res.data),
 };
 
 // 📊 Dashboard APIs
