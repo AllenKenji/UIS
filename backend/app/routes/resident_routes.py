@@ -1,11 +1,13 @@
 import logging
-from fastapi import APIRouter, Depends, Query, Body, HTTPException, status, Request
+import os
+from fastapi import APIRouter, Depends, Header, Query, Body, HTTPException, status, Request
 from typing import Optional, List
 from starlette.concurrency import run_in_threadpool
 from backend.app.models import ResidentCreate, ResidentUpdate, ResidentOut
 from backend.app.services import resident_service
 from backend.app.services.resident_service import ResidentError
 from backend.app.services.email_service import send_email
+from backend.app.services.tenant_service import list_tenants
 from backend.app.core.auth import get_current_user, require_permission, resolve_tenant_scope
 from pydantic import BaseModel, ValidationError
 
@@ -135,6 +137,70 @@ async def add_resident(
         except Exception as error:
             logger.warning("Welcome email could not be sent to resident %s: %s", resident.email, error)
     return resident
+
+
+class FdpResidentProvisionResponse(BaseModel):
+    id: str
+    created: bool
+
+
+def _resolve_barangay_id(barangay: str, city: str) -> Optional[str]:
+    """Match a plain barangay/city name pair (as recorded on a FDP household
+    survey) to a registered BIS tenant. Same name-matching approach as the
+    document-request forms' barangay picker — there's no other link between
+    the two systems, since FDP only knows barangay/city as free text."""
+    barangay_norm = barangay.strip().lower()
+    city_norm = city.strip().lower()
+    for tenant in list_tenants():
+        if tenant.barangay.strip().lower() == barangay_norm and tenant.city.strip().lower() == city_norm:
+            return tenant.id
+    return None
+
+
+@router.post(
+    "/internal/fdp/provision-resident",
+    response_model=FdpResidentProvisionResponse,
+    summary="Provision or find a BIS resident from a FDP household survey",
+    description="Internal, API-key-authenticated endpoint used by the FDP survey system to create (or "
+    "return an existing) resident record from a submitted/approved household survey — the "
+    "service-to-service counterpart of /internal/fdp/provision-account, since POST /residents "
+    "requires an interactive staff login the survey system's server can't provide.",
+)
+async def provision_resident_from_fdp(
+    payload: ResidentCreate = Body(...),
+    x_fdp_provision_key: Optional[str] = Header(default=None),
+) -> FdpResidentProvisionResponse:
+    expected_key = os.environ.get("FDP_TO_BIS_PROVISION_API_KEY", "").strip()
+    provided_key = (x_fdp_provision_key or "").strip()
+    if not expected_key or provided_key != expected_key:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+    barangay_id = _resolve_barangay_id(payload.address.barangay, payload.address.city)
+    if not barangay_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f'No registered barangay matches "{payload.address.barangay}, {payload.address.city}"',
+        )
+
+    if payload.email:
+        existing = await safe_service_call(
+            "find resident by email (FDP provision)",
+            resident_service.find_by_email,
+            payload.email,
+            barangay_id,
+        )
+        if existing:
+            return FdpResidentProvisionResponse(id=existing.id, created=False)
+
+    created = await safe_service_call(
+        "create resident (FDP provision)",
+        resident_service.add_resident,
+        payload.model_dump(by_alias=True),
+        None,
+        True,
+        barangay_id,
+    )
+    return FdpResidentProvisionResponse(id=created.id, created=True)
 
 # 🚀 PUT /residents/{id}
 @router.put("/residents/{id}", response_model=ResidentOut)

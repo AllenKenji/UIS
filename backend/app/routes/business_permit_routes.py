@@ -3,7 +3,7 @@ expiration. There is no in-process scheduler in this app (and running one
 inside the web dyno would double-fire once you scale to 2+ instances), so
 this is exposed as a single protected endpoint meant to be called once a
 day by an external trigger (a Render Cron Job) — the same shared-secret
-pattern already used by the /internal/cfdp/* endpoints in account_routes.py.
+pattern already used by the /internal/fdp/* endpoints in account_routes.py.
 
 Residents who register a business never log in (no account, no
 notification bell to see), so the only channel that reliably reaches them

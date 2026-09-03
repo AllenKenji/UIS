@@ -96,7 +96,7 @@ def create_app() -> FastAPI:
     app.include_router(complaint_routes.router, prefix=f"{api_prefix}/complaints", tags=["Complaints"])
     app.include_router(account_routes.router, prefix=f"{api_prefix}", tags=["Accounts"])
     app.include_router(audit_routes.router, prefix=f"{api_prefix}/document_audit", tags=["Audit"])
-    app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
+    app.include_router(dashboard.router, prefix=api_prefix, tags=["Dashboard"])
     app.include_router(business_routes.router, prefix=api_prefix, tags=["Business"])
     app.include_router(business_permit_routes.router, prefix=api_prefix, tags=["Business Permits"])
     app.include_router(payment_routes.router, prefix=api_prefix, tags=["Payments"]) 

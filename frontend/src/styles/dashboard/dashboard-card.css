@@ -7,6 +7,15 @@
   padding: var(--space-md);
   box-shadow: var(--shadow-card);
   transition: transform 0.25s ease, box-shadow 0.25s ease;
+  /* Fill whatever height the grid row already stretched the card's
+     wrapper to (a grid item stretches by default, but this block-level
+     child doesn't inherit that unless told to) — otherwise a card whose
+     label happens to wrap to two lines sizes taller than its neighbors,
+     which only get one line, even though they sit in the same row. */
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
 .dashboard-card.is-clickable {
@@ -56,6 +65,9 @@
   font-size: var(--font-size-lg);
   font-weight: bold;
   color: var(--color-text);
+  /* Keeps the value pinned to the bottom of the card so it lines up across
+     cards even when one label wraps to two lines and another doesn't. */
+  margin-top: auto;
 }
 
 @media (max-width: 768px) {

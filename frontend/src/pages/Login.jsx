@@ -15,8 +15,8 @@ const roleRedirects = {
   treasurer: "/treasurer",
   sk: "/youth",
   dilg: "/audit",
-  surveyor: import.meta.env.VITE_CFDP_SURVEY_URL || "/cfdp-survey",
-  supervisor: import.meta.env.VITE_CFDP_SURVEY_URL || "/cfdp-survey",
+  surveyor: import.meta.env.VITE_FDP_SURVEY_URL || "/fdp-survey",
+  supervisor: import.meta.env.VITE_FDP_SURVEY_URL || "/fdp-survey",
 };
 
 const normalizeRole = (role) => (role?.trim().toLowerCase() || "resident");
@@ -109,7 +109,7 @@ const Login = () => {
 
       if (role === "surveyor" || role === "supervisor") {
         try {
-          const { data } = await api.post("/api/internal/cfdp/survey-handoff");
+          const { data } = await api.post("/api/internal/fdp/survey-handoff");
           if (data?.redirectUrl) {
             window.location.assign(data.redirectUrl);
             return;

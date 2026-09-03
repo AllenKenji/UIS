@@ -3,18 +3,19 @@ import { AuditAPI } from "../../services/api";
 import DashboardCard from "../dashboard/DashboardCard";
 import { roleCollections, metricConfig } from "../../config/metrics";
 import "../../styles/dashboard/analytics-panel.css";
-import { Bar } from "react-chartjs-2";
+import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
-  BarElement,
+  LineElement,
+  PointElement,
   Title,
   Tooltip,
   Legend,
 } from "chart.js";
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, LineElement, PointElement, Title, Tooltip, Legend);
 
 const PERIOD_OPTIONS = ["month", "year"];
 
@@ -144,7 +145,11 @@ const AnalyticsPanel = ({ role }) => {
     },
   });
   const [error, setError] = useState(null);
-  const [periodValues, setPeriodValues] = useState({ previous: null, current: null });
+  // Day 1-31 (within a month) or Jan-Dec (within a year) breakdown for the
+  // line chart — granularity always follows currentPeriodType, so the
+  // "compare" line lines up point-for-point against "current" on the same
+  // axis even if its own period-type toggle happens to say something else.
+  const [seriesData, setSeriesData] = useState({ current: [], compare: [] });
 
   const normalizedRole = role?.trim().toLowerCase();
   const accessibleMetrics = useMemo(() => roleCollections[normalizedRole] || [], [normalizedRole]);
@@ -208,39 +213,37 @@ const AnalyticsPanel = ({ role }) => {
     if (!selectedMetricKey) return;
 
     let cancelled = false;
-    const getSummaryParams = (periodType, picks) =>
-      periodType === "year"
+    // Always bucketed by currentPeriodType's granularity — compare's own
+    // period-type toggle only picks *which* month/year to compare against
+    // here, not how finely it's broken down, so both lines share one axis.
+    const getSeriesParams = (picks) =>
+      currentPeriodType === "year"
         ? { periodType: "yearly", year: Number(picks.year) || new Date().getFullYear() }
         : { periodType: "monthly", month: picks.month };
 
-    const fetchPeriodValues = async () => {
+    const fetchSeries = async () => {
       try {
-        const [previousSummary, currentSummary] = await Promise.all([
-          AuditAPI.summary(getSummaryParams(comparePeriodType, periodPicks.compare)),
-          AuditAPI.summary(getSummaryParams(currentPeriodType, periodPicks.current)),
+        const [compareSeries, currentSeries] = await Promise.all([
+          AuditAPI.summarySeries(getSeriesParams(periodPicks.compare)),
+          AuditAPI.summarySeries(getSeriesParams(periodPicks.current)),
         ]);
-        const getValue = (summary) =>
-          selectedMetricKey === "collections"
-            ? Number(summary?.collectionsAmount) || 0
-            : Number(summary?.[selectedMetricKey]) || 0;
-
         if (!cancelled) {
-          setPeriodValues({
-            previous: getValue(previousSummary),
-            current: getValue(currentSummary),
+          setSeriesData({
+            current: currentSeries?.buckets || [],
+            compare: compareSeries?.buckets || [],
           });
         }
       } catch (err) {
-        console.warn("⚠️ Error fetching analytics period summaries:", err.message);
-        if (!cancelled) setPeriodValues({ previous: null, current: null });
+        console.warn("⚠️ Error fetching analytics series:", err.message);
+        if (!cancelled) setSeriesData({ current: [], compare: [] });
       }
     };
 
-    fetchPeriodValues();
+    fetchSeries();
     return () => {
       cancelled = true;
     };
-  }, [selectedMetricKey, currentPeriodType, comparePeriodType, periodPicks]);
+  }, [selectedMetricKey, currentPeriodType, periodPicks]);
 
   if (!normalizedRole) {
     return (
@@ -254,53 +257,70 @@ const AnalyticsPanel = ({ role }) => {
   const selectedMetric = metrics.find((metric) => metric.key === selectedMetricKey);
   const currentRange = getSinglePeriodRange(currentPeriodType, periodPicks.current, new Date());
   const compareRange = getSinglePeriodRange(comparePeriodType, periodPicks.compare, new Date());
-  const selectedComparison = periodValues;
   const periodLabels = { previous: compareRange.label, current: currentRange.label };
   const chartIsCurrency = selectedMetricKey === "collections";
 
-  const chartOptions = {
+  // Day 1-31 (monthly) or Jan-Dec (yearly) line chart — labels come from
+  // whichever series actually loaded, since both are always the same
+  // fixed length (31 or 12) for a given currentPeriodType.
+  const seriesLabels = (seriesData.current.length ? seriesData.current : seriesData.compare).map((b) => b.label);
+  const getSeriesValue = (bucket) => {
+    const raw = selectedMetricKey === "collections" ? bucket?.collectionsAmount : bucket?.[selectedMetricKey];
+    return raw === null || raw === undefined ? null : Number(raw);
+  };
+
+  const lineData = {
+    labels: seriesLabels,
+    datasets: [
+      {
+        label: `Compare (${periodLabels.previous})`,
+        data: seriesData.compare.map(getSeriesValue),
+        borderColor: "#94a3b8",
+        backgroundColor: "#94a3b8",
+        tension: 0.3,
+        spanGaps: true,
+      },
+      {
+        label: `Current (${periodLabels.current})`,
+        data: seriesData.current.map(getSeriesValue),
+        borderColor: "#16a34a",
+        backgroundColor: "#16a34a",
+        tension: 0.3,
+        spanGaps: true,
+      },
+    ],
+  };
+
+  const lineOptions = {
     responsive: true,
     plugins: {
       legend: { position: "top" },
       title: {
         display: true,
         text: selectedMetric
-          ? `${selectedMetric.label}: ${periodLabels.previous} vs ${periodLabels.current}`
+          ? `${selectedMetric.label} by ${currentPeriodType === "year" ? "month" : "day"}: ${periodLabels.previous} vs ${periodLabels.current}`
           : "Analytics Trends",
       },
       tooltip: {
         callbacks: {
           label: (context) => {
-            const value = Number(context.raw || 0);
-            if (chartIsCurrency) {
-              return formatCurrency(value);
-            }
-            return `${value}`;
+            const value = context.raw;
+            if (value === null || value === undefined) return `${context.dataset.label}: —`;
+            return `${context.dataset.label}: ${chartIsCurrency ? formatCurrency(value) : value}`;
           },
         },
       },
     },
     scales: {
-      x: { type: "category", title: { display: true, text: "Period" } },
+      x: {
+        type: "category",
+        title: { display: true, text: currentPeriodType === "year" ? "Month" : "Day" },
+      },
       y: {
         beginAtZero: true,
         title: { display: true, text: chartIsCurrency ? "Amount" : "Count" },
       },
     },
-  };
-
-  const chartData = {
-    labels: [periodLabels.previous, periodLabels.current],
-    datasets: [
-      {
-        label: selectedMetric?.label || "Metric",
-        data: [
-          selectedComparison.previous,
-          selectedComparison.current,
-        ],
-        backgroundColor: ["#94a3b8", "#3b82f6"],
-      },
-    ],
   };
 
   return (
@@ -500,7 +520,7 @@ const AnalyticsPanel = ({ role }) => {
                     </div>
                   </div>
                 </div>
-                <Bar data={chartData} options={chartOptions} />
+                <Line data={lineData} options={lineOptions} />
               </div>
             )}
           </>

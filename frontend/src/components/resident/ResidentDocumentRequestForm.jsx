@@ -24,6 +24,7 @@ const ResidentDocumentRequestForm = ({ residentId = "", residentName = "", baran
     fee: 0,
     complainant: residentName || "",   // for Blotter Report autoFill
     businessName: "",                  // for Business Clearance select
+    businessId: "",                    // links to the selected business's permit record
     "location.barangay": "",
     "location.street": "",
     "location.city": PARANAQUE.city,
@@ -64,12 +65,17 @@ const ResidentDocumentRequestForm = ({ residentId = "", residentName = "", baran
   }, [barangayId]);
 
   useEffect(() => {
-    if (residentName) {
-      BusinessesAPI.listByOwner(residentName)
+    if (residentId) {
+      // listByOwner requires a login — but this form is used by residents
+      // who resolved their session through the public barangay portal and
+      // never actually logged in (see PublicDocumentRequest.jsx), so that
+      // call would 401 and silently leave this list empty. listMine is the
+      // public/unauthenticated equivalent, scoped by residentId instead.
+      BusinessesAPI.listMine(residentId)
         .then(data => setResidentBusinesses(data))
-        .catch(err => console.error("❌ Failed to fetch resident businesses:", err)); 
-    } 
-  }, [residentName]);
+        .catch(err => console.error("❌ Failed to fetch resident businesses:", err));
+    }
+  }, [residentId]);
 
 
   useEffect(() => {
@@ -100,13 +106,14 @@ const ResidentDocumentRequestForm = ({ residentId = "", residentName = "", baran
         setFormData(prev => ({
           ...prev,
           businessName: value,
+          businessId: business.businessId || "",
           "location.street": business.street || "",
           "location.barangay": business.barangay || "",
           "location.city": business.city || "",
           "location.province": business.province || ""
         }));
       } else {
-        setFormData(prev => ({ ...prev, businessName: value }));
+        setFormData(prev => ({ ...prev, businessName: value, businessId: "" }));
       }
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
@@ -117,6 +124,15 @@ const ResidentDocumentRequestForm = ({ residentId = "", residentName = "", baran
   const handleFileChange = (e, field) => {
     const file = e.target.files[0];
     setAttachments(prev => ({ ...prev, [field]: file }));
+  };
+
+  // An approved business already has a verified record on file (it went
+  // through staff evaluation) — its permit number gets cited on the
+  // clearance automatically, so re-uploading a permit copy is redundant.
+  // Anyone without a linked, approved business still needs to prove it.
+  const hasApprovedBusinessLinked = () => {
+    const business = residentBusinesses.find(b => b.businessName === formData.businessName);
+    return Boolean(business) && String(business.status).toLowerCase() === "approved";
   };
 
   const validateForm = () => {
@@ -133,7 +149,11 @@ const ResidentDocumentRequestForm = ({ residentId = "", residentName = "", baran
         return `${field.label} must be at least ${field.min}.`;
     }
 
+    const skipBusinessPermitUpload =
+      formData.document_type === "Business Clearance" && hasApprovedBusinessLinked();
+
     for (const att of attachmentRules) {
+      if (att.name === "businessPermit" && skipBusinessPermitUpload) continue;
       const file = attachments[att.name];
       if (att.required && !file) return `${att.label} is required.`;
     }
@@ -204,6 +224,7 @@ const ResidentDocumentRequestForm = ({ residentId = "", residentName = "", baran
         fee: documentTypes.length > 0 ? documentTypes[0].totalFee : 0,
         complainant: residentName || "",
         businessName: "",
+        businessId: "",
         "location.barangay": "",
         "location.street": "",
         "location.city": "",
@@ -324,6 +345,7 @@ const ResidentDocumentRequestForm = ({ residentId = "", residentName = "", baran
           }
 
           if (field.type === "select" && field.name === "businessName") {
+            const selectedBusiness = residentBusinesses.find(biz => biz.businessName === formData.businessName);
             return (
               <div className="form-group" key={field.name}>
                 <label htmlFor={field.name}>{field.label}</label>
@@ -341,6 +363,14 @@ const ResidentDocumentRequestForm = ({ residentId = "", residentName = "", baran
                     </option>
                   ))}
                 </select>
+
+                {selectedBusiness && (
+                  <p className="business-permit-hint">
+                    {String(selectedBusiness.status).toLowerCase() === "approved"
+                      ? `✅ Registered — Permit No. ${selectedBusiness.businessId} will be cited on the clearance.`
+                      : `⚠️ This business's application is still ${selectedBusiness.status || "pending"} — no permit number will be cited yet.`}
+                  </p>
+                )}
 
                 {/* 🔹 Render auto-filled address fields right after business select */}
                 {formData.document_type === "Business Clearance" && formData.businessName && (
@@ -408,20 +438,33 @@ const ResidentDocumentRequestForm = ({ residentId = "", residentName = "", baran
         })}
 
         {/* Dynamic attachments */}
-        {documentConfig[formData.document_type]?.attachments?.map(att => (
-          <div className="form-group" key={att.name}>
-            <label htmlFor={att.name}>
-              {att.label} {att.required && <span className="required">*</span>}
-            </label>
-            <input
-              id={att.name}
-              type="file"
-              accept=".jpg,.jpeg,.png,.pdf"
-              required={att.required}
-              onChange={e => handleFileChange(e, att.name)}
-            />
-          </div>
-        ))}
+        {documentConfig[formData.document_type]?.attachments?.map(att => {
+          const isOptionalBusinessPermit =
+            att.name === "businessPermit" &&
+            formData.document_type === "Business Clearance" &&
+            hasApprovedBusinessLinked();
+          const isRequired = att.required && !isOptionalBusinessPermit;
+
+          return (
+            <div className="form-group" key={att.name}>
+              <label htmlFor={att.name}>
+                {att.label} {isRequired && <span className="required">*</span>}
+              </label>
+              {isOptionalBusinessPermit && (
+                <p className="business-permit-hint">
+                  ✅ Not required — this business's approved permit is already on file.
+                </p>
+              )}
+              <input
+                id={att.name}
+                type="file"
+                accept=".jpg,.jpeg,.png,.pdf"
+                required={isRequired}
+                onChange={e => handleFileChange(e, att.name)}
+              />
+            </div>
+          );
+        })}
 
         <button type="submit" className="submit-btn">
           Submit Request (₱{formData.fee})

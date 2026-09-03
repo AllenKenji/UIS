@@ -33,8 +33,8 @@ const MainLayout = () => {
     treasurer: "/treasurer",
     sk: "/youth",
     dilg: "/audit",
-    surveyor: "/cfdp-survey",
-    supervisor: "/cfdp-survey",
+    surveyor: "/fdp-survey",
+    supervisor: "/fdp-survey",
   };
 
   useEffect(() => {
@@ -42,6 +42,23 @@ const MainLayout = () => {
     return () => {
       document.body.classList.remove("dashboard-scroll-lock");
     };
+  }, []);
+
+  useEffect(() => {
+    if (!role || role === "resident") return;
+    // userInfo.roles is only ever set at login/switch-role time and then
+    // cached (see UserContext.setSession) — if an admin grants this account
+    // another role while it's already logged in, the role-switcher below
+    // would never show it without this. switchRole(role) is a no-op switch
+    // (same role in, same role out) whose only purpose here is to re-fetch
+    // the account's current `roles` from Firestore and refresh the cache.
+    switchRole(role).catch(() => {
+      // Non-fatal — worst case the newly granted role only shows up after
+      // the next full login.
+    });
+    // Intentionally once per mount, not on every `role` change (switchRole
+    // itself changes `role`, which would otherwise loop).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

@@ -50,7 +50,7 @@ export const endpoints = {
       documents: "/api/reporting/treasurer/documents",
     },
   },
-  dashboard: "/dashboard-summary",
+  dashboard: "/api/dashboard-summary",
   disbursements: "/api/disbursements",
   accounts: {
     create: "/api/admin/create-account",
@@ -369,6 +369,10 @@ export const AuditAPI = {
     api.get(`${endpoints.audit}/summary`, { params })
       .then((res) => res.data)
       .catch((err) => handleError(err, "Audit summary fetch")),
+  summarySeries: (params = {}) =>
+    api.get(`${endpoints.audit}/summary/series`, { params })
+      .then((res) => res.data)
+      .catch((err) => handleError(err, "Audit summary series fetch")),
   listByDoc: (docId) =>
     api.get(`${endpoints.audit}?documentId=${docId}`) 
       .then((res) => res.data) 

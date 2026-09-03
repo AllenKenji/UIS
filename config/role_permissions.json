@@ -77,10 +77,10 @@
   ],
   "surveyor": [
     "viewDashboard",
-    "viewCfdpSurvey"
+    "viewFdpSurvey"
   ],
   "supervisor": [
     "viewDashboard",
-    "viewCfdpSurvey"
+    "viewFdpSurvey"
   ]
 }

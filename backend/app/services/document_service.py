@@ -243,6 +243,26 @@ def prepare_generator_data(doc: Document) -> dict:
     # Health certificate specific
     data["health_purpose"] = getattr(doc, "purpose", None)
 
+    # Business Clearance: if the requester picked one of their already
+    # registered businesses (see extraFields.businessId), pull its permit
+    # reference (businessId, e.g. "BIZ-MERVILLE-2026-a1b2") so the generated
+    # certificate cites it — only once actually approved, since a pending
+    # application isn't "permitted to operate" yet.
+    business_id = data.get("businessId")
+    if business_id:
+        try:
+            business_docs = (
+                get_db().collection("businesses")
+                .where("businessId", "==", business_id)
+                .limit(1)
+                .get()
+            )
+            business_data = (business_docs[0].to_dict() or {}) if business_docs else {}
+            if str(business_data.get("status", "")).strip().lower() == "approved":
+                data["business_permit_number"] = business_id
+        except Exception as e:
+            logger.warning("Failed to look up business %s for permit number: %s", business_id, e)
+
     return data
 
 # ===============================
@@ -452,6 +472,7 @@ async def create_document(
     locationCity: Optional[str] = None,
     locationProvince: Optional[str] = None,
     businessName: Optional[str] = None,
+    businessId: Optional[str] = None,
     activityName: Optional[str] = None,
     activityDate: Optional[str] = None,
     occupation: Optional[str] = None,
@@ -625,6 +646,7 @@ async def create_document(
 
             document_data["extraFields"] = {
                 "businessName": businessName,
+                "businessId": businessId,
                 "location": location_dict,
             }
 

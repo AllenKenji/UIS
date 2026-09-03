@@ -32,12 +32,13 @@
 
 .chart-controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-sm) var(--space-md);
   margin-bottom: var(--space-md);
 }
 
-.chart-controls label {
+.chart-controls > label {
   font-weight: 600;
   color: var(--color-text-strong);
 }
@@ -67,19 +68,32 @@
   display: flex;
   gap: var(--space-md);
   flex-wrap: wrap;
+  /* Forces this onto its own line below the Category select, however much
+     room is left on the .chart-controls row — a flex item at width:100%
+     always exceeds the remaining space, so the wrapping row breaks here. */
   width: 100%;
+  padding-top: var(--space-sm);
+  border-top: 1px dashed var(--color-border);
 }
 
 .compare-block {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+  flex: 1 1 260px;
   min-width: 260px;
+  background: var(--color-card-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm);
 }
 
 .compare-title {
-  font-weight: 600;
-  color: var(--color-text-strong);
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
 }
 
 .trend-toggle button {

@@ -1,4 +1,5 @@
 # app/routes/audit_routes.py
+import calendar
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -147,7 +148,11 @@ def _resolve_collection_date(record: dict):
     return None
 
 
-def _build_collection_amount(db, period_start: datetime, period_end: datetime) -> float:
+def _paid_transactions(db) -> list[dict]:
+    """Every transaction (payment/business/document) currently in a "paid"
+    state, deduped by transactionId/id — same merge get_audit_summary and
+    the series endpoint both build their collections totals from, factored
+    out so the two don't drift out of sync with each other."""
     payments = [
         {"id": snap.id, "entityType": "payment", **(snap.to_dict() or {})}
         for snap in db.collection("payments").stream()
@@ -189,12 +194,15 @@ def _build_collection_amount(db, period_start: datetime, period_end: datetime) -
         if existing.get("entityType") != "payment" and tx.get("entityType") == "payment":
             unique[key] = tx
 
-    collections_amount = 0.0
-    for tx in unique.values():
-        status = _normalize_status(tx.get("paymentStatus") or tx.get("status"))
-        if status != "paid":
-            continue
+    return [
+        tx for tx in unique.values()
+        if _normalize_status(tx.get("paymentStatus") or tx.get("status")) == "paid"
+    ]
 
+
+def _build_collection_amount(db, period_start: datetime, period_end: datetime) -> float:
+    collections_amount = 0.0
+    for tx in _paid_transactions(db):
         date_value = _resolve_collection_date(tx)
         if not date_value or not (period_start <= date_value < period_end):
             continue
@@ -322,3 +330,136 @@ def get_audit_summary(
     except Exception as e:
         logger.error("❌ Error fetching audit summary: %s", str(e), exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to fetch audit summary")
+
+
+def _monthly_bucket_windows(year: int, month: int) -> list[tuple[str, Optional[datetime], Optional[datetime]]]:
+    """Always 31 fixed slots (Day 1..31), so a 30/28/29-day month still lines
+    up index-for-index against a 31-day month on the same chart — days past
+    the end of the month get no window (left as None) rather than a bucket
+    that would otherwise silently read 0."""
+    days_in_month = calendar.monthrange(year, month)[1]
+    windows = []
+    for day in range(1, 32):
+        if day <= days_in_month:
+            start = datetime(year, month, day)
+            windows.append((str(day), start, start + timedelta(days=1)))
+        else:
+            windows.append((str(day), None, None))
+    return windows
+
+
+def _yearly_bucket_windows(year: int) -> list[tuple[str, datetime, datetime]]:
+    return [
+        (
+            datetime(year, m, 1).strftime("%b"),
+            datetime(year, m, 1),
+            datetime(year + (1 if m == 12 else 0), 1 if m == 12 else m + 1, 1),
+        )
+        for m in range(1, 13)
+    ]
+
+
+@router.get("/summary/series", tags=["Audit"])
+def get_audit_summary_series(
+    periodType: Optional[str] = Query(None),
+    year: Optional[int] = Query(None),
+    month: Optional[str] = Query(None),
+    _: str = Depends(require_permission("auditBarangayData")),
+):
+    """
+    Per-bucket breakdown of the same metrics get_audit_summary totals up —
+    Day 1..31 within one month, or Jan..Dec within one year — for the admin
+    analytics line chart. Always returns a fixed-length bucket list (31 for
+    monthly, 12 for yearly) so a "current" and "compare" series drawn on the
+    same chart line up by index even when their months have different
+    lengths; a day past a shorter month's end comes back as null values
+    instead of a misleading 0.
+    """
+    try:
+        db = get_db()
+        normalized = (periodType or "").strip().lower()
+        now = datetime.now(LOCAL_TZ)
+
+        if normalized == "yearly":
+            safe_year = year if isinstance(year, int) and 2000 <= year <= 9999 else now.year
+            windows = _yearly_bucket_windows(safe_year)
+        else:
+            source = month or now.strftime("%Y-%m")
+            try:
+                year_part, month_part = source.split("-")
+                safe_year, safe_month = int(year_part), int(month_part)
+                if not (1 <= safe_month <= 12):
+                    raise ValueError
+            except Exception:
+                safe_year, safe_month = now.year, now.month
+            windows = _monthly_bucket_windows(safe_year, safe_month)
+
+        residents_docs = [snap.to_dict() or {} for snap in db.collection("residents").stream()]
+
+        def _collection_docs(name: str):
+            return [snap.to_dict() or {} for snap in db.collection(name).stream()]
+
+        businesses_docs = _collection_docs("businesses")
+        documents_docs = _collection_docs("documents")
+        logins_docs = _collection_docs("logins")
+        complaints_docs = _collection_docs("complaints")
+        incidents_docs = _collection_docs("incidents")
+        paid_transactions = _paid_transactions(db)
+
+        def _count_in_window(docs, collection_name, start, end):
+            return sum(
+                1
+                for data in docs
+                if _is_within_range(_resolve_record_date(collection_name, data), start, end)
+            )
+
+        buckets = []
+        for label, start, end in windows:
+            if start is None:
+                buckets.append({
+                    "label": label,
+                    "residents": None,
+                    "youth": None,
+                    "businesses": None,
+                    "documents": None,
+                    "logins": None,
+                    "complaints": None,
+                    "incidents": None,
+                    "collectionsAmount": None,
+                })
+                continue
+
+            residents_count = 0
+            youth_count = 0
+            for data in residents_docs:
+                created_at = _resolve_record_date("residents", data)
+                if not _is_within_range(created_at, start, end):
+                    continue
+                residents_count += 1
+                age = _resident_age(data)
+                if isinstance(age, int) and 15 <= age <= 24:
+                    youth_count += 1
+
+            collections_amount = 0.0
+            for tx in paid_transactions:
+                date_value = _resolve_collection_date(tx)
+                if not date_value or not (start <= date_value < end):
+                    continue
+                collections_amount += _to_number(tx.get("amount"))
+
+            buckets.append({
+                "label": label,
+                "residents": residents_count,
+                "youth": youth_count,
+                "businesses": _count_in_window(businesses_docs, "businesses", start, end),
+                "documents": _count_in_window(documents_docs, "documents", start, end),
+                "logins": _count_in_window(logins_docs, "logins", start, end),
+                "complaints": _count_in_window(complaints_docs, "complaints", start, end),
+                "incidents": _count_in_window(incidents_docs, "incidents", start, end),
+                "collectionsAmount": round(collections_amount, 2),
+            })
+
+        return {"periodType": "yearly" if normalized == "yearly" else "monthly", "buckets": buckets}
+    except Exception as e:
+        logger.error("❌ Error fetching audit summary series: %s", str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to fetch audit summary series")

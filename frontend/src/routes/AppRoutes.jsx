@@ -39,7 +39,7 @@ import SKDashboard from "../pages/SKDashboard";
 import SKAddProgramPage from "../pages/SKAddProgramPage";
 import SKAddEventPage from "../pages/SKAddEventPage";
 import AuditView from "../pages/AuditView";
-import CfdpSurveyModule from "../pages/CfdpSurveyModule";
+import FdpSurveyModule from "../pages/FdpSurveyModule";
 import PublicResidentRegistration from "../pages/PublicResidentRegistration";
 import PublicServicesAccess from "../pages/PublicServicesAccess";
 import LocationPicker from "../pages/public/LocationPicker";
@@ -190,12 +190,12 @@ const AppRoutes = ({ isDarkMode, toggleDarkMode }) => {
             <Route path="/audit/documents" element={<ProtectedRoute allowedRoles={["admin", "dilg"]}><AuditView /></ProtectedRoute>} />
             <Route path="/audit/exports" element={<ProtectedRoute allowedRoles={["admin", "dilg"]}><AuditView /></ProtectedRoute>} />
 
-            {/* Embedded CFDP Survey System */}
+            {/* Embedded FDP Survey System */}
             <Route
-              path="/cfdp-survey"
+              path="/fdp-survey"
               element={
                 <ProtectedRoute allowedRoles={["admin", "surveyor", "supervisor"]} allowAdminOverride={false}>
-                  <CfdpSurveyModule />
+                  <FdpSurveyModule />
                 </ProtectedRoute>
               }
             />

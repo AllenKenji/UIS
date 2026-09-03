@@ -319,10 +319,13 @@ def generate_business_clearance_pdf(data, issued_by, issued_at, doc_id, signatur
     resident = data.get("resident", {})
     owner = safe_text(resident.get("fullName", "Unnamed"))
     full_address, barangay = format_address(data.get("location", {}) or resident.get("address", {}))
+    permit_number = data.get("business_permit_number")
 
     body = (
         f"This is to certify that the business named '{business_name}', owned by {owner}, "
-        f"located at {full_address}, is duly recognized and permitted to operate within Barangay {barangay}.\n\n"
+        f"located at {full_address}, is duly recognized and permitted to operate within Barangay {barangay}"
+        + (f" under Business Permit No. {permit_number}" if permit_number else "")
+        + ".\n\n"
         f"This clearance is issued for registration, renewal, or legal compliance. "
         f"Issued this {issued_at.strftime('%B %d, %Y')} at Barangay {barangay}.\n\n"
         f"Document ID: {doc_id}"

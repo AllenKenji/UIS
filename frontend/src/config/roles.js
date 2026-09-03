@@ -35,7 +35,7 @@ export const ROLE_OPTIONS = Object.freeze(
 // 🚦 Base permissions template (all possible actions)
 export const BASE_PERMISSIONS = Object.freeze({
   viewDashboard: true,
-  viewCfdpSurvey: false,
+  viewFdpSurvey: false,
   manageResidents: false,
   fileComplaints: false,
   fileComplaintsForResidents: false,

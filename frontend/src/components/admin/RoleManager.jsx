@@ -277,7 +277,11 @@ const RoleManager = () => {
                 <td>{user.photo_url ? <img className="role-profile-photo" src={user.photo_url} alt="" /> : <span className="role-profile-placeholder">{(user.full_name || "?").charAt(0)}</span>}</td>
                 <td>{user.full_name || "Unnamed User"}<small className="role-email">{user.email}</small></td>
                 <td>
-                  <span className={`role-badge ${user.role}`}>{user.role}</span>
+                  {(user.roles?.length ? user.roles : [user.role]).map((r) => (
+                    <span key={r} className={`role-badge ${r}${r === user.role ? " role-badge-active" : ""}`}>
+                      {r}
+                    </span>
+                  ))}
                 </td>
                 <td>
                   <span className="presence-indicator" title={getUserOnline(user.id) ? "Online" : "Offline"}>

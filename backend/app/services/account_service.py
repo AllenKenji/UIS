@@ -13,7 +13,7 @@ from backend.app.core.roles import ROLE_PERMISSIONS
 from backend.app.core.local_auth import create_user, delete_user
 
 logger: logging.Logger = logging.getLogger("uvicorn.error")
-CFDP_SYNC_ROLES = {"surveyor", "supervisor"}
+FDP_SYNC_ROLES = {"surveyor", "supervisor"}
 
 
 # ===============================
@@ -79,18 +79,18 @@ def rollback_account_creation(uid: str):
         logger.warning("Local auth rollback failed for UID %s: %s", uid, err)
 
 
-def provision_cfdp_local_user(uid: str, data: AccountCreate):
-    """Provision surveyor/supervisor credentials in CFDP local-auth system."""
+def provision_fdp_local_user(uid: str, data: AccountCreate):
+    """Provision surveyor/supervisor credentials in FDP local-auth system."""
     role = str(data.role.value).strip().lower()
-    if role not in CFDP_SYNC_ROLES:
+    if role not in FDP_SYNC_ROLES:
         return
 
-    provision_url = os.environ.get("CFDP_PROVISION_URL", "").strip()
-    provision_key = os.environ.get("CFDP_PROVISION_API_KEY", "").strip()
-    strict_sync = os.environ.get("CFDP_PROVISION_REQUIRED", "false").strip().lower() in {"1", "true", "yes", "on"}
+    provision_url = os.environ.get("FDP_PROVISION_URL", "").strip()
+    provision_key = os.environ.get("FDP_PROVISION_API_KEY", "").strip()
+    strict_sync = os.environ.get("FDP_PROVISION_REQUIRED", "false").strip().lower() in {"1", "true", "yes", "on"}
 
     if not provision_url or not provision_key:
-        detail = "CFDP provisioning is not configured. Set CFDP_PROVISION_URL and CFDP_PROVISION_API_KEY."
+        detail = "FDP provisioning is not configured. Set FDP_PROVISION_URL and FDP_PROVISION_API_KEY."
         if strict_sync:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -98,7 +98,7 @@ def provision_cfdp_local_user(uid: str, data: AccountCreate):
             )
 
         logger.warning(
-            "⚠️ %s Skipping CFDP sync for UID=%s role=%s (set CFDP_PROVISION_REQUIRED=true to enforce).",
+            "⚠️ %s Skipping FDP sync for UID=%s role=%s (set FDP_PROVISION_REQUIRED=true to enforce).",
             detail,
             uid,
             role,
@@ -126,32 +126,32 @@ def provision_cfdp_local_user(uid: str, data: AccountCreate):
     try:
         with urllib_request.urlopen(req, timeout=10) as res:
             if int(getattr(res, "status", 0)) >= 400:
-                detail = f"CFDP provisioning failed with status {res.status}"
+                detail = f"FDP provisioning failed with status {res.status}"
                 if strict_sync:
                     raise HTTPException(
                         status_code=status.HTTP_502_BAD_GATEWAY,
                         detail=detail,
                     )
-                logger.warning("⚠️ %s; continuing because CFDP_PROVISION_REQUIRED=false", detail)
+                logger.warning("⚠️ %s; continuing because FDP_PROVISION_REQUIRED=false", detail)
                 return
     except HTTPError as err:
         error_detail = err.read().decode("utf-8", errors="ignore") if hasattr(err, "read") else str(err)
-        detail = f"CFDP provisioning failed ({err.code}): {error_detail}"
+        detail = f"FDP provisioning failed ({err.code}): {error_detail}"
         if strict_sync:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=detail,
             )
-        logger.warning("⚠️ %s; continuing because CFDP_PROVISION_REQUIRED=false", detail)
+        logger.warning("⚠️ %s; continuing because FDP_PROVISION_REQUIRED=false", detail)
         return
     except URLError as err:
-        detail = f"CFDP provisioning unreachable: {err}"
+        detail = f"FDP provisioning unreachable: {err}"
         if strict_sync:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=detail,
             )
-        logger.warning("⚠️ %s; continuing because CFDP_PROVISION_REQUIRED=false", detail)
+        logger.warning("⚠️ %s; continuing because FDP_PROVISION_REQUIRED=false", detail)
         return
 
 
@@ -248,7 +248,7 @@ def update_user_role(uid: str, new_role: RoleEnum, changed_by: str) -> AccountRe
 async def create_barangay_account(
     data: AccountCreate,
     created_by: str,
-    skip_cfdp_provision: bool = False,
+    skip_fdp_provision: bool = False,
 ) -> AccountResponse:
     """Create a Firebase Auth user, Firestore profile, and set claims."""
     uid = create_local_user(data)
@@ -257,8 +257,8 @@ async def create_barangay_account(
     try:
         write_firestore_profile(uid, payload)
         set_user_claims(uid, data.role)
-        if not skip_cfdp_provision:
-            provision_cfdp_local_user(uid, data)
+        if not skip_fdp_provision:
+            provision_fdp_local_user(uid, data)
     except Exception:
         rollback_account_creation(uid)
         raise

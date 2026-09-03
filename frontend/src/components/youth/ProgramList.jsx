@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { useUser } from "../../context/UserContext";
 import { DisbursementsAPI, notifyYouthDataChanged, NotificationsAPI, YouthProgramsAPI } from "../../services/api";
+import { uploadLocalFile } from "../../utils/fileUtils";
 import "../../styles/sk.css";
 
 const toDate = (value) => {
@@ -35,7 +36,9 @@ const DISBURSEMENT_CATEGORIES = [
 
 const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
   const { role, userInfo } = useUser();
-  const [form, setForm] = useState({ title: "", date: "", category: "Miscellaneous", status: "Planned", budget: "" });
+  const [form, setForm] = useState({ title: "", date: "", category: "Miscellaneous", status: "Planned", budget: "", description: "", imageUrl: "" });
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
@@ -52,7 +55,9 @@ const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
   };
 
   const clearForm = () => {
-    setForm({ title: "", date: "", category: "Miscellaneous", status: "Planned", budget: "" });
+    setForm({ title: "", date: "", category: "Miscellaneous", status: "Planned", budget: "", description: "", imageUrl: "" });
+    setImageFile(null);
+    setImagePreview("");
     setEditingId(null);
   };
 
@@ -64,7 +69,17 @@ const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
       category: program.category || "Miscellaneous",
       status: program.status || "Planned",
       budget: program.budget != null ? String(program.budget) : "",
+      description: program.description || "",
+      imageUrl: program.imageUrl || "",
     });
+    setImageFile(null);
+    setImagePreview("");
+  };
+
+  const handleImageChange = (event) => {
+    const file = event.target.files?.[0] || null;
+    setImageFile(file);
+    setImagePreview(file ? URL.createObjectURL(file) : "");
   };
 
   const handleDelete = async (programId) => {
@@ -102,6 +117,16 @@ const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
 
     setSaving(true);
     try {
+      // Upload the photo first (if a new one was picked) so imageUrl is
+      // ready to go into the same create/update call as everything else —
+      // this is what the barangay portal's Programs & Events section reads
+      // (see public_routes._PROGRAM_FIELDS, already wired to display it).
+      let imageUrl = form.imageUrl || null;
+      if (imageFile) {
+        const uploaded = await uploadLocalFile(userInfo?.uid || "sk", imageFile, "sk_programs", `${Date.now()}_${imageFile.name}`);
+        imageUrl = uploaded.url;
+      }
+
       if (editingId) {
         await YouthProgramsAPI.update(editingId, {
           title: form.title.trim(),
@@ -109,6 +134,8 @@ const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
           category: form.category,
           status: form.status,
           budget,
+          description: form.description.trim(),
+          imageUrl,
         });
         const linkedDisbursement = (await DisbursementsAPI.list()).find(
           (entry) => entry.sourceId === editingId && String(entry.sourceType || "").trim().toLowerCase() === "sk_program"
@@ -124,6 +151,8 @@ const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
           category: form.category,
           status: form.status,
           budget,
+          description: form.description.trim(),
+          imageUrl,
         });
 
         if (String(role || "").trim().toLowerCase() === "sk") {
@@ -213,6 +242,20 @@ const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
               value={form.budget}
               onChange={(e) => handleChange("budget", e.target.value)}
             />
+            <textarea
+              className="sk-description-field"
+              placeholder="Description (shown on the barangay portal)"
+              value={form.description}
+              onChange={(e) => handleChange("description", e.target.value)}
+              rows={3}
+            />
+            <label className="sk-photo-field">
+              Photo
+              <input type="file" accept="image/*" onChange={handleImageChange} />
+            </label>
+            {(imagePreview || form.imageUrl) && (
+              <img className="sk-photo-preview" src={imagePreview || form.imageUrl} alt="Program preview" />
+            )}
             <button type="submit" disabled={saving}>{saving ? "Saving..." : editingId ? "Update Program" : "Add Program"}</button>
             {editingId ? (
               <button type="button" className="sk-secondary-btn" onClick={clearForm}>
@@ -231,6 +274,9 @@ const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
         <ul>
           {sortedPrograms.map((program) => (
             <li key={program.id}>
+              {program.imageUrl && (
+                <img className="sk-item-photo" src={program.imageUrl} alt={program.title || "Program"} />
+              )}
               <strong>{program.title || "Untitled Program"}</strong>
               <div className="sk-item-meta">
                 <span>{formatDate(program.date)}</span>
@@ -238,6 +284,7 @@ const ProgramList = ({ programs = [], formOnly = false, readOnly = false }) => {
                 <span>{program.status || "Planned"}</span>
                 <span>Budget: ₱{Number(program.budget || 0).toLocaleString()}</span>
               </div>
+              {program.description && <p className="sk-item-description">{program.description}</p>}
               {!readOnly ? (
                 <div className="sk-item-actions">
                   <button type="button" className="sk-secondary-btn" onClick={() => handleEdit(program)}>

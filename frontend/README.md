@@ -1,22 +1,22 @@
 # BIS Frontend
 
-## CFDP Survey Integration
+## FDP Survey Integration
 
-The BIS frontend now includes an embedded CFDP Survey module at `/cfdp-survey`.
+The BIS frontend now includes an embedded FDP Survey module at `/fdp-survey`.
 
-Set the CFDP URL in your frontend environment file:
+Set the FDP URL in your frontend environment file:
 
 ```bash
-REACT_APP_CFDP_SURVEY_URL=http://localhost:3001
+REACT_APP_FDP_SURVEY_URL=http://localhost:3001
 ```
 
 ### Local run order
 
-1. Run CFDP server from `../cfdp-survey-system` (default: `pnpm dev`).
+1. Run FDP server from `../fdp-survey-system` (default: `pnpm dev`).
 2. Run BIS frontend (`npm start`).
-3. Open BIS and navigate to **CFDP Survey** from the sidebar.
+3. Open BIS and navigate to **FDP Survey** from the sidebar.
 
-If CFDP is deployed, set `REACT_APP_CFDP_SURVEY_URL` to the deployed URL.
+If FDP is deployed, set `REACT_APP_FDP_SURVEY_URL` to the deployed URL.
 
 # Getting Started with Create React App
 

@@ -48,6 +48,15 @@
   font-size: var(--font-size-sm);
   font-weight: 600;
   text-transform: capitalize;
+  margin: 0 0.25rem 0.25rem 0;
+  opacity: 0.6;
+}
+
+/* The account's current *active* role (vs. the other roles it also has
+   assigned) stands out from the rest of its badges. */
+.role-badge.role-badge-active {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--color-text-strong, #1a1a1a) inset;
 }
 
 .role-badge.admin { background: var(--color-admin); color: #fff; }

@@ -254,7 +254,7 @@ const CreateAccountForm = () => {
       />
 
       {(form.role === "surveyor" || form.role === "supervisor") && (
-        <p className="feedback">ℹ️ This account will also be auto-created in CFDP.</p>
+        <p className="feedback">ℹ️ This account will also be auto-created in FDP.</p>
       )}
 
       {!confirming ? (

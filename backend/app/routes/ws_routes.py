@@ -171,7 +171,7 @@ def _merge_presence_users(base_users: dict[str, dict], overlay_users: dict[str, 
 
 
 def _is_valid_internal_presence_key(provided_key: str | None) -> bool:
-    expected_key = os.environ.get("CFDP_TO_BIS_PROVISION_API_KEY", "").strip()
+    expected_key = os.environ.get("FDP_TO_BIS_PROVISION_API_KEY", "").strip()
     return bool(expected_key) and (provided_key or "").strip() == expected_key
 
 
@@ -247,12 +247,12 @@ async def _emit_disconnect_logout_if_still_offline(uid: str, role: str):
         logger.warning("⚠️ Failed websocket-disconnect logout notify uid=%s: %s", uid, err)
 
 
-@router.post("/api/internal/cfdp/presence")
-async def sync_cfdp_presence(
+@router.post("/api/internal/fdp/presence")
+async def sync_fdp_presence(
     payload: SurveyPresencePayload,
-    x_cfdp_provision_key: str | None = Header(default=None),
+    x_fdp_provision_key: str | None = Header(default=None),
 ):
-    if not _is_valid_internal_presence_key(x_cfdp_provision_key):
+    if not _is_valid_internal_presence_key(x_fdp_provision_key):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
     normalized_role = _normalize_role(payload.role)
@@ -291,7 +291,7 @@ async def sync_cfdp_presence(
                 user_id=uid,
             )
         except Exception as err:
-            logger.warning("⚠️ Failed CFDP login notify uid=%s: %s", uid, err)
+            logger.warning("⚠️ Failed FDP login notify uid=%s: %s", uid, err)
 
     if before_count > 0 and after_count == 0:
         try:
@@ -304,7 +304,7 @@ async def sync_cfdp_presence(
                 user_id=uid,
             )
         except Exception as err:
-            logger.warning("⚠️ Failed CFDP logout notify uid=%s: %s", uid, err)
+            logger.warning("⚠️ Failed FDP logout notify uid=%s: %s", uid, err)
 
     return {"success": True}
 

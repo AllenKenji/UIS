@@ -24,7 +24,7 @@ Frontend is a static React site. Deploy separately:
 6. Add environment variables:
    - VITE_API_BASE_URL
    - VITE_WS_BASE_URL
-   - VITE_CFDP_SURVEY_URL
+   - VITE_FDP_SURVEY_URL
 
 ## Services to create
 
@@ -62,13 +62,13 @@ uvicorn app.main:app --host 0.0.0.0 --port $PORT
 - `GMAIL_REFRESH_TOKEN`
 - `BUSINESS_PERMIT_CHECK_KEY` (shared secret required by `POST /api/internal/business-permits/check-expirations` in the `X-BIS-Permit-Check-Key` header — see "Business permit expiration cron job" below)
 
-### Optional CFDP provisioning variables (for surveyor/supervisor sync)
+### Optional FDP provisioning variables (for surveyor/supervisor sync)
 
-- `CFDP_PROVISION_URL` (CFDP internal endpoint, e.g. `/survey/api/internal/bis/provision-user`)
-- `CFDP_PROVISION_API_KEY` (shared secret expected by CFDP in `X-BIS-Provision-Key`)
-- `CFDP_PROVISION_REQUIRED` (`true` to block BIS account creation when CFDP sync fails; default is `false`)
-- `CFDP_TO_BIS_PROVISION_API_KEY` (shared secret required by BIS internal endpoint `POST /api/internal/cfdp/provision-account`)
-- `CFDP_SURVEY_BASE_URL` (optional public CFDP base URL used for auto-login handoff; if omitted BIS derives it from `CFDP_PROVISION_URL`)
+- `FDP_PROVISION_URL` (FDP internal endpoint, e.g. `/survey/api/internal/bis/provision-user`)
+- `FDP_PROVISION_API_KEY` (shared secret expected by FDP in `X-BIS-Provision-Key`)
+- `FDP_PROVISION_REQUIRED` (`true` to block BIS account creation when FDP sync fails; default is `false`)
+- `FDP_TO_BIS_PROVISION_API_KEY` (shared secret required by BIS internal endpoints `POST /api/internal/fdp/provision-account` and `POST /api/internal/fdp/provision-resident` — same key FDP sends as `BIS_ACCOUNT_PROVISION_API_KEY` for both calls)
+- `FDP_SURVEY_BASE_URL` (optional public FDP base URL used for auto-login handoff; if omitted BIS derives it from `FDP_PROVISION_URL`)
 
 ## 2) Frontend service (Static Site)
 
@@ -89,7 +89,7 @@ build
 
 - `VITE_API_BASE_URL=https://<your-bis-backend>.onrender.com`
 - `VITE_WS_BASE_URL=wss://<your-bis-backend>.onrender.com`
-- `VITE_CFDP_SURVEY_URL=https://<your-cfdp-frontend>.onrender.com`
+- `VITE_FDP_SURVEY_URL=https://<your-fdp-frontend>.onrender.com`
 
 ## Business permit expiration cron job
 

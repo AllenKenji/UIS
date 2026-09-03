@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import YouthRegistry from "../components/youth/YouthRegistry";
 import ProgramList from "../components/youth/ProgramList";
@@ -11,6 +11,8 @@ import "../styles/sk.css";
 
 const YOUTH_MIN_AGE = 15;
 const YOUTH_MAX_AGE = 24;
+
+const SECTION_ICONS = { registry: "📋", programs: "🎯", events: "📅", feedback: "💬" };
 
 const toDate = (value) => {
   if (!value) return null;
@@ -48,25 +50,40 @@ const SKDashboard = () => {
   const events = useFirestoreCollection("sk_events");
   const feedback = useFirestoreCollection("youth_feedback");
 
-  const registryRef = useRef(null);
-  const programsRef = useRef(null);
-  const eventsRef = useRef(null);
-  const feedbackRef = useRef(null);
+  const isAdminOversight = role === "admin" || location.pathname.startsWith("/admin/youth");
+
+  // Which section the current URL points at, if any (e.g. a direct link to
+  // /youth/feedback, or the browser back/forward button) — null means the
+  // bare "/youth" landing route, which just defaults to the first tab.
+  const pathSection = useMemo(() => {
+    if (location.pathname.startsWith("/youth/registry")) return "registry";
+    if (location.pathname.startsWith("/youth/programs")) return "programs";
+    if (location.pathname.startsWith("/youth/events")) return "events";
+    if (location.pathname.startsWith("/youth/feedback")) return "feedback";
+    return null;
+  }, [location.pathname]);
+
   const [adminOversightSection, setAdminOversightSection] = useState("registry");
+  const [normalSection, setNormalSection] = useState(pathSection || "registry");
+
+  useEffect(() => {
+    if (pathSection) setNormalSection(pathSection);
+  }, [pathSection]);
+
+  const activeSection = isAdminOversight ? adminOversightSection : normalSection;
+
+  const isProgramAddRoute = !isAdminOversight && location.pathname.startsWith("/youth/programs/add");
+  const isEventAddRoute = !isAdminOversight && location.pathname.startsWith("/youth/events/add");
 
   const youthResidents = useMemo(() => {
     return residents
-      .map((resident) => {
-        const age = getResidentAge(resident);
-        return { ...resident, _computedAge: age };
-      })
-      .filter((resident) => {
-        return (
+      .map((resident) => ({ ...resident, _computedAge: getResidentAge(resident) }))
+      .filter(
+        (resident) =>
           typeof resident._computedAge === "number" &&
           resident._computedAge >= YOUTH_MIN_AGE &&
           resident._computedAge <= YOUTH_MAX_AGE
-        );
-      });
+      );
   }, [residents]);
 
   const activePrograms = useMemo(
@@ -88,36 +105,20 @@ const SKDashboard = () => {
     [feedback]
   );
 
-  const isAdminOversight = role === "admin" || location.pathname.startsWith("/admin/youth");
-
-  const quickNav = [
-    { key: "registry", title: "Youth Registry", value: youthResidents.length, path: "/youth/registry", ref: registryRef },
-    { key: "programs", title: "Programs", value: activePrograms.length, path: "/youth/programs", ref: programsRef },
-    { key: "events", title: "Events", value: upcomingEvents.length, path: "/youth/events", ref: eventsRef },
-    { key: "feedback", title: "Feedback", value: pendingFeedback.length, path: "/youth/feedback", ref: feedbackRef },
+  const tabs = [
+    { key: "registry", title: "Youth Registry", value: youthResidents.length, path: "/youth/registry" },
+    { key: "programs", title: "Programs", value: activePrograms.length, path: "/youth/programs" },
+    { key: "events", title: "Events", value: upcomingEvents.length, path: "/youth/events" },
+    { key: "feedback", title: "Feedback", value: pendingFeedback.length, path: "/youth/feedback" },
   ];
 
-  const activeSection = useMemo(() => {
-    if (location.pathname.startsWith("/youth/registry")) return "registry";
-    if (location.pathname.startsWith("/youth/programs")) return "programs";
-    if (location.pathname.startsWith("/youth/events")) return "events";
-    if (location.pathname.startsWith("/youth/feedback")) return "feedback";
-    return "all";
-  }, [location.pathname]);
-
-  const isProgramAddRoute = location.pathname.startsWith("/youth/programs/add");
-  const isEventAddRoute = location.pathname.startsWith("/youth/events/add");
-
-  const handleScrollTo = (targetRef, path) => {
-    if (location.pathname !== path) {
-      navigate(path);
+  const handleTabClick = (tab) => {
+    if (isAdminOversight) {
+      setAdminOversightSection(tab.key);
+      return;
     }
-    targetRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
-  const shouldShowSection = (section) => {
-    if (isAdminOversight) return adminOversightSection === section;
-    return activeSection === "all" || activeSection === section;
+    setNormalSection(tab.key);
+    if (location.pathname !== tab.path) navigate(tab.path);
   };
 
   return (
@@ -141,118 +142,54 @@ const SKDashboard = () => {
         ) : null}
       </header>
 
-      <div className="sk-summary-grid">
-        <article className="sk-summary-card">
-          <h3>Youth Residents</h3>
-          <p>{residentsLoading ? "..." : youthResidents.length}</p>
-        </article>
-        <article className="sk-summary-card">
-          <h3>Active Programs</h3>
-          <p>{activePrograms.length}</p>
-        </article>
-        <article className="sk-summary-card">
-          <h3>Upcoming Events</h3>
-          <p>{upcomingEvents.length}</p>
-        </article>
-        <article className="sk-summary-card">
-          <h3>Open Feedback</h3>
-          <p>{pendingFeedback.length}</p>
-        </article>
+      <nav className="sk-tab-grid" aria-label="Youth sections" role="tablist">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            role="tab"
+            aria-selected={activeSection === tab.key}
+            className={`sk-tab-card ${activeSection === tab.key ? "active" : ""}`}
+            onClick={() => handleTabClick(tab)}
+          >
+            <span className="sk-tab-icon" aria-hidden="true">{SECTION_ICONS[tab.key]}</span>
+            <span className="sk-tab-body">
+              <span className="sk-tab-title">{tab.title}</span>
+              <strong className="sk-tab-value">{residentsLoading && tab.key === "registry" ? "…" : tab.value}</strong>
+            </span>
+          </button>
+        ))}
+      </nav>
+
+      <div className="sk-active-panel">
+        {activeSection === "registry" && (
+          <section className="tool-section">
+            <h3>📋 Youth Registry</h3>
+            <YouthRegistry residents={youthResidents} loading={residentsLoading} />
+          </section>
+        )}
+
+        {activeSection === "programs" && (
+          <section className="tool-section">
+            <h3>{isProgramAddRoute ? "➕ Add Program" : "🎯 Program List"}</h3>
+            <ProgramList programs={programs} formOnly={isProgramAddRoute} />
+          </section>
+        )}
+
+        {activeSection === "events" && (
+          <section className="tool-section">
+            <h3>{isEventAddRoute ? "➕ Add Event" : "📅 Event Calendar"}</h3>
+            <EventCalendar events={events} formOnly={isEventAddRoute} />
+          </section>
+        )}
+
+        {activeSection === "feedback" && (
+          <section className="tool-section">
+            <h3>💬 Youth Feedback</h3>
+            <YouthFeedbackForm feedbackItems={feedback} />
+          </section>
+        )}
       </div>
-
-      {isAdminOversight ? (
-        <>
-          <div className="sk-nav-grid">
-            {quickNav.map((item) => (
-              <button
-                key={item.title}
-                type="button"
-                className={`sk-nav-card ${adminOversightSection === item.key ? "active" : ""}`}
-                onClick={() => setAdminOversightSection(item.key)}
-              >
-                <span>{item.title}</span>
-                <strong>{item.value}</strong>
-              </button>
-            ))}
-          </div>
-
-          <div className="sk-tools sk-tools-oversight">
-            {shouldShowSection("registry") ? (
-              <section className="tool-section" ref={registryRef}>
-                <h3>📋 Youth Registry</h3>
-                <YouthRegistry residents={youthResidents} loading={residentsLoading} />
-              </section>
-            ) : null}
-
-            {shouldShowSection("programs") ? (
-              <section className="tool-section" ref={programsRef}>
-                <h3>🎯 Program List</h3>
-                <ProgramList programs={programs} />
-              </section>
-            ) : null}
-
-            {shouldShowSection("events") ? (
-              <section className="tool-section" ref={eventsRef}>
-                <h3>📅 Event Calendar</h3>
-                <EventCalendar events={events} />
-              </section>
-            ) : null}
-
-            {shouldShowSection("feedback") ? (
-              <section className="tool-section" ref={feedbackRef}>
-                <h3>💬 Youth Feedback</h3>
-                <YouthFeedbackForm feedbackItems={feedback} />
-              </section>
-            ) : null}
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="sk-nav-grid">
-            {quickNav.map((item) => (
-              <button
-                key={item.title}
-                type="button"
-                className={`sk-nav-card ${activeSection === item.key ? "active" : ""}`}
-                onClick={() => handleScrollTo(item.ref, item.path)}
-              >
-                <span>{item.title}</span>
-                <strong>{item.value}</strong>
-              </button>
-            ))}
-          </div>
-
-          <div className="sk-tools">
-            {shouldShowSection("registry") ? (
-            <section className="tool-section" ref={registryRef}>
-              <h3>📋 Youth Registry</h3>
-              <YouthRegistry residents={youthResidents} loading={residentsLoading} />
-            </section>
-            ) : null}
-
-            {shouldShowSection("programs") ? (
-            <section className="tool-section" ref={programsRef}>
-              <h3>{isProgramAddRoute ? "➕ Add Program" : "🎯 Program List"}</h3>
-              <ProgramList programs={programs} formOnly={isProgramAddRoute} />
-            </section>
-            ) : null}
-
-            {shouldShowSection("events") ? (
-            <section className="tool-section" ref={eventsRef}>
-              <h3>{isEventAddRoute ? "➕ Add Event" : "📅 Event Calendar"}</h3>
-              <EventCalendar events={events} formOnly={isEventAddRoute} />
-            </section>
-            ) : null}
-
-            {shouldShowSection("feedback") ? (
-            <section className="tool-section" ref={feedbackRef}>
-              <h3>💬 Youth Feedback</h3>
-              <YouthFeedbackForm feedbackItems={feedback} />
-            </section>
-            ) : null}
-          </div>
-        </>
-      )}
     </section>
   );
 };

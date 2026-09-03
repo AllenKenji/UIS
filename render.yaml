@@ -15,17 +15,17 @@ services:
         sync: false
       - key: CORS_ORIGINS
         sync: false
-      - key: CFDP_PROVISION_URL
+      - key: FDP_PROVISION_URL
         sync: false
-      - key: CFDP_PROVISION_API_KEY
+      - key: FDP_PROVISION_API_KEY
         sync: false
-      - key: CFDP_PROVISION_REQUIRED
+      - key: FDP_PROVISION_REQUIRED
         value: "false"
-      - key: CFDP_TO_BIS_PROVISION_API_KEY
+      - key: FDP_TO_BIS_PROVISION_API_KEY
         sync: false
-      - key: CFDP_SURVEY_BASE_URL
+      - key: FDP_SURVEY_BASE_URL
         sync: false
-      - key: CFDP_SURVEY_HANDOFF_SECRET
+      - key: FDP_SURVEY_HANDOFF_SECRET
         sync: false
 
   - type: static
@@ -38,7 +38,7 @@ services:
         sync: false
       - key: REACT_APP_WS_BASE_URL
         sync: false
-      - key: REACT_APP_CFDP_SURVEY_URL
+      - key: REACT_APP_FDP_SURVEY_URL
         sync: false
     routes:
       - type: rewrite

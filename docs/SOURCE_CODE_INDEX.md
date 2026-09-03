@@ -120,7 +120,7 @@ Frontend variables observed in source:
 
 - `REACT_APP_API_BASE_URL`
 - `REACT_APP_WS_BASE_URL`
-- `REACT_APP_CFDP_SURVEY_URL`
+- `REACT_APP_FDP_SURVEY_URL`
 
 ## Local Run Reference
 

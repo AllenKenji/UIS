@@ -20,7 +20,7 @@ from backend.app.services.account_service import (
 from backend.app.core.auth import get_admin_uid, get_current_user, require_permission, resolve_tenant_scope, get_db
 from backend.app.core.local_auth import authenticate, issue_token
 from backend.app.services.email_service import send_email
-from backend.app.services.tenant_service import require_tenant_exists
+from backend.app.services.tenant_service import get_tenant, require_tenant_exists
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -38,7 +38,7 @@ class RoleUpdatePayload(BaseModel):
     role: RoleEnum
 
 
-class CfdpProvisionPayload(BaseModel):
+class FdpProvisionPayload(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=128)
@@ -105,7 +105,7 @@ async def switch_role(payload: SwitchRolePayload, user: dict = Depends(get_curre
 
 
 def _get_survey_handoff_secret() -> str:
-    return os.environ.get("CFDP_SURVEY_HANDOFF_SECRET", "cfdp-survey-handoff-dev-secret").strip()
+    return os.environ.get("FDP_SURVEY_HANDOFF_SECRET", "fdp-survey-handoff-dev-secret").strip()
 
 
 def _base64url_encode(data: bytes) -> str:
@@ -123,11 +123,11 @@ def _sign_handoff_payload(payload: dict) -> str:
 
 
 def _derive_survey_base_url() -> str:
-    explicit = os.environ.get("CFDP_SURVEY_BASE_URL", "").strip().rstrip("/")
+    explicit = os.environ.get("FDP_SURVEY_BASE_URL", "").strip().rstrip("/")
     if explicit:
         return explicit
 
-    provision_url = os.environ.get("CFDP_PROVISION_URL", "").strip()
+    provision_url = os.environ.get("FDP_PROVISION_URL", "").strip()
     if not provision_url:
         return ""
 
@@ -385,18 +385,18 @@ async def list_accounts_handler(
 
 
 @router.post(
-    "/internal/cfdp/provision-account",
+    "/internal/fdp/provision-account",
     response_model=AccountResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Provision BIS account from CFDP",
-    description="Internal endpoint used by CFDP to create surveyor/supervisor BIS accounts.",
+    summary="Provision BIS account from FDP",
+    description="Internal endpoint used by FDP to create surveyor/supervisor BIS accounts.",
 )
-async def provision_account_from_cfdp(
-    payload: CfdpProvisionPayload,
-    x_cfdp_provision_key: str | None = Header(default=None),
+async def provision_account_from_fdp(
+    payload: FdpProvisionPayload,
+    x_fdp_provision_key: str | None = Header(default=None),
 ) -> AccountResponse:
-    expected_key = os.environ.get("CFDP_TO_BIS_PROVISION_API_KEY", "").strip()
-    provided_key = (x_cfdp_provision_key or "").strip()
+    expected_key = os.environ.get("FDP_TO_BIS_PROVISION_API_KEY", "").strip()
+    provided_key = (x_fdp_provision_key or "").strip()
 
     if not expected_key or provided_key != expected_key:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
@@ -407,7 +407,7 @@ async def provision_account_from_cfdp(
             detail="Only surveyor or supervisor roles are allowed",
         )
 
-    created_by = f"cfdp:{(payload.requestedBy or 'system').strip() or 'system'}"
+    created_by = f"fdp:{(payload.requestedBy or 'system').strip() or 'system'}"
     create_payload = AccountCreate(
         full_name=payload.name,
         email=payload.email,
@@ -419,16 +419,16 @@ async def provision_account_from_cfdp(
         create_barangay_account,
         create_payload,
         created_by=created_by,
-        skip_cfdp_provision=True,
+        skip_fdp_provision=True,
     )
 
 
 @router.post(
-    "/internal/cfdp/survey-handoff",
+    "/internal/fdp/survey-handoff",
     response_model=SurveyHandoffResponse,
     status_code=status.HTTP_200_OK,
     summary="Create a survey login handoff",
-    description="Creates a short-lived signed URL that logs an admin, surveyor, or supervisor into CFDP.",
+    description="Creates a short-lived signed URL that logs an admin, surveyor, or supervisor into FDP.",
 )
 async def create_survey_handoff(user: dict = Depends(get_current_user)) -> SurveyHandoffResponse:
     uid = str(user.get("uid") or "").strip()
@@ -455,6 +455,22 @@ async def create_survey_handoff(user: dict = Depends(get_current_user)) -> Surve
         or email
     ).strip()
 
+    # Carry over this account's own registered barangay/city so FDP can
+    # auto-fill Section A's location instead of asking the person to set it
+    # again in its own Settings — BIS is the authoritative source for this
+    # assignment. super_admin accounts have no barangayId, so they still
+    # fall back to setting it manually on the FDP side.
+    barangay_id = str(profile.get("barangayId") or user.get("barangayId") or "").strip()
+    municipality = None
+    barangay = None
+    if barangay_id:
+        try:
+            tenant = get_tenant(barangay_id)
+            municipality = tenant.city
+            barangay = tenant.barangay
+        except HTTPException:
+            logger.warning("⚠️ Survey handoff: barangayId %s not found for UID %s", barangay_id, uid)
+
     issued_at = int(time.time())
     payload = {
         "uid": uid,
@@ -464,13 +480,16 @@ async def create_survey_handoff(user: dict = Depends(get_current_user)) -> Surve
         "iat": issued_at,
         "exp": issued_at + 300,
     }
+    if municipality and barangay:
+        payload["municipality"] = municipality
+        payload["barangay"] = barangay
     token = _sign_handoff_payload(payload)
 
     survey_base_url = _derive_survey_base_url()
     if not survey_base_url:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="CFDP survey base URL is not configured. Set CFDP_SURVEY_BASE_URL or CFDP_PROVISION_URL.",
+            detail="FDP survey base URL is not configured. Set FDP_SURVEY_BASE_URL or FDP_PROVISION_URL.",
         )
 
     redirect_url = f"{survey_base_url}/api/internal/auth/handoff?token={quote(token, safe='')}"

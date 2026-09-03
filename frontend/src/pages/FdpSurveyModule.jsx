@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { api } from "../services/api";
-import "./cfdp-survey-module.css";
+import "./fdp-survey-module.css";
 
-const CFDP_DEFAULT_URL = "http://localhost:3001";
+const FDP_DEFAULT_URL = "http://localhost:3001";
 
-const CfdpSurveyModule = () => {
-  const cfdpUrl = import.meta.env.VITE_CFDP_SURVEY_URL || CFDP_DEFAULT_URL;
-  const [resolvedUrl, setResolvedUrl] = useState(cfdpUrl);
+const FdpSurveyModule = () => {
+  const fdpUrl = import.meta.env.VITE_FDP_SURVEY_URL || FDP_DEFAULT_URL;
+  const [resolvedUrl, setResolvedUrl] = useState(fdpUrl);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -14,17 +14,17 @@ const CfdpSurveyModule = () => {
 
     const loadHandoffUrl = async () => {
       try {
-        const { data } = await api.post("/api/internal/cfdp/survey-handoff");
+        const { data } = await api.post("/api/internal/fdp/survey-handoff");
         if (!cancelled && data?.redirectUrl) {
           setResolvedUrl(data.redirectUrl);
           return;
         }
       } catch (error) {
-        console.warn("Survey handoff unavailable, using direct CFDP URL:", error);
+        console.warn("Survey handoff unavailable, using direct FDP URL:", error);
       }
 
       if (!cancelled) {
-        setResolvedUrl(cfdpUrl);
+        setResolvedUrl(fdpUrl);
       }
     };
 
@@ -37,36 +37,36 @@ const CfdpSurveyModule = () => {
     return () => {
       cancelled = true;
     };
-  }, [cfdpUrl]);
+  }, [fdpUrl]);
 
   return (
-    <section className="cfdp-module-page" aria-label="CFDP Survey System">
-      <header className="cfdp-module-header">
+    <section className="fdp-module-page" aria-label="FDP Survey System">
+      <header className="fdp-module-header">
         <div>
-          <h2>CFDP Survey System</h2>
+          <h2>FDP Survey System</h2>
           <p>
             Embedded integration from BIS. Configure the source via
-            VITE_CFDP_SURVEY_URL.
+            VITE_FDP_SURVEY_URL.
           </p>
         </div>
         <a
           href={resolvedUrl}
           target="_blank"
           rel="noreferrer"
-          className="cfdp-open-tab-btn"
+          className="fdp-open-tab-btn"
         >
           Open in New Tab
         </a>
       </header>
 
-      <div className="cfdp-iframe-shell">
+      <div className="fdp-iframe-shell">
         {loading ? (
-          <div className="cfdp-survey-loading">Preparing your survey session...</div>
+          <div className="fdp-survey-loading">Preparing your survey session...</div>
         ) : (
           <iframe
-            title="CFDP Survey System"
+            title="FDP Survey System"
             src={resolvedUrl}
-            className="cfdp-survey-iframe"
+            className="fdp-survey-iframe"
             loading="lazy"
             referrerPolicy="strict-origin-when-cross-origin"
             allow="clipboard-read; clipboard-write"
@@ -77,4 +77,4 @@ const CfdpSurveyModule = () => {
   );
 };
 
-export default CfdpSurveyModule;
+export default FdpSurveyModule;

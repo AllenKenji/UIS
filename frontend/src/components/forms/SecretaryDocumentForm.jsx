@@ -133,13 +133,14 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
         setFormData(prev => ({
           ...prev,
           businessName: value,
+          businessId: business.businessId || "",
           "location.street": business.street || "",
           "location.barangay": business.barangay || "",
           "location.city": business.city || "",
           "location.province": business.province || ""
         }));
       } else {
-        setFormData(prev => ({ ...prev, businessName: value }));
+        setFormData(prev => ({ ...prev, businessName: value, businessId: "" }));
       }
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
@@ -150,6 +151,18 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
   const handleFileChange = (e, field) => {
     const file = e.target.files[0];
     setAttachments(prev => ({ ...prev, [field]: file }));
+  };
+
+  // An approved business already has a verified record on file (it went
+  // through staff evaluation) — its permit number gets cited on the
+  // clearance automatically, so re-uploading a permit copy is redundant.
+  // Anyone without a linked, approved business still needs to prove it.
+  const hasApprovedBusinessLinked = () => {
+    const resident = residents.find(r => r.id === formData.resident_id);
+    const business = registeredBusinesses.find(
+      b => b.businessName === formData.businessName && b.ownerName === resident?.fullName
+    );
+    return Boolean(business) && String(business.status).toLowerCase() === "approved";
   };
 
   const validateForm = () => {
@@ -175,7 +188,11 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
         return `${field.label} must be at least ${field.min}.`;
     }
 
+    const skipBusinessPermitUpload =
+      formData.document_type === "Business Clearance" && hasApprovedBusinessLinked();
+
     for (const att of attachmentRules) {
+      if (att.name === "businessPermit" && skipBusinessPermitUpload) continue;
       const file = attachments[att.name];
       if (att.required && !file) {
         return `${att.label} is required.`;
@@ -222,13 +239,17 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
         if (loc.province) payload.append("locationProvince", loc.province); 
       }
 
-      if (formData.document_type === "Business Clearance") { 
-        if (loc.barangay) payload.append("locationBarangay", loc.barangay); 
-        if (loc.street) payload.append("locationStreet", loc.street); 
+      if (formData.document_type === "Business Clearance") {
+        if (loc.barangay) payload.append("locationBarangay", loc.barangay);
+        if (loc.street) payload.append("locationStreet", loc.street);
         if (loc.city) payload.append("locationCity", loc.city);
-        if (loc.province) payload.append("locationProvince", loc.province); 
-        // ✅ Add normalized full address 
-        payload.append("address", loc.address); 
+        if (loc.province) payload.append("locationProvince", loc.province);
+        // ✅ Add normalized full address
+        payload.append("address", loc.address);
+        // Links this request to the resident's already-registered business —
+        // if it's approved, the generated clearance cites its permit number
+        // (see document_service.prepare_generator_data).
+        if (formData.businessId) payload.append("businessId", formData.businessId);
       }
 
       fields.forEach(field => {
@@ -413,6 +434,7 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
               const residentBusinesses = resident
                 ? registeredBusinesses.filter(b => b.ownerName === resident.fullName)
                 : [];
+              const selectedBusiness = residentBusinesses.find(b => b.businessName === formData.businessName);
 
               return (
                 <div className="form-group" key={field.name}>
@@ -431,10 +453,18 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
                     </option>
                     {residentBusinesses.map(b => (
                       <option key={b.businessId} value={b.businessName}>
-                        {b.businessName} — {b.barangay}
+                        {b.businessName}
                       </option>
                     ))}
                   </select>
+
+                  {selectedBusiness && (
+                    <p className="business-permit-hint">
+                      {String(selectedBusiness.status).toLowerCase() === "approved"
+                        ? `✅ Registered — Permit No. ${selectedBusiness.businessId} will be cited on the clearance.`
+                        : `⚠️ This business's application is still ${selectedBusiness.status || "pending"} — no permit number will be cited yet.`}
+                    </p>
+                  )}
 
                   {/* 🔹 Show auto-filled business address when selected */}
                   {formData.document_type === "Business Clearance" && formData.businessName && (
@@ -491,20 +521,33 @@ const SecretaryDocumentWorkflow = ({ onCompleted }) => {
             );
           })}
 
-          {documentConfig[formData.document_type]?.attachments?.map(att => (
-            <div className="form-group" key={att.name}>
-              <label htmlFor={att.name}>
-                {att.label} {att.required && <span className="required">*</span>}
-              </label>
-              <input
-                id={att.name}
-                type="file"
-                accept=".jpg,.jpeg,.png,.pdf"
-                required={att.required}
-                onChange={e => handleFileChange(e, att.name)}
-              />
-            </div>
-          ))}
+          {documentConfig[formData.document_type]?.attachments?.map(att => {
+            const isOptionalBusinessPermit =
+              att.name === "businessPermit" &&
+              formData.document_type === "Business Clearance" &&
+              hasApprovedBusinessLinked();
+            const isRequired = att.required && !isOptionalBusinessPermit;
+
+            return (
+              <div className="form-group" key={att.name}>
+                <label htmlFor={att.name}>
+                  {att.label} {isRequired && <span className="required">*</span>}
+                </label>
+                {isOptionalBusinessPermit && (
+                  <p className="business-permit-hint">
+                    ✅ Not required — this business's approved permit is already on file.
+                  </p>
+                )}
+                <input
+                  id={att.name}
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.pdf"
+                  required={isRequired}
+                  onChange={e => handleFileChange(e, att.name)}
+                />
+              </div>
+            );
+          })}
 
                     <button type="submit" className="submit-btn" disabled={!currentSecretary}>
             Create Document (₱{formData.fee})

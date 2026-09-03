@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { useUser } from "../../context/UserContext";
 import { DisbursementsAPI, notifyYouthDataChanged, NotificationsAPI, YouthEventsAPI } from "../../services/api";
+import { uploadLocalFile } from "../../utils/fileUtils";
 import "../../styles/sk.css";
 
 const toDate = (value) => {
@@ -33,7 +34,9 @@ const DISBURSEMENT_CATEGORIES = [
 
 const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
   const { role, userInfo } = useUser();
-  const [form, setForm] = useState({ title: "", date: "", location: "", category: "Miscellaneous", budget: "" });
+  const [form, setForm] = useState({ title: "", date: "", location: "", category: "Miscellaneous", budget: "", description: "", imageUrl: "" });
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
@@ -50,7 +53,9 @@ const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
   };
 
   const clearForm = () => {
-    setForm({ title: "", date: "", location: "", category: "Miscellaneous", budget: "" });
+    setForm({ title: "", date: "", location: "", category: "Miscellaneous", budget: "", description: "", imageUrl: "" });
+    setImageFile(null);
+    setImagePreview("");
     setEditingId(null);
   };
 
@@ -62,7 +67,17 @@ const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
       location: eventItem.location || "",
       category: eventItem.category || "Miscellaneous",
       budget: eventItem.budget != null ? String(eventItem.budget) : "",
+      description: eventItem.description || "",
+      imageUrl: eventItem.imageUrl || "",
     });
+    setImageFile(null);
+    setImagePreview("");
+  };
+
+  const handleImageChange = (event) => {
+    const file = event.target.files?.[0] || null;
+    setImageFile(file);
+    setImagePreview(file ? URL.createObjectURL(file) : "");
   };
 
   const handleDelete = async (eventId) => {
@@ -100,6 +115,16 @@ const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
 
     setSaving(true);
     try {
+      // Upload the photo first (if a new one was picked) so imageUrl is
+      // ready to go into the same create/update call as everything else —
+      // this is what the barangay portal's Programs & Events section reads
+      // (see public_routes._EVENT_FIELDS, already wired to display it).
+      let imageUrl = form.imageUrl || null;
+      if (imageFile) {
+        const uploaded = await uploadLocalFile(userInfo?.uid || "sk", imageFile, "sk_events", `${Date.now()}_${imageFile.name}`);
+        imageUrl = uploaded.url;
+      }
+
       if (editingId) {
         await YouthEventsAPI.update(editingId, {
           title: form.title.trim(),
@@ -107,6 +132,8 @@ const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
           location: form.location.trim(),
           category: form.category.trim(),
           budget,
+          description: form.description.trim(),
+          imageUrl,
         });
         const linkedDisbursement = (await DisbursementsAPI.list()).find(
           (entry) => entry.sourceId === editingId && String(entry.sourceType || "").trim().toLowerCase() === "sk_event"
@@ -122,6 +149,8 @@ const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
           location: form.location.trim(),
           category: form.category.trim(),
           budget,
+          description: form.description.trim(),
+          imageUrl,
         });
 
         if (String(role || "").trim().toLowerCase() === "sk") {
@@ -212,6 +241,20 @@ const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
               value={form.budget}
               onChange={(e) => handleChange("budget", e.target.value)}
             />
+            <textarea
+              className="sk-description-field"
+              placeholder="Description (shown on the barangay portal)"
+              value={form.description}
+              onChange={(e) => handleChange("description", e.target.value)}
+              rows={3}
+            />
+            <label className="sk-photo-field">
+              Photo
+              <input type="file" accept="image/*" onChange={handleImageChange} />
+            </label>
+            {(imagePreview || form.imageUrl) && (
+              <img className="sk-photo-preview" src={imagePreview || form.imageUrl} alt="Event preview" />
+            )}
             <button type="submit" disabled={saving}>{saving ? "Saving..." : editingId ? "Update Event" : "Add Event"}</button>
             {editingId ? (
               <button type="button" className="sk-secondary-btn" onClick={clearForm}>
@@ -230,6 +273,9 @@ const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
         <ul>
           {sortedEvents.map((item) => (
             <li key={item.id}>
+              {item.imageUrl && (
+                <img className="sk-item-photo" src={item.imageUrl} alt={item.title || "Event"} />
+              )}
               <strong>{item.title || "Untitled Event"}</strong>
               <div className="sk-item-meta">
                 <span>{formatDate(item.date || item.eventDate)}</span>
@@ -237,6 +283,7 @@ const EventCalendar = ({ events = [], formOnly = false, readOnly = false }) => {
                 <span>{item.category || "Miscellaneous"}</span>
                 <span>Budget: ₱{Number(item.budget || 0).toLocaleString()}</span>
               </div>
+              {item.description && <p className="sk-item-description">{item.description}</p>}
               {!readOnly ? (
                 <div className="sk-item-actions">
                   <button type="button" className="sk-secondary-btn" onClick={() => handleEdit(item)}>

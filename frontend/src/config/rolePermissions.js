@@ -28,7 +28,7 @@ const rolePermissions = {
   ],
   admin: [
     "viewDashboard",
-    "viewCfdpSurvey",
+    "viewFdpSurvey",
     "createAccount",
     "deleteAccount",
     "updateRole",
@@ -56,11 +56,11 @@ const rolePermissions = {
   ],
   surveyor: [
     "viewDashboard",
-    "viewCfdpSurvey"
+    "viewFdpSurvey"
   ],
   supervisor: [
     "viewDashboard",
-    "viewCfdpSurvey"
+    "viewFdpSurvey"
   ],
   staff: [
     "viewDashboard",

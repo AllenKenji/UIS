@@ -19,6 +19,12 @@
   margin-bottom: 1.2rem;
 }
 
+.business-permit-hint {
+  margin: 0.4rem 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #667085);
+}
+
 .form-group label {
   display: block;
   font-weight: 600;
