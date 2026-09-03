@@ -131,45 +131,42 @@ function buildResidentPayload(
       province: household.province,
       zipCode: trimToUndefined(sectionA.zipCode),
     },
-    householdId: trimToUndefined(sectionA.householdNumber) ?? `CFDP-HH-${household.id}`,
+    householdId: trimToUndefined(sectionA.householdNumber) ?? `FDP-HH-${household.id}`,
     isHeadOfFamily: true,
     voterStatus,
     occupation: trimToUndefined(household.occupation) ?? trimToUndefined(headMember?.occupation),
     remarks: originalCivilStatus && originalCivilStatus.toLowerCase() === "cohabiting"
-      ? `Imported from CFDP survey household ${household.id}. Original civil status: ${originalCivilStatus}.`
-      : `Imported from CFDP survey household ${household.id}.`,
+      ? `Imported from FDP survey household ${household.id}. Original civil status: ${originalCivilStatus}.`
+      : `Imported from FDP survey household ${household.id}.`,
   };
 }
 
-async function findResidentByEmail(email: string) {
-  const url = new URL("api/residents", ensureTrailingSlash(ENV.bisApiBaseUrl));
-  url.searchParams.set("email", email);
-
-  const response = await fetch(url, { method: "GET" });
-  if (!response.ok) {
-    throw new Error(`BIS resident lookup failed (${response.status} ${response.statusText})`);
-  }
-
-  const residents = (await response.json()) as Array<{ id?: string }>;
-  return residents[0];
-}
-
-async function createResident(payload: BisResidentPayload) {
-  const url = new URL("api/residents", ensureTrailingSlash(ENV.bisApiBaseUrl));
+// POST /residents on the BIS side requires an interactive staff login
+// (get_current_user + manageResidents) — this server has no such session, so
+// a plain unauthenticated call there always 401s. /internal/fdp/provision-resident
+// is the service-to-service counterpart (same trust boundary/API key as
+// bisAccountProvision.ts's /internal/fdp/provision-account) that does the
+// find-or-create in one authenticated call instead.
+async function provisionResident(
+  payload: BisResidentPayload,
+  provisionKey: string,
+): Promise<{ id?: string; created: boolean }> {
+  const url = new URL("api/internal/fdp/provision-resident", ensureTrailingSlash(ENV.bisApiBaseUrl));
   const response = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "x-fdp-provision-key": provisionKey,
     },
     body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
     const detail = await response.text().catch(() => response.statusText);
-    throw new Error(`BIS resident creation failed (${response.status} ${response.statusText}): ${detail}`);
+    throw new Error(`BIS resident provisioning failed (${response.status} ${response.statusText}): ${detail}`);
   }
 
-  return (await response.json()) as { id?: string };
+  return (await response.json()) as { id?: string; created: boolean };
 }
 
 export async function syncSurveyToBisResident(
@@ -178,6 +175,11 @@ export async function syncSurveyToBisResident(
 ): Promise<SyncResult> {
   if (!ENV.bisApiBaseUrl) {
     return { status: "disabled" };
+  }
+
+  const provisionKey = String(ENV.bisAccountProvisionApiKey || "").trim();
+  if (!provisionKey) {
+    return { status: "skipped", reason: "bis_provision_api_key_not_configured" };
   }
 
   if (!household || !survey) {
@@ -189,13 +191,10 @@ export async function syncSurveyToBisResident(
     return { status: "skipped", reason: "missing_required_identity_fields" };
   }
 
-  const existing = await findResidentByEmail(payload.email);
-  if (existing) {
-    return { status: "exists", residentId: existing.id };
-  }
-
-  const created = await createResident(payload);
-  return { status: "created", residentId: created.id };
+  const result = await provisionResident(payload, provisionKey);
+  return result.created
+    ? { status: "created", residentId: result.id }
+    : { status: "exists", residentId: result.id };
 }
 
 export { buildResidentPayload };

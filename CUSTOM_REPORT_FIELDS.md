@@ -1,6 +1,6 @@
 # Custom Report Builder - Available Fields
 
-The Custom Report Builder now includes **89 data fields** organized into **17 categories**, covering all sections of the comprehensive CFDP survey form.
+The Custom Report Builder now includes **89 data fields** organized into **17 categories**, covering all sections of the comprehensive FDP survey form.
 
 ## Field Categories and Count
 

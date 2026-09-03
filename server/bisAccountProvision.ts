@@ -22,10 +22,10 @@ function buildProvisionUrl(): string {
   const base = String(ENV.bisApiBaseUrl || "").trim();
   if (!base) return "";
 
-  return new URL("api/internal/cfdp/provision-account", base.endsWith("/") ? base : `${base}/`).toString();
+  return new URL("api/internal/fdp/provision-account", base.endsWith("/") ? base : `${base}/`).toString();
 }
 
-export async function provisionBisAccountFromCfdp(input: ProvisionBisAccountInput): Promise<void> {
+export async function provisionBisAccountFromFdp(input: ProvisionBisAccountInput): Promise<void> {
   const strictSync = ENV.bisAccountProvisionRequired;
   if (!BIS_SYNC_ROLES.has(input.role)) {
     return;
@@ -55,7 +55,7 @@ export async function provisionBisAccountFromCfdp(input: ProvisionBisAccountInpu
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-cfdp-provision-key": provisionKey,
+      "x-fdp-provision-key": provisionKey,
     },
     body: JSON.stringify({
       name: input.name,

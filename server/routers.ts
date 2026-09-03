@@ -12,7 +12,7 @@ import { hashPassword, normalizeUsername, verifyPassword } from "./_core/localAu
 import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
 import { ONE_YEAR_MS } from "@shared/const";
-import { provisionBisAccountFromCfdp } from "./bisAccountProvision";
+import { provisionBisAccountFromFdp } from "./bisAccountProvision";
 
 const BIS_PRESENCE_SYNC_ROLES = new Set(["surveyor", "supervisor"]);
 
@@ -20,7 +20,7 @@ function resolveBisPresenceUrl(): string {
   const baseUrl = String(ENV.bisApiBaseUrl || "").trim();
   if (!baseUrl) return "";
   return new URL(
-    "api/internal/cfdp/presence",
+    "api/internal/fdp/presence",
     baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`
   ).toString();
 }
@@ -73,7 +73,7 @@ async function syncBisPresenceLease(
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-cfdp-provision-key": provisionKey,
+        "x-fdp-provision-key": provisionKey,
       },
       body: JSON.stringify({
         uid,
@@ -102,6 +102,20 @@ export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
+    // Self-service: a surveyor sets the city/barangay they operate in once
+    // (Settings page) — Section A of every survey they submit auto-fills
+    // from this instead of asking them to pick it again each time.
+    updateLocation: protectedProcedure
+      .input(
+        z.object({
+          municipality: z.string().min(1),
+          barangay: z.string().min(1),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        await db.updateUserLocation(ctx.user.id, input);
+        return { success: true } as const;
+      }),
     syncBisPresence: protectedProcedure
       .input(
         z.object({
@@ -222,7 +236,7 @@ export const appRouter = router({
           isActive: true,
         });
 
-        await provisionBisAccountFromCfdp({
+        await provisionBisAccountFromFdp({
           name: input.name,
           username,
           password: input.password,

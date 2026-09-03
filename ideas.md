@@ -1,4 +1,4 @@
-# Design Brainstorming: CFDP Survey System
+# Design Brainstorming: FDP Survey System
 
 ## Response 1
 <response>

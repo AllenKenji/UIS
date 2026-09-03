@@ -1,26 +1,26 @@
-# CFDP Render Setup
+# FDP Render Setup
 
 ## Fast path (Render Blueprint)
 
 This repository now includes [render.yaml](render.yaml).
 
 In Render, use New + Blueprint and point it to this repo/branch.
-Render will create the cfdp-survey web service.
+Render will create the fdp-survey web service.
 
 Then set all environment variables marked sync: false.
 
 ## Services to create
 
-Create two Render services for CFDP:
+Create two Render services for FDP:
 
-1. Web Service: CFDP server
-2. Static Site: CFDP client
+1. Web Service: FDP server
+2. Static Site: FDP client
 
 You also need a managed PostgreSQL database for production.
 
 ## 1) Server service (Web Service)
 
-- Root directory: `cfdp-survey-system`
+- Root directory: `fdp-survey-system`
 - Runtime: Node
 - Build command:
 
@@ -41,7 +41,7 @@ pnpm start
 - `DATABASE_URL`
 - `JWT_SECRET`
 - `BIS_API_BASE_URL`
-- `BIS_ACCOUNT_PROVISION_API_KEY`
+- `BIS_ACCOUNT_PROVISION_API_KEY` (also used to authenticate resident sync — see `bisSync.ts` — against BIS's `FDP_TO_BIS_PROVISION_API_KEY`)
 - `OAUTH_SERVER_URL` (or `VITE_OAUTH_PORTAL_URL`)
 
 ### Optional environment variables
@@ -49,14 +49,14 @@ pnpm start
 - `DEV_AUTH_BYPASS=false`
 - `LOCAL_AUTH_ENABLED=true`
 - `LOCAL_AUTH_BOOTSTRAP=false`
-- `BIS_ACCOUNT_PROVISION_URL` (defaults to `${BIS_API_BASE_URL}/api/internal/cfdp/provision-account`)
-- `BIS_ACCOUNT_PROVISION_REQUIRED=false` (set `true` to fail CFDP registration when BIS sync fails)
+- `BIS_ACCOUNT_PROVISION_URL` (defaults to `${BIS_API_BASE_URL}/api/internal/fdp/provision-account`)
+- `BIS_ACCOUNT_PROVISION_REQUIRED=false` (set `true` to fail FDP registration when BIS sync fails)
 
 ## 2) Client service (Static Site)
 
 If your client is served by Vite static build:
 
-- Root directory: `cfdp-survey-system`
+- Root directory: `fdp-survey-system`
 - Build command:
 
 ```bash

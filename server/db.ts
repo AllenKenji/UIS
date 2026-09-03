@@ -42,7 +42,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     };
     const updateSet: Record<string, unknown> = {};
 
-    const textFields = ["name", "email", "loginMethod"] as const;
+    const textFields = ["name", "email", "loginMethod", "municipality", "barangay"] as const;
     type TextField = (typeof textFields)[number];
 
     const assignNullable = (field: TextField) => {
@@ -245,6 +245,28 @@ export async function updateUserProfileById(
       name: updates.name,
       email: updates.email,
       role: updates.role,
+    })
+    .where(eq(users.id, userId));
+}
+
+/** Self-service: a surveyor sets the city/barangay they operate in once
+ * (Settings page), which then auto-fills Section A on every survey they
+ * submit — see routers.ts's user.updateLocation and SurveyForm.tsx. */
+export async function updateUserLocation(
+  userId: number,
+  updates: { municipality: string; barangay: string }
+): Promise<void> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  await db
+    .update(users)
+    .set({
+      municipality: updates.municipality,
+      barangay: updates.barangay,
+      updatedAt: new Date(),
     })
     .where(eq(users.id, userId));
 }

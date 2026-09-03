@@ -90,7 +90,7 @@ export default function Layout({ children, role = "admin", userName = "User", us
           C
         </div>
         <div>
-          <h1 className="font-bold text-lg leading-none">CFDP System</h1>
+          <h1 className="font-bold text-lg leading-none">FDP System</h1>
           <p className="text-xs text-muted-foreground mt-1">Provincial Gov</p>
         </div>
       </div>
@@ -124,7 +124,7 @@ export default function Layout({ children, role = "admin", userName = "User", us
           </Avatar>
           <div className="flex-1 overflow-hidden">
             <p className="text-sm font-medium truncate">{userName}</p>
-            <p className="text-xs text-muted-foreground truncate">{userEmail ?? `${role}@cfdp.local`}</p>
+            <p className="text-xs text-muted-foreground truncate">{userEmail ?? `${role}@fdp.local`}</p>
           </div>
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onLogout} title="Sign out">
             <LogOut className="h-4 w-4 text-muted-foreground hover:text-destructive transition-colors" />

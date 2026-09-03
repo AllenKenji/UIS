@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
 
-const FORCE_LOGGED_OUT_KEY = "cfdp-force-logged-out";
+const FORCE_LOGGED_OUT_KEY = "fdp-force-logged-out";
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
@@ -39,7 +39,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-sky-100 via-blue-50 to-emerald-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md shadow-lg border-blue-100">
         <CardHeader className="space-y-2">
-          <CardTitle className="text-2xl">CFDP Survey System</CardTitle>
+          <CardTitle className="text-2xl">FDP Survey System</CardTitle>
           <CardDescription>Sign in to continue to your standalone survey workspace.</CardDescription>
         </CardHeader>
         <CardContent>

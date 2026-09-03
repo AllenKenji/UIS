@@ -27,7 +27,7 @@ export type SessionPayload = {
 const EXCHANGE_TOKEN_PATH = `/webdev.v1.WebDevAuthPublicService/ExchangeToken`;
 const GET_USER_INFO_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfo`;
 const GET_USER_INFO_WITH_JWT_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfoWithJwt`;
-const FALLBACK_APP_ID = "cfdp-standalone";
+const FALLBACK_APP_ID = "fdp-standalone";
 
 class OAuthService {
   constructor(private client: ReturnType<typeof axios.create>) {

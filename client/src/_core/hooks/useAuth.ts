@@ -8,7 +8,7 @@ type UseAuthOptions = {
   redirectPath?: string;
 };
 
-const FORCE_LOGGED_OUT_KEY = "cfdp-force-logged-out";
+const FORCE_LOGGED_OUT_KEY = "fdp-force-logged-out";
 const FORCE_LOGGED_OUT_TTL_MS = 30000;
 
 export function useAuth(options?: UseAuthOptions) {
@@ -38,7 +38,7 @@ export function useAuth(options?: UseAuthOptions) {
   const bisPresenceSessionId = useMemo(() => {
     if (typeof window === "undefined") return "server";
 
-    const storageKey = "cfdp-bis-presence-session-id";
+    const storageKey = "fdp-bis-presence-session-id";
     const existing = window.sessionStorage.getItem(storageKey);
     if (existing) return existing;
 

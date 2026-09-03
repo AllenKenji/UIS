@@ -22,6 +22,11 @@ type SurveyHandoffPayload = {
   role: string;
   iat: number;
   exp: number;
+  // The BIS account's own registered barangay/city, if it has one (every
+  // role but super_admin does) — lets the handoff auto-fill Section A's
+  // location instead of asking the person to set it again in Settings.
+  municipality?: string;
+  barangay?: string;
 };
 
 const normalizeBasePath = (value: string | undefined) => {
@@ -93,7 +98,9 @@ const decodeSurveyHandoff = (token: string): SurveyHandoffPayload | null => {
       typeof payload.name !== "string" ||
       typeof payload.role !== "string" ||
       typeof payload.iat !== "number" ||
-      typeof payload.exp !== "number"
+      typeof payload.exp !== "number" ||
+      (payload.municipality !== undefined && typeof payload.municipality !== "string") ||
+      (payload.barangay !== undefined && typeof payload.barangay !== "string")
     ) {
       return null;
     }
@@ -180,7 +187,7 @@ async function startServer() {
       const usernameCandidate = normalizeUsername(email);
       const existingUsername = await db.getLocalCredentialByUsername(usernameCandidate);
       if (existingUsername && existingUsername.userId !== user.id) {
-        res.status(409).json({ detail: "Username already exists in CFDP" });
+        res.status(409).json({ detail: "Username already exists in FDP" });
         return;
       }
 
@@ -204,8 +211,8 @@ async function startServer() {
         },
       });
     } catch (err) {
-      console.error("[BIS Provision] Failed to provision CFDP user", err);
-      res.status(500).json({ detail: "Failed to provision CFDP user" });
+      console.error("[BIS Provision] Failed to provision FDP user", err);
+      res.status(500).json({ detail: "Failed to provision FDP user" });
     }
   });
 
@@ -256,6 +263,12 @@ async function startServer() {
       email: payload.email,
       loginMethod: user?.loginMethod ?? "bis-handoff",
       role: role as "admin" | "surveyor" | "supervisor",
+      // BIS is authoritative for which barangay/city this account belongs
+      // to — sync it on every handoff so a BIS-side reassignment follows
+      // through here too. Only super_admin accounts (no barangay in BIS)
+      // send neither, in which case whatever's already set here is kept.
+      municipality: payload.municipality ?? user?.municipality,
+      barangay: payload.barangay ?? user?.barangay,
       lastSignedIn: new Date(),
     });
 

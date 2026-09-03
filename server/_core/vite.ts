@@ -20,7 +20,9 @@ export async function setupVite(app: Express, server: Server, basePath = "") {
     appType: "custom",
   });
 
-  app.use(vite.middlewares);
+  // Mount Vite where the SPA is exposed so its root middleware does not
+  // return a 404 before the FDP base-path fallback can render index.html.
+  app.use(basePath || "/", vite.middlewares);
   app.use(`${basePath || ""}*`, async (req, res, next) => {
     const url = req.originalUrl;
 

@@ -31,6 +31,11 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: roleEnum("role").default("user").notNull(),
+  /** The surveyor's own assigned city/municipality and barangay — set once
+   * in Settings, then used to auto-fill Section A (Identification) on every
+   * survey they conduct, since a surveyor only ever works within one. */
+  municipality: varchar("municipality", { length: 255 }),
+  barangay: varchar("barangay", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),

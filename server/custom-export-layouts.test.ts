@@ -179,7 +179,7 @@ describe('Custom Export Layouts', () => {
         fontSize: 'medium' as const,
         orientation: 'portrait' as const,
         pageSize: 'A4' as const,
-        headerText: 'CFDP Survey Report',
+        headerText: 'FDP Survey Report',
         footerText: 'Confidential',
         includeTimestamp: true,
         includePageNumbers: true,

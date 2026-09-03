@@ -14,6 +14,9 @@ import { trpc } from "@/lib/trpc";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/_core/hooks/useAuth";
+// Shared with Settings.tsx, where a surveyor picks their own Province → City
+// → Barangay once — Section A below just auto-fills from that saved choice.
+import { getProvinceForMunicipality } from "@/lib/bisLocations";
 
 const steps = [
   { id: 1, title: "A. Identification", description: "Household Location & Interview Details" },
@@ -30,59 +33,6 @@ const steps = [
   { id: 12, title: "Review", description: "Verify and Submit" },
 ];
 
-type BisLocationConfig = {
-  province: string;
-  barangays: string[];
-  districts: string[];
-  barangayToDistrict: Record<string, string>;
-};
-
-// BIS master location reference (BIS frontend src/data/locations.js)
-const BIS_MASTER_LOCATIONS: Record<string, BisLocationConfig> = {
-  "Parañaque": {
-    province: "Metro Manila",
-    barangays: [
-      "Baclaran",
-      "BF Homes",
-      "Don Bosco",
-      "Don Galo",
-      "La Huerta",
-      "Marcelo Green",
-      "Merville",
-      "Moonwalk",
-      "San Dionisio",
-      "San Isidro",
-      "San Antonio",
-      "San Martin de Porres",
-      "Santo Niño",
-      "Sun Valley",
-      "Tambo",
-      "Vitalez",
-    ],
-    // Parañaque is split into 2 legislative districts.
-    districts: ["1", "2"],
-    barangayToDistrict: {
-      "Baclaran": "1",
-      "Don Galo": "1",
-      "La Huerta": "1",
-      "San Dionisio": "1",
-      "San Isidro": "1",
-      "Santo Niño": "1",
-      "Tambo": "1",
-      "Vitalez": "1",
-      "BF Homes": "2",
-      "Don Bosco": "2",
-      "Marcelo Green": "2",
-      "Merville": "2",
-      "Moonwalk": "2",
-      "San Antonio": "2",
-      "San Martin de Porres": "2",
-      "Sun Valley": "2",
-    },
-  },
-};
-
-const BIS_MASTER_MUNICIPALITIES = Object.keys(BIS_MASTER_LOCATIONS);
 
 // ── Form State Types ──────────────────────────────────────────────────────────
 interface SectionAData {
@@ -90,7 +40,6 @@ interface SectionAData {
   dateOfInterview: string;
   municipality: string;
   barangay: string;
-  district: string;
   enumeratorName: string;
   houseNumber: string;
   street: string;
@@ -246,7 +195,6 @@ export default function SurveyForm() {
     dateOfInterview: new Date().toISOString().split("T")[0],
     municipality: "",
     barangay: "",
-    district: "",
     enumeratorName: "",
     houseNumber: "",
     street: "",
@@ -427,7 +375,7 @@ export default function SurveyForm() {
 
   // ── Offline & Draft ───────────────────────────────────────────────────────
   useEffect(() => {
-    const savedDraft = localStorage.getItem("survey_draft_cfdp_2025");
+    const savedDraft = localStorage.getItem("survey_draft_fdp_2025");
     if (savedDraft) {
       try {
         const parsed = JSON.parse(savedDraft);
@@ -461,6 +409,19 @@ export default function SurveyForm() {
     };
   }, []);
 
+  // Auto-fill City/Municipality and Barangay from the surveyor's own
+  // assigned location (set once in Settings) — always wins over a
+  // restored draft's copy, since a surveyor only ever works within one
+  // barangay and this should reflect their current assignment.
+  useEffect(() => {
+    if (!user?.municipality || !user?.barangay) return;
+    setSectionA((prev) => ({
+      ...prev,
+      municipality: user.municipality ?? "",
+      barangay: user.barangay ?? "",
+    }));
+  }, [user?.municipality, user?.barangay]);
+
   useEffect(() => {
     const draft = {
       step: currentStep, sectionA, sectionB, members, sectionC, sectionE,
@@ -468,7 +429,7 @@ export default function SurveyForm() {
       dwellingPhoto, idPhoto, dwellingLocation, idLocation,
       lastUpdated: new Date().toISOString(),
     };
-    localStorage.setItem("survey_draft_cfdp_2025", JSON.stringify(draft));
+    localStorage.setItem("survey_draft_fdp_2025", JSON.stringify(draft));
   }, [currentStep, sectionA, sectionB, members, sectionC, sectionE, sectionF, sectionG, sectionH, sectionI, sectionK, dwellingPhoto, idPhoto, dwellingLocation, idLocation]);
 
   useEffect(() => {
@@ -530,42 +491,10 @@ export default function SurveyForm() {
   const toggleArrayItem = (arr: string[], item: string): string[] =>
     arr.includes(item) ? arr.filter((i) => i !== item) : [...arr, item];
 
-  const handleMunicipalityChange = (municipality: string) => {
-    const config = BIS_MASTER_LOCATIONS[municipality];
-    setSectionA((prev) => ({
-      ...prev,
-      municipality,
-      barangay: config?.barangays?.includes(prev.barangay) ? prev.barangay : "",
-      district: config?.districts?.includes(prev.district) ? prev.district : "",
-    }));
-  };
-
-  const handleBarangayChange = (barangay: string) => {
-    setSectionA((prev) => ({
-      ...prev,
-      barangay,
-    }));
-  };
-
-  const handleDistrictChange = (district: string) => {
-    setSectionA((prev) => {
-      const cityConfig = BIS_MASTER_LOCATIONS[prev.municipality];
-      const barangayIsInDistrict = cityConfig?.barangayToDistrict?.[prev.barangay] === district;
-      return {
-        ...prev,
-        district,
-        barangay: barangayIsInDistrict ? prev.barangay : "",
-      };
-    });
-  };
-
-  const selectedCityConfig = BIS_MASTER_LOCATIONS[sectionA.municipality];
-  const availableBarangays = !sectionA.district
-    ? []
-    : (selectedCityConfig?.barangays ?? []).filter(
-        (barangay) => selectedCityConfig?.barangayToDistrict?.[barangay] === sectionA.district,
-      );
-  const availableDistricts = selectedCityConfig?.districts ?? [];
+  // City/Municipality and Barangay are no longer picked here — they're
+  // auto-filled from the surveyor's own assigned location (see the effect
+  // above and Settings.tsx). Province is derived from the auto-filled city.
+  const sectionAProvince = getProvinceForMunicipality(sectionA.municipality);
 
   const getBisProvisioningError = (): string | null => {
     const errors: Partial<Record<SubmitFieldErrorKey, string>> = {};
@@ -579,10 +508,10 @@ export default function SurveyForm() {
     const headBirthDate = sectionB.headBirthDate ?? "";
 
     if (!municipality) {
-      errors.municipality = "City/Municipality is required for BIS account creation.";
+      errors.municipality = "Set your assigned City/Municipality in Settings before surveying.";
     }
     if (!barangay) {
-      errors.barangay = "Barangay is required for BIS account creation.";
+      errors.barangay = "Set your assigned Barangay in Settings before surveying.";
     }
     if (!houseNumber) {
       errors.houseNumber = "House number is required for BIS account creation.";
@@ -651,7 +580,7 @@ export default function SurveyForm() {
         const household = await createHousehold.mutateAsync({
           barangay: sectionA.barangay.trim(),
           municipality: sectionA.municipality.trim(),
-          province: BIS_MASTER_LOCATIONS[sectionA.municipality.trim()]?.province ?? "Metro Manila",
+          province: getProvinceForMunicipality(sectionA.municipality.trim()) || "Metro Manila",
           headOfFamily: sectionB.headName || "Unknown",
           age: parseInt(sectionB.headAge || "0"),
           civilStatus: sectionB.headCivilStatus,
@@ -675,7 +604,7 @@ export default function SurveyForm() {
             dateOfInterview: sectionA.dateOfInterview,
             municipality: sectionA.municipality,
             barangay: sectionA.barangay,
-            district: sectionA.district,
+            province: sectionAProvince,
             enumeratorName: sectionA.enumeratorName,
             houseNumber: sectionA.houseNumber,
             street: sectionA.street,
@@ -803,7 +732,7 @@ export default function SurveyForm() {
 
         toast.dismiss();
         toast.success("Survey submitted successfully!");
-        localStorage.removeItem("survey_draft_cfdp_2025");
+        localStorage.removeItem("survey_draft_fdp_2025");
         setTimeout(() => setLocation("/surveys"), 1500);
       } catch (error) {
         toast.dismiss();
@@ -847,7 +776,7 @@ export default function SurveyForm() {
           )}
         </div>
         <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Family Survey Questionnaire</h2>
-        <p className="text-muted-foreground">Parañaque Family Development Program (CFDP) — "No Family Left Behind"</p>
+        <p className="text-muted-foreground">Parañaque Family Development Program (FDP) — "No Family Left Behind"</p>
       </div>
 
       {/* Progress Steps */}
@@ -898,6 +827,17 @@ export default function SurveyForm() {
           {/* ── Section A: Household Identification ─────────────────────────── */}
           {currentStep === 1 && (
             <div className="grid gap-6 md:grid-cols-2 animate-in fade-in slide-in-from-right-4 duration-300">
+              {(!user?.municipality || !user?.barangay) && (
+                <div className="md:col-span-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm flex flex-wrap items-center justify-between gap-2">
+                  <span>
+                    City/Municipality and Barangay aren't set for your account yet, so they can't
+                    auto-fill below. Set them once in Settings — every survey you submit will use it after that.
+                  </span>
+                  <Button type="button" size="sm" variant="outline" onClick={() => setLocation("/settings")}>
+                    Go to Settings
+                  </Button>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>Household ID Number</Label>
                 <Input value={sectionA.householdNumber} onChange={(e) => setSectionA({ ...sectionA, householdNumber: e.target.value })} />
@@ -908,42 +848,29 @@ export default function SurveyForm() {
               </div>
               <div className="space-y-2">
                 <Label>City / Municipality</Label>
-                <Select value={sectionA.municipality} onValueChange={handleMunicipalityChange}>
-                  <SelectTrigger className={`w-full ${submitErrors.municipality ? "border-red-500 ring-red-500" : ""}`}><SelectValue placeholder="Select City / Municipality" /></SelectTrigger>
-                  <SelectContent>
-                    {BIS_MASTER_MUNICIPALITIES.map((municipality) => (
-                      <SelectItem key={municipality} value={municipality}>{municipality}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input
+                  className={submitErrors.municipality ? "border-red-500 focus-visible:ring-red-500" : ""}
+                  value={sectionA.municipality || "Not set"}
+                  readOnly
+                  disabled
+                  title="Set in Settings — auto-filled from your assigned location"
+                />
                 {submitErrors.municipality && <p className="text-xs text-red-600">{submitErrors.municipality}</p>}
               </div>
               <div className="space-y-2">
                 <Label>Barangay</Label>
-                <Select value={sectionA.barangay} onValueChange={handleBarangayChange} disabled={!sectionA.municipality || !sectionA.district}>
-                  <SelectTrigger className={`w-full ${submitErrors.barangay ? "border-red-500 ring-red-500" : ""}`}>
-                    <SelectValue
-                      placeholder={!sectionA.municipality ? "Select City / Municipality first" : !sectionA.district ? "Select District first" : "Select Barangay"}
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableBarangays.map((barangay) => (
-                      <SelectItem key={barangay} value={barangay}>{barangay}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input
+                  className={submitErrors.barangay ? "border-red-500 focus-visible:ring-red-500" : ""}
+                  value={sectionA.barangay || "Not set"}
+                  readOnly
+                  disabled
+                  title="Set in Settings — auto-filled from your assigned location"
+                />
                 {submitErrors.barangay && <p className="text-xs text-red-600">{submitErrors.barangay}</p>}
               </div>
               <div className="space-y-2">
-                <Label>Legislative District</Label>
-                <Select value={sectionA.district} onValueChange={handleDistrictChange} disabled={!sectionA.municipality}>
-                  <SelectTrigger className="w-full"><SelectValue placeholder="Select District" /></SelectTrigger>
-                  <SelectContent>
-                    {availableDistricts.map((district) => (
-                      <SelectItem key={district} value={district}>District {district}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Province</Label>
+                <Input value={sectionAProvince || "Not set"} readOnly disabled />
               </div>
               <div className="space-y-2">
                 <Label>Enumerator's Name</Label>

@@ -1,4 +1,4 @@
-name: CFDP CI
+name: FDP CI
 
 on:
   push:

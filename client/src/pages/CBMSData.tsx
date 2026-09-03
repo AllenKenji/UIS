@@ -204,9 +204,7 @@ export default function CBMSData() {
             <MapPin className="w-5 h-5 text-blue-600" />
             <h1 className="text-2xl font-bold text-gray-900">CBMS 13+1 Core Indicators</h1>
           </div>
-          <p className="text-gray-500 text-sm">
-            Barangay filter is synchronized with BIS-linked barangay records and combined with approved CBMS survey data.
-          </p>
+          <p className="text-gray-500 text-sm">Barangay filter is synchronized with BIS-linked barangay records and combined with approved CBMS survey data.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Shared Barangay Filter */}
