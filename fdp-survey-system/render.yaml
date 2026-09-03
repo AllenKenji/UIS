@@ -1,0 +1,46 @@
+services:
+  - type: web
+    name: fdp-survey
+    runtime: node
+    rootDir: .
+    buildCommand: pnpm install --frozen-lockfile && pnpm build
+    startCommand: pnpm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: BIS_API_BASE_URL
+        sync: false
+      - key: BIS_ACCOUNT_PROVISION_URL
+        sync: false
+      - key: BIS_ACCOUNT_PROVISION_API_KEY
+        sync: false
+      - key: BIS_ACCOUNT_PROVISION_REQUIRED
+        value: "false"
+      - key: OAUTH_SERVER_URL
+        sync: false
+      - key: VITE_OAUTH_PORTAL_URL
+        sync: false
+      - key: FDP_SURVEY_HANDOFF_SECRET
+        sync: false
+      - key: OWNER_OPEN_ID
+        sync: false
+      - key: BUILT_IN_FORGE_API_URL
+        sync: false
+      - key: BUILT_IN_FORGE_API_KEY
+        sync: false
+      - key: VITE_FRONTEND_FORGE_API_KEY
+        sync: false
+      - key: VITE_FRONTEND_FORGE_API_URL
+        sync: false
+      - key: VITE_ANALYTICS_ENDPOINT
+        sync: false
+      - key: VITE_ANALYTICS_WEBSITE_ID
+        sync: false
+      - key: DEV_AUTH_BYPASS
+        value: "false"
+      - key: LOCAL_AUTH_BOOTSTRAP
+        value: "false"

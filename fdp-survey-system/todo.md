@@ -1,0 +1,70 @@
+
+- [x] Connect Dashboard to database for real-time statistics
+- [x] Connect Income Distribution chart to database for real income data
+- [x] Connect Household Master List to database for real household data
+- [x] Connect Household Profile page to database for full survey details
+- [x] Add survey history timeline to Household Profile page
+- [x] Add advanced analytics charts to Dashboard (completion trends, income comparisons)
+- [x] Create Data Validation Dashboard for supervisors
+- [x] Implement data quality checks (incomplete surveys, duplicates, outliers)
+- [x] Add flagging and review system for quality issues
+- [x] Create Barangay Performance Scorecard page
+- [x] Implement data quality metrics calculation (completion rate, error rate)
+- [x] Add visual ranking and comparison features
+- [x] Connect Survey List page to database to display submitted surveys
+- [x] Create dashboard widget for real-time survey status counts and approval trends
+- [x] Add backend API endpoints for status statistics (counts by status, approval rates)
+- [x] Create visual charts for status distribution and approval rate trends
+- [x] Display key metrics (approval rate percentage, pending reviews, average review time)
+- [x] Redesign Reports module with analytical reporting tools
+- [x] Create report templates (Monthly Summary, Barangay Analysis, Program Enrollment)
+- [x] Implement custom report builder with filters and date ranges
+- [x] Add export functionality for PDF, Excel, and CSV formats
+- [x] Add historical comparison and trend analysis features
+- [x] Develop Custom Report Builder with field selection interface
+- [x] Add advanced filters with multiple conditions and AND/OR logic
+- [x] Implement template save/load/edit/delete functionality
+- [x] Add live preview showing filtered results
+- [x] Create backend API for custom report templates and filtered queries
+- [x] Expand Custom Report Builder field selection to include all survey sections (A-K)
+- [x] Add search box to Custom Report Builder for quick field lookup
+- [x] Implement Recent Searches feature with last 5 queries as clickable chips
+- [x] Add autocomplete dropdown to search box with field suggestions and keyboard navigation
+- [x] Create predefined export layouts (Executive Summary, Detailed Data Table, Field Report) with format-specific optimizations
+- [x] Add feature to create and save custom report export layouts
+- [x] Add database schema for custom export layouts
+- [x] Create backend API for layout CRUD operations
+- [x] Build custom layout builder UI with format preferences
+- [x] Implement layout library for viewing and managing saved layouts
+- [x] Add quick-load functionality to apply saved layouts when exporting
+- [x] Implement live preview modal for report layouts
+- [x] Add preview button to Custom Report Builder
+- [x] Create layout-specific rendering for preview (Executive/Detailed/Field/Custom)
+- [x] Add direct export functionality from preview modal
+- [x] Add "Save as Draft" feature to preview modal
+- [x] Create database schema for report drafts
+- [x] Implement backend API for draft CRUD operations
+- [x] Add shareable link generation for drafts
+- [x] Create draft management interface
+- [x] Implement quick-load functionality for saved drafts
+- [x] Add comment thread feature to report drafts
+- [x] Create database schema for draft comments
+- [x] Implement backend API for comment CRUD operations
+- [x] Build comment thread UI component with add/edit/delete functionality
+- [x] Add user attribution and timestamps to comments
+- [x] Integrate comments into Save Draft dialog
+- [x] Create CBMS Data page with all 13+1 indicator categories from the PowerPoint
+- [x] Add CBMS summary widget to Dashboard with key statistics
+- [x] Add CBMS Data navigation link in sidebar
+- [x] Map survey schema fields to CBMS 13+1 indicators
+- [x] Build backend API to compute CBMS indicators from approved survey data
+- [x] Update CBMS Data page to show live vs. baseline comparison
+- [x] Update Dashboard CBMS widget to show dynamic computed values
+- [x] Write unit tests for CBMS indicator computation
+- [x] Add database schema for CBMS threshold configurations
+- [x] Build backend API to evaluate live indicators against thresholds
+- [x] Create threshold configuration UI per indicator
+- [x] Add alert panel to Dashboard for breached thresholds
+- [x] Add inline warning badges to CBMS Live vs. Baseline table
+- [x] Write unit tests for threshold evaluation logic
+- [ ] Fix TRPCClientError on /cbms page (server returning HTML instead of JSON)
